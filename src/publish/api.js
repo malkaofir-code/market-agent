@@ -93,13 +93,14 @@ export async function publish(urls, caption, { dryRun = false } = {}) {
   // FINISHED and only fails at media_publish, which is exactly the
   // symptom here; hiding this behind dryRun meant three live failures
   // taught us nothing.
-  let attached = null;
+  // status_code is the ONLY field Meta documents on a container.
+  // Asking for media_type or children returns "nonexisting field
+  // (code 100)" - a container is not a media object, so there is no
+  // way to introspect what it holds. The children are verified
+  // individually above instead.
   try {
-    const d = await call(`/${carousel}`,
-      { fields: 'id,status_code,media_type,children{id,media_type}' }, 'GET');
-    attached = d?.children?.data?.length ?? 0;
-    console.log(`  carousel ${carousel}: media_type=${d.media_type ?? '?'} ` +
-      `status=${d.status_code ?? '?'} children_attached=${attached} (sent ${children.length})`);
+    const d = await call(`/${carousel}`, { fields: 'status_code' }, 'GET');
+    console.log(`  carousel ${carousel}: status=${d.status_code ?? '?'}, ${children.length} child(ren) FINISHED`);
   } catch (e) { console.log('  container probe failed:', e.message); }
 
   if (dryRun) return { id: null, carousel, dryRun: true, children, attached };
@@ -112,10 +113,18 @@ export async function publish(urls, caption, { dryRun = false } = {}) {
     // 2207085 is undocumented. Re-read the container after the refusal:
     // whatever Meta objects to should be visible in its final state.
     try {
-      const post = await call(`/${carousel}`,
-        { fields: 'id,status_code,status,media_type,children{id,status_code,status}' }, 'GET');
+      const post = await call(`/${carousel}`, { fields: 'status_code,status' }, 'GET');
       console.log('  container after refusal:', JSON.stringify(post));
     } catch (p) { console.log('  post-mortem probe failed:', p.message); }
+    // 2207085 is undocumented and identical across days, machines and
+    // decks. Meta's own guidance: an account whose Page requires Page
+    // Publishing Authorization cannot publish, and there is no
+    // programmatic way to detect it. Say so rather than retrying.
+    if (/2207085/.test(e.message)) {
+      console.log('  NOTE: every stage before media_publish succeeded. If this repeats,');
+      console.log('  check Page Publishing Authorization on the linked Facebook Page —');
+      console.log('  it blocks publishing and is invisible to the API.');
+    }
     throw e;
   }
   const { permalink } = await call(`/${id}`, { fields: 'permalink' }, 'GET').catch(() => ({}));
