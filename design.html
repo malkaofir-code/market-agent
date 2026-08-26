@@ -1,0 +1,598 @@
+<title>Market Alert Slide System</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&family=Frank+Ruhl+Libre:wght@700;800&family=Assistant:wght@400;600;700;800&display=swap">
+<style>
+:root{
+  --bg:#FCFCFB; --surf:#F3F3F1; --sunk:#ECECE9; --fg:#17181A; --mut:#6A6C72;
+  --line:#E2E2DE; --line2:#CFCFC9; --slate:#2E4C6D; --warn:#8A4B12;
+  --f-h:'Archivo',system-ui,sans-serif; --f-b:'Source Serif 4',Georgia,serif;
+  --f-m:'IBM Plex Mono',ui-monospace,monospace;
+  --sw:300;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#101113; --surf:#191A1D; --sunk:#0B0C0E; --fg:#E9E9E6; --mut:#91939B;
+  --line:#2A2C31; --line2:#3A3D43; --slate:#9CBBDC; --warn:#D89A5C;
+}}
+:root[data-theme="dark"]{
+  --bg:#101113; --surf:#191A1D; --sunk:#0B0C0E; --fg:#E9E9E6; --mut:#91939B;
+  --line:#2A2C31; --line2:#3A3D43; --slate:#9CBBDC; --warn:#D89A5C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-b);
+  font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px 120px}
+h1,h2,h3,.lbl,.mn,.kv,.fx{font-family:var(--f-h)}
+.mn,.lbl,.kv b,.fx b{font-family:var(--f-m)}
+p{margin:0 0 1em;max-width:66ch}
+a{color:var(--slate)}
+:focus-visible{outline:2px solid var(--slate);outline-offset:3px}
+
+/* ---- masthead ---- */
+header.top{padding:clamp(56px,9vw,104px) 0 40px;border-bottom:1px solid var(--line)}
+.kicker{font-family:var(--f-m);font-size:12px;font-weight:600;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--mut);margin:0 0 22px}
+h1{font-size:clamp(38px,6.4vw,66px);font-weight:700;letter-spacing:-.03em;line-height:1.02;
+  margin:0 0 24px;text-wrap:balance;max-width:22ch}
+.lede{font-size:clamp(18px,2.1vw,21px);color:var(--mut);max-width:60ch;margin:0}
+.facts{display:flex;flex-wrap:wrap;gap:0;margin:44px 0 0;border-top:1px solid var(--line)}
+.fx{flex:1 1 150px;padding:18px 20px 18px 0;border-right:1px solid var(--line)}
+.fx:last-child{border-right:0}
+.fx b{display:block;font-size:24px;font-weight:600;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.fx span{display:block;font-family:var(--f-m);font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--mut);margin-top:6px}
+
+/* ---- sections: mono rail + content ---- */
+section{padding:76px 0 0;border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:0}
+.sec{display:grid;grid-template-columns:1fr;gap:8px 48px}
+@media(min-width:900px){.sec{grid-template-columns:132px 1fr}}
+.rail{font-family:var(--f-m);font-size:11px;font-weight:600;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--mut);padding-top:10px}
+h2{font-size:clamp(25px,3.1vw,33px);font-weight:600;letter-spacing:-.024em;
+  margin:0 0 18px;text-wrap:balance}
+.body{padding-bottom:76px}
+h3{font-size:20px;font-weight:600;letter-spacing:-.015em;margin:0 0 10px}
+.heb{unicode-bidi:isolate;font-family:'Assistant',sans-serif;font-weight:600;color:var(--mut);font-size:16px}
+
+/* ---- specimen frame ---- */
+.spec{width:calc(var(--sw)*1px);height:calc(var(--sw)*1.25*1px);overflow:hidden;
+  flex:0 0 auto;border:1px solid var(--line2);position:relative}
+.spec>.slide{transform:scale(calc(var(--sw)/1080));transform-origin:top left}
+@media(min-width:640px){:root{--sw:340}}
+@media(min-width:1100px){:root{--sw:392}}
+
+/* ---- canvas demo ---- */
+.demo{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}
+.demo .spec{transition:height .28s ease}
+.demo:has(#sq:checked) .spec{height:calc(var(--sw)*1*1px)}
+.demo:has(#sq:checked) .spec>.slide{height:1080px}
+@media(prefers-reduced-motion:reduce){.demo .spec{transition:none}}
+.demo-side{flex:1 1 300px;min-width:0}
+.tog{display:inline-flex;align-items:center;gap:12px;font-family:var(--f-m);
+  font-size:13px;letter-spacing:.04em;background:var(--surf);border:1px solid var(--line);
+  padding:12px 16px;cursor:pointer;margin:0 0 24px}
+.tog input{accent-color:var(--slate);width:16px;height:16px;cursor:pointer}
+.meas{border-collapse:collapse;font-family:var(--f-m);font-size:13px;width:100%;
+  font-variant-numeric:tabular-nums}
+.meas th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--mut);padding:0 14px 8px 0;border-bottom:1px solid var(--line)}
+.meas td{padding:9px 14px 9px 0;border-bottom:1px solid var(--line)}
+.meas .bad{color:var(--warn);font-weight:600}
+.trip{display:none;margin-top:20px;padding:14px 16px;border-left:3px solid var(--warn);
+  background:var(--surf);font-family:var(--f-m);font-size:13px;line-height:1.55}
+.demo:has(#sq:checked) .trip{display:block}
+
+/* ---- palette ---- */
+.sws{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line)}
+.sw{background:var(--bg);padding:18px;display:flex;gap:16px}
+.sw-chip{width:46px;height:46px;flex:0 0 auto;border:1px solid var(--line2)}
+.sw-t b{font-family:var(--f-m);font-size:13px;font-weight:600;display:block}
+.sw-t .mn{font-size:12px;color:var(--mut);display:block;margin-top:2px}
+.sw-t p{font-size:14px;margin:8px 0 0;max-width:none;line-height:1.45}
+.sw-t .sw-n{color:var(--mut);font-size:13px;margin-top:6px}
+
+/* ---- type ---- */
+.face{padding:26px 0;border-top:1px solid var(--line);display:grid;gap:14px 40px;
+  grid-template-columns:1fr}
+@media(min-width:760px){.face{grid-template-columns:1fr 260px}}
+.face:first-child{border-top:0}
+.sample{margin:0;line-height:1.05;overflow:hidden}
+.f-disp{font-family:'Frank Ruhl Libre',serif;font-weight:800;font-size:clamp(34px,5.4vw,58px);
+  letter-spacing:-.028em;direction:rtl}
+.f-text{font-family:'Assistant',sans-serif;font-weight:800;font-size:clamp(24px,3.4vw,34px);
+  letter-spacing:-.015em;direction:rtl;line-height:1.25}
+.f-mono{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:clamp(34px,5.4vw,56px);
+  letter-spacing:-.05em}
+.face-meta b{font-family:var(--f-m);font-size:13px;font-weight:600;display:block;margin-bottom:8px}
+.face-meta ul{list-style:none;margin:0;padding:0;font-family:var(--f-m);font-size:12.5px;
+  color:var(--mut);line-height:1.9}
+.face-meta li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dotted var(--line2)}
+
+/* ---- anatomy ---- */
+.anat{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}
+.bands{flex:1 1 320px;min-width:0;border-top:1px solid var(--line)}
+.band{display:grid;grid-template-columns:26px 1fr auto;gap:14px;align-items:baseline;
+  padding:14px 0;border-bottom:1px solid var(--line)}
+.band i{font-family:var(--f-m);font-size:12px;color:var(--slate);font-style:normal;font-weight:600}
+.band b{font-family:var(--f-h);font-size:16px;font-weight:600}
+.band p{margin:4px 0 0;font-size:14.5px;color:var(--mut);grid-column:2}
+.band em{font-family:var(--f-m);font-size:12px;color:var(--mut);font-style:normal;
+  font-variant-numeric:tabular-nums}
+
+/* ---- archetypes ---- */
+.arcs{display:flex;flex-direction:column;gap:0}
+.arc{display:flex;flex-wrap:wrap;gap:36px;padding:44px 0;border-top:1px solid var(--line)}
+.arc:first-child{border-top:0;padding-top:0}
+.arc-txt{flex:1 1 300px;min-width:0}
+.arc-txt p{font-size:16.5px}
+.rule{border-left:3px solid var(--slate);padding:2px 0 2px 16px;margin-top:20px}
+.rule .lbl{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--mut);
+  display:block;margin-bottom:4px}
+.rule p{margin:0;font-size:15.5px}
+
+/* ---- code ---- */
+pre{background:var(--sunk);border:1px solid var(--line);padding:16px 18px;overflow-x:auto;
+  font-family:var(--f-m);font-size:13px;line-height:1.6;margin:0 0 8px}
+code{font-family:var(--f-m);font-size:.92em;background:var(--surf);padding:1px 5px;
+  border:1px solid var(--line)}
+pre code{background:none;border:0;padding:0}
+.cap{font-family:var(--f-m);font-size:12.5px;color:var(--mut);margin:0 0 30px;max-width:70ch}
+
+/* ---- don't list ---- */
+.nots{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line)}
+.not{background:var(--bg);padding:18px 20px}
+.not b{font-family:var(--f-h);font-size:15.5px;font-weight:600;display:block;margin-bottom:6px}
+.not p{margin:0;font-size:14.5px;color:var(--mut);max-width:none}
+footer{padding:56px 0 0;font-family:var(--f-m);font-size:12.5px;color:var(--mut);
+  border-top:1px solid var(--line)}
+
+/* ================= the slide system itself, scoped ================= */
+.spec{--paper:#F4EFE3;--ink:#12100B;--dim:#69614F;--dim2:#38332A;--pos:#0F6236;
+  --neg:#A11F13;--acc:#B2560F;--rule:#C6BCA6;--f-text:'Assistant',sans-serif;
+  --f-disp:'Frank Ruhl Libre',serif;--f-mono:'IBM Plex Mono',monospace;}
+
+.spec .slide{width:1080px;height:1350px;position:relative;overflow:hidden;background:var(--paper);
+color:var(--ink);direction:rtl;text-align:right;font-family:var(--f-text);display:grid;
+grid-template-rows:auto 1fr auto auto;padding:58px 64px 48px;transform-origin:center}
+.spec .slide>*{position:relative;z-index:2}
+.spec .bgm{position:absolute;inset:0;z-index:0;background-image:
+linear-gradient(to right,rgba(18,16,11,.055) 1px,transparent 1px),
+linear-gradient(to bottom,rgba(18,16,11,.055) 1px,transparent 1px);background-size:54px 54px}
+.spec .slide::after{content:"";position:absolute;inset:0 0 auto 0;height:9px;background:var(--acc);z-index:3}
+.spec .sl-hd{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-bottom:18px;
+border-bottom:4px double var(--ink)}
+.spec .hd-l{display:flex;align-items:center;gap:14px}
+.spec .hd-mark{width:38px;height:38px;display:block;color:var(--acc)}
+.spec .hd-name{font-family:var(--f-mono);font-size:26px;font-weight:700;letter-spacing:.2em;white-space:nowrap}
+.spec .hd-meta{font-family:var(--f-mono);font-size:25px;color:var(--dim);direction:ltr;unicode-bidi:isolate;white-space:nowrap}
+.spec .sl-bd{min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding-top:44px}
+.spec .sl-bd:has(.a-cv){justify-content:flex-start}
+.spec .tick{display:flex;align-items:center;margin-top:26px;border-top:1.5px solid var(--rule);
+border-bottom:1.5px solid var(--rule);padding:16px 0;font-family:var(--f-mono);font-size:25px;
+direction:ltr;unicode-bidi:isolate;overflow:hidden;white-space:nowrap}
+.spec .tick i{font-style:normal;padding:0 22px;border-inline-end:1.5px solid var(--rule)}
+.spec .tick i:last-child{border:0;color:var(--dim)}
+.spec .tick b{font-weight:700}
+.spec .tick .pos{color:var(--pos)}
+.spec .tick .neg{color:var(--neg)}
+.spec .sl-ft{display:flex;align-items:baseline;justify-content:space-between;gap:18px;margin-top:20px;
+padding-top:16px;border-top:2.5px solid var(--ink)}
+.spec .ft-ix{font-family:var(--f-mono);font-size:24px;color:var(--acc);font-weight:700;direction:ltr;
+unicode-bidi:isolate;letter-spacing:.08em}
+.spec .ft-src{font-size:23px;color:var(--dim);flex:1;line-height:1.35}
+.spec .ft-hd{font-family:var(--f-mono);font-size:23px;color:var(--dim);direction:ltr;unicode-bidi:isolate}
+.spec .eyeb{font-family:var(--f-mono);font-size:24px;letter-spacing:.14em;color:var(--acc);margin:0 0 22px;font-weight:700}
+.spec .num{direction:ltr;unicode-bidi:isolate;font-family:inherit}
+.spec .lat{unicode-bidi:isolate}
+.spec .a-cv h1{margin:0;font-family:var(--f-disp);font-weight:800;font-size:102px;line-height:1.03;
+letter-spacing:-.028em;max-width:16ch}
+.spec .a-cv .stand{font-size:36px;line-height:1.4;color:var(--dim2);margin:34px 0 0;max-width:26ch;
+border-top:1.5px solid var(--rule);padding-top:26px}
+.spec .a-cv .kick{width:200px;height:7px;background:var(--acc);margin:38px 0 0}
+.spec .a-hr .fig{font-family:var(--f-mono);font-weight:600;line-height:.82;letter-spacing:-.05em;
+direction:ltr;unicode-bidi:isolate;margin:0;display:block}
+.spec .a-hr .fig.up,.spec .a-hr .fig.pos{color:var(--pos)}
+.spec .a-hr .fig.dn,.spec .a-hr .fig.neg{color:var(--neg)}
+.spec .a-hr .unit{font-size:52px;font-weight:800;margin:6px 0 0}
+.spec .a-hr .quo{font-size:36px;line-height:1.46;color:var(--dim2);margin:38px 0 0;max-width:31ch;
+border-top:1.5px solid var(--rule);padding-top:30px}
+.spec .a-ls h2,.spec .a-ch h2{margin:0 0 34px;font-family:var(--f-disp);font-weight:800;font-size:54px;letter-spacing:-.028em}
+.spec .row{display:grid;grid-template-columns:56px 1fr;gap:26px;align-items:start;padding:30px 0;
+border-top:1.5px solid var(--rule)}
+.spec .rows .row:last-child{border-bottom:1.5px solid var(--rule)}
+.spec .row-n{font-family:var(--f-mono);font-size:28px;font-weight:700;color:var(--acc);direction:ltr;
+unicode-bidi:isolate;padding-top:6px}
+.spec .row-h{font-size:40px;font-weight:800;line-height:1.24;margin:0}
+.spec .row-s{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:12px 0 0;display:block}
+.spec .a-nt .lab{font-family:var(--f-mono);font-size:25px;letter-spacing:.14em;color:var(--acc);margin:0 0 26px;font-weight:700}
+.spec .a-nt .abt{font-size:29px;font-weight:700;color:var(--dim2);margin:0 0 26px;padding-bottom:24px;
+border-bottom:1.5px solid var(--rule);line-height:1.34}
+.spec .a-nt .txt{font-size:50px;font-weight:800;line-height:1.34;margin:0;letter-spacing:-.015em;max-width:22ch;
+border-inline-start:9px solid var(--acc);padding-inline-start:34px}
+.spec .a-nt .dis{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:40px 0 0}
+.spec .ch{display:block;width:100%;height:auto;direction:ltr}
+.spec .ch text{direction:ltr;unicode-bidi:isolate;font-family:var(--f-mono);fill:var(--ink)}
+.spec .ch-bar{stroke:var(--ink);stroke-width:1.5}
+.spec .ch-bar.pos{fill:var(--pos)}
+.spec .ch-bar.neg{fill:var(--neg)}
+.spec .ch-zero{stroke:var(--ink);stroke-width:2}
+.spec .ch-tk{font-size:40px;font-weight:700}
+.spec .ch-val{font-size:34px;font-weight:700}
+.spec .ch-val.pos{fill:var(--pos)}
+.spec .ch-val.neg{fill:var(--neg)}
+.spec .a-ch .note{font-size:26px;color:var(--dim);margin:24px 0 0;line-height:1.4}
+.spec .a-tg .big{font-family:var(--f-disp);font-weight:800;font-size:78px;line-height:1.08;margin:0 0 36px;max-width:16ch}
+.spec .a-tg .sr{display:grid;grid-template-columns:160px 1fr;gap:22px;align-items:baseline;padding:20px 0;
+border-top:1.5px solid var(--rule)}
+.spec .a-tg .sr:last-child{border-bottom:1.5px solid var(--rule)}
+.spec .a-tg .st{font-family:var(--f-mono);font-size:34px;font-weight:700;color:var(--acc);direction:ltr;unicode-bidi:isolate}
+.spec .a-tg .se{font-size:34px;font-weight:700}
+.spec .a-tg .link{font-family:var(--f-mono);font-size:36px;font-weight:700;direction:ltr;unicode-bidi:isolate;
+text-align:center;padding:22px;margin-top:38px;background:var(--acc);color:var(--paper)}
+
+/* The scoped slide sheet sets transform-origin:center (it is normally rendered
+   full size). These come last so the specimen scales into its box corner. */
+.spec>.slide{transform-origin:top left}
+.demo:has(#sq:checked) .spec>.slide{height:1080px}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <p class="kicker">@marketalert.il · design system</p>
+  <h1>A financial page, not a social template</h1>
+  <p class="lede">Six slide archetypes on warm broadsheet stock with a terminal's instrument
+  panel inside. Hebrew-first, right-to-left, dark ink on light paper. Everything below is
+  rendered live from <code>builder.js</code> — the specimens are the system, not pictures of it.</p>
+  <div class="facts">
+    <div class="fx"><b>1080×1350</b><span>canvas · 4:5</span></div>
+    <div class="fx"><b>6</b><span>archetypes</span></div>
+    <div class="fx"><b>3</b><span>typefaces</span></div>
+    <div class="fx"><b>1</b><span>accent hue</span></div>
+    <div class="fx"><b>10</b><span>slides max</span></div>
+  </div>
+</header>
+
+<section><div class="sec"><p class="rail">01 · Canvas</p><div class="body">
+  <h2>Why 4:5, provably</h2>
+  <p>The canvas is 1080×1350 and never square. Not a taste call — a measurement.
+  Tick the box and the same cover redraws at 1:1.</p>
+  <div class="demo">
+    <div class="spec"><div class="slide"><div class="bgm"></div>
+<header class="sl-hd"><span class="hd-l"><svg class="hd-mark" viewBox="0 0 100 100"><g fill="currentColor">
+<rect x="14" y="55" width="16" height="22" rx="2.5"/><rect x="19.5" y="47" width="5" height="38" rx="2.5"/>
+<rect x="42" y="44" width="16" height="22" rx="2.5"/><rect x="47.5" y="36" width="5" height="38" rx="2.5"/>
+<rect x="70" y="33" width="16" height="22" rx="2.5"/><rect x="75.5" y="25" width="5" height="38" rx="2.5"/>
+</g></svg><span class="hd-name">MARKET ALERT</span></span>
+<span class="hd-meta">עדכון <span class="num"><span class="num">21:00</span>–<span class="num">21:15</span></span> · <span class="num">24.08.26</span></span></header>
+<main class="sl-bd"><div class="a-cv"><p class="eyeb">עדכון <span class="num"><span class="num">21:00</span>–<span class="num">21:15</span></span></p><h1>הוצאת סוריה מרשימת הטרור — צינורות הנפט של עיראק בתמונה</h1>
+    <p class="stand">Brian Sullivan מ־<span class="lat">CNBC</span> מציין שהוצאת סוריה מרשימת "המדינות התומכות בטרור" נראית כמכוונת לאפשר בנייה ושיקום של צינורות נפט מעיראק לכיוון סוריה וטורקיה.</p><div class="kick"></div></div></main><div class="tick"><i><b>NQ</b> 29,131.00 <span class="pos">-0.87%</span></i><i><b>ES</b> 6,412.25 <span class="neg">-0.32%</span></i><i><b>YM</b> 44,180.00 <span class="neg">-0.41%</span></i><i>21:01</i></div>
+<footer class="sl-ft"><span class="ft-ix">01/06</span>
+<span class="ft-src"></span>
+<span class="ft-hd">@marketalert.il</span></footer></div></div>
+    <div class="demo-side">
+      <label class="tog" for="sq"><input type="checkbox" id="sq"> RENDER AT 1:1</label>
+      <table class="meas">
+        <thead><tr><th>Band</th><th>4:5</th><th>1:1</th></tr></thead>
+        <tbody>
+          <tr><td>Frame height</td><td>1350</td><td>1080</td></tr>
+          <tr><td>Body room</td><td>1118</td><td class="bad">848</td></tr>
+          <tr><td>This cover needs</td><td>872</td><td class="bad">872</td></tr>
+        </tbody>
+      </table>
+      <div class="trip"><b>TRIPWIRE</b> — body needs 872px, has 848px.
+      The build fails here rather than shipping a clipped slide.</div>
+      <p style="margin-top:22px;font-size:15.5px;color:var(--mut)">A 102px Hebrew serif
+      headline plus a standfirst plus the tape strip needs the extra 270px. At 1:1 the
+      kicker and part of the standfirst fall outside the frame — which is how the aspect
+      ratio stopped being negotiable.</p>
+    </div>
+  </div>
+</div></div></section>
+
+<section><div class="sec"><p class="rail">02 · Colour</p><div class="body">
+  <h2>Warm paper, one accent, colour reserved for sign</h2>
+  <p>Dark ink on light stock throughout. Green and red appear <em>only</em> on signed
+  values — never as decoration, never as a mood. The burnt orange is the single accent and
+  it is spent in five places: the 9px bar across the top of every slide, the eyebrow, the
+  index number, the rail on the interpretation slide, and one highlighted bar in a chart.
+  Nothing else on the account is orange.</p>
+  <div class="sws">
+    <div class="sw">
+  <div class="sw-chip" style="background:#F4EFE3"></div>
+  <div class="sw-t"><b>--paper</b><span class="mn">#F4EFE3</span><p>Ground. Warm enough to read as stock rather than as UI.</p>
+  </div></div>
+    <div class="sw">
+  <div class="sw-chip" style="background:#12100B"></div>
+  <div class="sw-t"><b>--ink</b><span class="mn">#12100B</span><p>Text and every chart stroke. Not pure black — 12/16/11 keeps it printed, not screen-lit.</p>
+  </div></div>
+    <div class="sw">
+  <div class="sw-chip" style="background:#B2560F"></div>
+  <div class="sw-t"><b>--acc</b><span class="mn">#B2560F</span><p>The one accent.</p>
+  <p class="sw-n">Five uses, listed above. A sixth means the system is drifting.</p></div></div>
+    <div class="sw">
+  <div class="sw-chip" style="background:#0F6236"></div>
+  <div class="sw-t"><b>--pos</b><span class="mn">#0F6236</span><p>Positive values only.</p>
+  </div></div>
+    <div class="sw">
+  <div class="sw-chip" style="background:#A11F13"></div>
+  <div class="sw-t"><b>--neg</b><span class="mn">#A11F13</span><p>Negative values only.</p>
+  </div></div>
+    <div class="sw">
+  <div class="sw-chip" style="background:#C6BCA6"></div>
+  <div class="sw-t"><b>--rule</b><span class="mn">#C6BCA6</span><p>Hairlines. Content hangs off these instead of sitting in cards.</p>
+  </div></div>
+    <div class="sw">
+  <div class="sw-chip" style="background:#69614F"></div>
+  <div class="sw-t"><b>--dim</b><span class="mn">#69614F</span><p>Sources, axis labels, timestamps.</p>
+  </div></div>
+    <div class="sw">
+  <div class="sw-chip" style="background:#38332A"></div>
+  <div class="sw-t"><b>--dim2</b><span class="mn">#38332A</span><p>Standfirsts and pull quotes — softer than ink, not grey.</p>
+  </div></div>
+  </div>
+  <p class="cap" style="margin-top:24px">Texture, not gradient: a 54px graph-paper grid printed
+  at 5.5% ink, a 4px double rule under the masthead, a 2.5px solid rule above the footnote.</p>
+</div></div></section>
+
+<section><div class="sec"><p class="rail">03 · Type</p><div class="body">
+  <h2>Three faces, three jobs</h2>
+  <p>The single biggest reason the deck stopped looking generated was committing to a real
+  Hebrew serif for display. Body copy and figures each get their own face, and the two
+  never trade places.</p>
+  <div class="face">
+    <p class="sample f-disp">הוצאת סוריה מרשימת הטרור</p>
+    <div class="face-meta"><b>Frank Ruhl Libre 800</b><ul>
+      <li><span>cover</span><span>102px / −.028em</span></li>
+      <li><span>section head</span><span>54px</span></li>
+      <li><span>telegram</span><span>78px</span></li></ul></div>
+  </div>
+  <div class="face">
+    <p class="sample f-text">מסלול ייצוא נוסף מעיראק עשוי להפחית את פרמיית הסיכון</p>
+    <div class="face-meta"><b>Assistant 400–800</b><ul>
+      <li><span>interpretation</span><span>50px / 800</span></li>
+      <li><span>list row</span><span>40px / 800</span></li>
+      <li><span>standfirst</span><span>36px / 400</span></li></ul></div>
+  </div>
+  <div class="face">
+    <p class="sample f-mono">−0.87%</p>
+    <div class="face-meta"><b>IBM Plex Mono 400–700</b><ul>
+      <li><span>hero figure</span><span>≤256px / −.05em</span></li>
+      <li><span>tape, meta</span><span>25px</span></li>
+      <li><span>index, eyebrow</span><span>24px / .14em</span></li></ul></div>
+  </div>
+  <p style="margin-top:30px"><b>One rule that looks like a detail and is not:</b> mono is for
+  tabular columns and standalone figures only. Setting it on numbers inside running text
+  rendered <code>2.1%</code> as <code>2 . 1%</code>, because the isolate inherits the face.
+  Inline numbers use <code>font-family:inherit</code>.</p>
+  <p><b>And the hero figure is sized to its measure, not to a constant:</b>
+  <code>min(256, 940 / (len × 0.62))</code>. At the four-character size, <code>1,100%</code>
+  ran its percent sign off the right edge of the frame.</p>
+</div></div></section>
+
+<section><div class="sec"><p class="rail">04 · Anatomy</p><div class="body">
+  <h2>Four bands, every slide</h2>
+  <p>A carousel resurfaces from a slide nobody swiped to, so no slide may depend on another
+  for context. The furniture is identical on all of them; only the middle band changes.</p>
+  <div class="anat">
+    <div class="spec"><div class="slide"><div class="bgm"></div>
+<header class="sl-hd"><span class="hd-l"><svg class="hd-mark" viewBox="0 0 100 100"><g fill="currentColor">
+<rect x="14" y="55" width="16" height="22" rx="2.5"/><rect x="19.5" y="47" width="5" height="38" rx="2.5"/>
+<rect x="42" y="44" width="16" height="22" rx="2.5"/><rect x="47.5" y="36" width="5" height="38" rx="2.5"/>
+<rect x="70" y="33" width="16" height="22" rx="2.5"/><rect x="75.5" y="25" width="5" height="38" rx="2.5"/>
+</g></svg><span class="hd-name">MARKET ALERT</span></span>
+<span class="hd-meta">עדכון <span class="num"><span class="num">21:00</span>–<span class="num">21:15</span></span> · <span class="num">24.08.26</span></span></header>
+<main class="sl-bd"><div class="a-hr"><p class="eyeb">המספר של החלון</p>
+    <p class="fig " style="font-size:256px">7.5%</p>
+    <p class="quo">מכס חדש בסין: <span class="num">7.5%</span> על יבוא סין הודיעה על מכס של <span class="num">7.5%</span> על יבוא מוצרי פלדה, לפי בלומברג.</p></div></main><div class="tick"><i><b>NQ</b> 29,131.00 <span class="pos">-0.87%</span></i><i><b>ES</b> 6,412.25 <span class="neg">-0.32%</span></i><i><b>YM</b> 44,180.00 <span class="neg">-0.41%</span></i><i>21:01</i></div>
+<footer class="sl-ft"><span class="ft-ix">02/06</span>
+<span class="ft-src"></span>
+<span class="ft-hd">@marketalert.il</span></footer></div></div>
+    <div class="bands">
+      <div class="band"><i>A</i><b>Masthead</b><em>auto · 18px pad</em>
+        <p>Mark, wordmark at .2em tracking, and the window plus date in mono. Closed by a
+        4px double rule — the one piece of Victorian newspaper furniture in the system.</p></div>
+      <div class="band"><i>B</i><b>Body</b><em>1fr · 1118px</em>
+        <p>The archetype. Optically centred, except a cover, which hangs off the top rule
+        like a front page. Overflow hidden, and the build refuses to render it clipped.</p></div>
+      <div class="band"><i>C</i><b>Tape</b><em>auto · 25px</em>
+        <p>Live futures, ruled above and below. Not decoration: it is the one number a
+        trader wants on screen no matter which slide surfaced.</p></div>
+      <div class="band"><i>D</i><b>Footnote</b><em>auto · 24px</em>
+        <p>Index <code>02/06</code> in accent, the source attribution, the handle. Attribution
+        is what separates reporting from opinion, so it gets a permanent slot.</p></div>
+    </div>
+  </div>
+  <p style="margin-top:34px">Padding is <code>58px 64px 48px</code>. Structure is a four-row
+  CSS grid — <code>auto 1fr auto auto</code> — so the body absorbs every difference in
+  content length and the furniture never moves between slides.</p>
+</div></div></section>
+
+<section><div class="sec"><p class="rail">05 · Archetypes</p><div class="body">
+  <h2>Six slides, and what each is for</h2>
+  <p>Each post in a window is consumed exactly once across the deck, so a story cannot
+  appear on both the cover and a card. Deck order is fixed: cover, hero, interpretation,
+  chart, lists, and the Telegram card once a day.</p>
+  <div class="arcs">
+    <article class="arc" id="a-cover">
+  <div class="arc-spec"><div class="spec"><div class="slide"><div class="bgm"></div>
+<header class="sl-hd"><span class="hd-l"><svg class="hd-mark" viewBox="0 0 100 100"><g fill="currentColor">
+<rect x="14" y="55" width="16" height="22" rx="2.5"/><rect x="19.5" y="47" width="5" height="38" rx="2.5"/>
+<rect x="42" y="44" width="16" height="22" rx="2.5"/><rect x="47.5" y="36" width="5" height="38" rx="2.5"/>
+<rect x="70" y="33" width="16" height="22" rx="2.5"/><rect x="75.5" y="25" width="5" height="38" rx="2.5"/>
+</g></svg><span class="hd-name">MARKET ALERT</span></span>
+<span class="hd-meta">עדכון <span class="num"><span class="num">21:00</span>–<span class="num">21:15</span></span> · <span class="num">24.08.26</span></span></header>
+<main class="sl-bd"><div class="a-cv"><p class="eyeb">עדכון <span class="num"><span class="num">21:00</span>–<span class="num">21:15</span></span></p><h1>הוצאת סוריה מרשימת הטרור — צינורות הנפט של עיראק בתמונה</h1>
+    <p class="stand">Brian Sullivan מ־<span class="lat">CNBC</span> מציין שהוצאת סוריה מרשימת "המדינות התומכות בטרור" נראית כמכוונת לאפשר בנייה ושיקום של צינורות נפט מעיראק לכיוון סוריה וטורקיה.</p><div class="kick"></div></div></main><div class="tick"><i><b>NQ</b> 29,131.00 <span class="pos">-0.87%</span></i><i><b>ES</b> 6,412.25 <span class="neg">-0.32%</span></i><i><b>YM</b> 44,180.00 <span class="neg">-0.41%</span></i><i>21:01</i></div>
+<footer class="sl-ft"><span class="ft-ix">01/06</span>
+<span class="ft-src"></span>
+<span class="ft-hd">@marketalert.il</span></footer></div></div></div>
+  <div class="arc-txt">
+    <h3>Cover <span class="heb">כותרת</span></h3>
+    <p>The lead story as a front page. Eyebrow, a 102px headline capped at 16 characters of measure, one standfirst sentence, and a 200×7px accent kicker.</p>
+    <div class="rule"><span class="lbl">The rule</span><p>The lead is chosen by score, not recency: an interpretation is worth 4, an extractable figure 2, a named source 1.</p></div>
+  </div></article>
+    <article class="arc" id="a-hero">
+  <div class="arc-spec"><div class="spec"><div class="slide"><div class="bgm"></div>
+<header class="sl-hd"><span class="hd-l"><svg class="hd-mark" viewBox="0 0 100 100"><g fill="currentColor">
+<rect x="14" y="55" width="16" height="22" rx="2.5"/><rect x="19.5" y="47" width="5" height="38" rx="2.5"/>
+<rect x="42" y="44" width="16" height="22" rx="2.5"/><rect x="47.5" y="36" width="5" height="38" rx="2.5"/>
+<rect x="70" y="33" width="16" height="22" rx="2.5"/><rect x="75.5" y="25" width="5" height="38" rx="2.5"/>
+</g></svg><span class="hd-name">MARKET ALERT</span></span>
+<span class="hd-meta">עדכון <span class="num"><span class="num">21:00</span>–<span class="num">21:15</span></span> · <span class="num">24.08.26</span></span></header>
+<main class="sl-bd"><div class="a-hr"><p class="eyeb">המספר של החלון</p>
+    <p class="fig " style="font-size:256px">7.5%</p>
+    <p class="quo">מכס חדש בסין: <span class="num">7.5%</span> על יבוא סין הודיעה על מכס של <span class="num">7.5%</span> על יבוא מוצרי פלדה, לפי בלומברג.</p></div></main><div class="tick"><i><b>NQ</b> 29,131.00 <span class="pos">-0.87%</span></i><i><b>ES</b> 6,412.25 <span class="neg">-0.32%</span></i><i><b>YM</b> 44,180.00 <span class="neg">-0.41%</span></i><i>21:01</i></div>
+<footer class="sl-ft"><span class="ft-ix">02/06</span>
+<span class="ft-src"></span>
+<span class="ft-hd">@marketalert.il</span></footer></div></div></div>
+  <div class="arc-txt">
+    <h3>Hero figure <span class="heb">המספר</span></h3>
+    <p>One number at up to 256px, coloured by sign, with its unit beneath and the sentence it came from below a hairline.</p>
+    <div class="rule"><span class="lbl">The rule</span><p>The figure comes from the channel or from arithmetic on channel numbers. A sentence carrying four or more figures is a table read aloud and is skipped — a hero number needs a claim attached.</p></div>
+  </div></article>
+    <article class="arc" id="a-note">
+  <div class="arc-spec"><div class="spec"><div class="slide"><div class="bgm"></div>
+<header class="sl-hd"><span class="hd-l"><svg class="hd-mark" viewBox="0 0 100 100"><g fill="currentColor">
+<rect x="14" y="55" width="16" height="22" rx="2.5"/><rect x="19.5" y="47" width="5" height="38" rx="2.5"/>
+<rect x="42" y="44" width="16" height="22" rx="2.5"/><rect x="47.5" y="36" width="5" height="38" rx="2.5"/>
+<rect x="70" y="33" width="16" height="22" rx="2.5"/><rect x="75.5" y="25" width="5" height="38" rx="2.5"/>
+</g></svg><span class="hd-name">MARKET ALERT</span></span>
+<span class="hd-meta">עדכון <span class="num"><span class="num">21:00</span>–<span class="num">21:15</span></span> · <span class="num">24.08.26</span></span></header>
+<main class="sl-bd"><div class="a-nt"><p class="lab">MEANING · משמעות</p>
+    <p class="txt">מסלול ייצוא נוסף מעיראק עשוי להפחית את פרמיית הסיכון סביב מעבר הורמוז.</p>
+    <p class="dis">פרשנות, לא המלצה.</p></div></main><div class="tick"><i><b>NQ</b> 29,131.00 <span class="pos">-0.87%</span></i><i><b>ES</b> 6,412.25 <span class="neg">-0.32%</span></i><i><b>YM</b> 44,180.00 <span class="neg">-0.41%</span></i><i>21:01</i></div>
+<footer class="sl-ft"><span class="ft-ix">03/06</span>
+<span class="ft-src"></span>
+<span class="ft-hd">@marketalert.il</span></footer></div></div></div>
+  <div class="arc-txt">
+    <h3>Interpretation <span class="heb">משמעות</span></h3>
+    <p>The channel’s own reading of the story — the only thing on the account that is not also on a newswire.</p>
+    <div class="rule"><span class="lbl">The rule</span><p>It gets the one heavy frame in the system: a 9px accent rail on the inline-start edge. Spent here because this is the original content. It always signs off <bdi>פרשנות, לא המלצה</bdi>.</p></div>
+  </div></article>
+    <article class="arc" id="a-chart">
+  <div class="arc-spec"><div class="spec"><div class="slide"><div class="bgm"></div>
+<header class="sl-hd"><span class="hd-l"><svg class="hd-mark" viewBox="0 0 100 100"><g fill="currentColor">
+<rect x="14" y="55" width="16" height="22" rx="2.5"/><rect x="19.5" y="47" width="5" height="38" rx="2.5"/>
+<rect x="42" y="44" width="16" height="22" rx="2.5"/><rect x="47.5" y="36" width="5" height="38" rx="2.5"/>
+<rect x="70" y="33" width="16" height="22" rx="2.5"/><rect x="75.5" y="25" width="5" height="38" rx="2.5"/>
+</g></svg><span class="hd-name">MARKET ALERT</span></span>
+<span class="hd-meta">עדכון <span class="num"><span class="num">21:00</span>–<span class="num">21:15</span></span> · <span class="num">24.08.26</span></span></header>
+<main class="sl-bd"><div class="a-ch"><p class="eyeb">TAPE · חוזים עתידיים</p>
+    <h2>התמונה בחוזים</h2><div class="chw"><svg class="ch" viewBox="0 0 928 354" width="928" height="354">
+  <line class="ch-zero" x1="482.56" y1="6" x2="482.56" y2="348"/>
+  <text class="ch-tk" x="14" y="72">NQ</text>
+    <rect class="ch-bar neg" x="167.03999999999996" y="32" width="315.52000000000004" height="54"/>
+    <text class="ch-val neg" x="914" y="71" text-anchor="end">-0.87%</text><text class="ch-tk" x="14" y="190">ES</text>
+    <rect class="ch-bar neg" x="366.50666666666666" y="150" width="116.05333333333334" height="54"/>
+    <text class="ch-val neg" x="914" y="189" text-anchor="end">-0.32%</text><text class="ch-tk" x="14" y="308">YM</text>
+    <rect class="ch-bar neg" x="333.8666666666667" y="268" width="148.69333333333336" height="54"/>
+    <text class="ch-val neg" x="914" y="307" text-anchor="end">-0.41%</text>
+  </svg></div><p class="note">נכון ל־<span class="num">21:01</span> · שעון ישראל</p></div></main><div class="tick"><i><b>NQ</b> 29,131.00 <span class="pos">-0.87%</span></i><i><b>ES</b> 6,412.25 <span class="neg">-0.32%</span></i><i><b>YM</b> 44,180.00 <span class="neg">-0.41%</span></i><i>21:01</i></div>
+<footer class="sl-ft"><span class="ft-ix">04/06</span>
+<span class="ft-src"></span>
+<span class="ft-hd">@marketalert.il</span></footer></div></div></div>
+  <div class="arc-txt">
+    <h3>Chart <span class="heb">גרף</span></h3>
+    <p>Hand-written SVG. Values live in a fixed right-hand column so a label can never collide with a mark, and every bar strokes ink at 1.5px so it reads as printed.</p>
+    <div class="rule"><span class="lbl">The rule</span><p>Three real data points minimum. Fewer becomes a hero figure instead — a two-bar chart in a 1350px frame says less than the tape strip already on every slide.</p></div>
+  </div></article>
+    <article class="arc" id="a-list">
+  <div class="arc-spec"><div class="spec"><div class="slide"><div class="bgm"></div>
+<header class="sl-hd"><span class="hd-l"><svg class="hd-mark" viewBox="0 0 100 100"><g fill="currentColor">
+<rect x="14" y="55" width="16" height="22" rx="2.5"/><rect x="19.5" y="47" width="5" height="38" rx="2.5"/>
+<rect x="42" y="44" width="16" height="22" rx="2.5"/><rect x="47.5" y="36" width="5" height="38" rx="2.5"/>
+<rect x="70" y="33" width="16" height="22" rx="2.5"/><rect x="75.5" y="25" width="5" height="38" rx="2.5"/>
+</g></svg><span class="hd-name">MARKET ALERT</span></span>
+<span class="hd-meta">עדכון <span class="num"><span class="num">21:00</span>–<span class="num">21:15</span></span> · <span class="num">24.08.26</span></span></header>
+<main class="sl-bd"><div class="a-ls"><h2>עוד מהחלון הזה</h2><div class="rows"><div class="row"><span class="row-n">01</span>
+    <span><p class="row-h">הנפט מחק את כל העלייה השבועית</p></span></div><div class="row"><span class="row-n">02</span>
+    <span><p class="row-h">טייוואן: כתב אישום בגין הברחת שרתי <span class="lat">NVDA</span></p></span></div><div class="row"><span class="row-n">03</span>
+    <span><p class="row-h">התשואה ל־<span class="num">10</span> שנים נגעה ב־<span class="num">4.31%</span></p></span></div></div></div></main><div class="tick"><i><b>NQ</b> 29,131.00 <span class="pos">-0.87%</span></i><i><b>ES</b> 6,412.25 <span class="neg">-0.32%</span></i><i><b>YM</b> 44,180.00 <span class="neg">-0.41%</span></i><i>21:01</i></div>
+<footer class="sl-ft"><span class="ft-ix">05/06</span>
+<span class="ft-src"></span>
+<span class="ft-hd">@marketalert.il</span></footer></div></div></div>
+  <div class="arc-txt">
+    <h3>List <span class="heb">עוד</span></h3>
+    <p>Everything else in the window, as numbered rows on hairlines. Index in accent mono, headline at 40px/800, source underneath.</p>
+    <div class="rule"><span class="lbl">The rule</span><p>Pages are balanced, not chunked: pages = ceil(n/3), then per = ceil(n/pages). Fixed threes leave a final slide holding one lonely row.</p></div>
+  </div></article>
+    <article class="arc" id="a-tg">
+  <div class="arc-spec"><div class="spec"><div class="slide"><div class="bgm"></div>
+<header class="sl-hd"><span class="hd-l"><svg class="hd-mark" viewBox="0 0 100 100"><g fill="currentColor">
+<rect x="14" y="55" width="16" height="22" rx="2.5"/><rect x="19.5" y="47" width="5" height="38" rx="2.5"/>
+<rect x="42" y="44" width="16" height="22" rx="2.5"/><rect x="47.5" y="36" width="5" height="38" rx="2.5"/>
+<rect x="70" y="33" width="16" height="22" rx="2.5"/><rect x="75.5" y="25" width="5" height="38" rx="2.5"/>
+</g></svg><span class="hd-name">MARKET ALERT</span></span>
+<span class="hd-meta">עדכון <span class="num"><span class="num">21:00</span>–<span class="num">21:15</span></span> · <span class="num">24.08.26</span></span></header>
+<main class="sl-bd"><div class="a-tg"><p class="eyeb">TELEGRAM · בזמן אמת</p>
+    <p class="big">הבית של סוחרי NQ &amp; ES</p>
+    <div class="sched"><div class="sr"><span class="st">08:00</span><span class="se">סקירת בוקר</span></div><div class="sr"><span class="st">15:00</span><span class="se">טרום־פתיחה</span></div><div class="sr"><span class="st">18:00</span><span class="se">סקירת פתיחה</span></div><div class="sr"><span class="st">23:00</span><span class="se">סיכום יום</span></div></div>
+    <div class="link">t.me/nq_es_hunters</div></div></main><div class="tick"><i><b>NQ</b> 29,131.00 <span class="pos">-0.87%</span></i><i><b>ES</b> 6,412.25 <span class="neg">-0.32%</span></i><i><b>YM</b> 44,180.00 <span class="neg">-0.41%</span></i><i>21:01</i></div>
+<footer class="sl-ft"><span class="ft-ix">06/06</span>
+<span class="ft-src"></span>
+<span class="ft-hd">@marketalert.il</span></footer></div></div></div>
+  <div class="arc-txt">
+    <h3>Telegram <span class="heb">טלגרם</span></h3>
+    <p>The one piece of promotion. Schedule as a table, handle reversed out of a solid accent block.</p>
+    <div class="rule"><span class="lbl">The rule</span><p>Once a day, on the 23:00 deck, and it costs a content slide — the cap drops from 10 to 9. A CTA on every deck is how an account stops being read.</p></div>
+  </div></article>
+  </div>
+</div></div></section>
+
+<section><div class="sec"><p class="rail">06 · Hebrew</p><div class="body">
+  <h2>Right-to-left is where the bugs live</h2>
+  <p>The slide is <code>direction:rtl</code> and the Unicode bidi algorithm reorders anything
+  left unisolated. Four rules, each of which cost a published mistake.</p>
+
+  <h3>The maqaf serves two masters</h3>
+  <p>U+05BE (<bdi style="font-family:Assistant,sans-serif">־</bdi>) is both a prefix hyphen
+  and a minus sign in this channel. <bdi style="font-family:Assistant,sans-serif">כ־5%</bdi>
+  means "about 5%"; <bdi style="font-family:Assistant,sans-serif">(־2.62%)</bdi> means minus.
+  A leading hyphen is a minus <em>only</em> when nothing word-like precedes it.</p>
+  <pre><code>const PCT = /(?&lt;![\w.,])((?:(?&lt;![֐-׿])[+\-−־])?\d+(?:[.,]\d+)?%)/gu;</code></pre>
+  <p class="cap">Without the inner lookbehind, six figures on one deck flipped sign. Without
+  <code>[.,]</code> in the outer one, <code>(־2.62%)</code> matched as <code>62%</code>.</p>
+
+  <h3>Isolate ranges before numbers</h3>
+  <pre><code>// whole range first, as ONE span — a dash between two isolates
+// takes the paragraph direction and renders 23:00–23:15 backwards
+.replace(/(?&lt;![\w.])(\d{1,2}[:.]\d{2}\s*[–—\-־]\s*\d{1,2}[:.]\d{2})/gu, NUM)
+// then one isolate per NUMBER — never per digit group, or 14/05 renders 05/14.
+// Currency rides inside the isolate, or $325 renders 325$.
+.replace(/(?&lt;![\w.])([$€£₪]?[+\-−]?\d+(?:[.,:\/]\d+)*%?)/gu, NUM)</code></pre>
+
+  <h3>Bidi leaks into SVG</h3>
+  <p><code>direction:rtl</code> inherits into SVG <code>&lt;text&gt;</code>. Under RTL the
+  sign and percent glyph of <code>+7.30%</code> reorder out of the run and the label lands on
+  top of its own bar. Every chart label is numeric or Latin, so the chart is pinned LTR.</p>
+  <pre><code>.ch{direction:ltr} .ch text{direction:ltr;unicode-bidi:isolate}</code></pre>
+
+  <h3>Load order, and a vocabulary mismatch</h3>
+  <p>Structure first, skin second — reversed, every skin override loses at equal specificity
+  and the slide renders as empty boxes. And colour both vocabularies: the archetype emits
+  <code>up</code>/<code>dn</code> while charts use <code>pos</code>/<code>neg</code>. A skin
+  matching only one rendered every signed hero figure in plain ink for a week.</p>
+</div></div></section>
+
+<section><div class="sec"><p class="rail">07 · Not this</p><div class="body">
+  <h2>What "too Claude-made" meant</h2>
+  <p>The brief that produced this system was a rejection. These are the specific things that
+  were wrong, kept as a list because each one is tempting again every time the deck is touched.</p>
+  <div class="nots">
+    <div class="not"><b>Rounded cards</b><p>Content hangs off hairlines on a grid. A card is a way of avoiding a decision about hierarchy.</p></div>
+    <div class="not"><b>Soft shadows</b><p>Paper does not glow. Everything is flat ink on flat stock.</p></div>
+    <div class="not"><b>Centred everything</b><p>The body is optically centred; text is not. A cover hangs off the top rule.</p></div>
+    <div class="not"><b>Pastel wash</b><p>One ground, one ink, one accent. A gradient is a stand-in for a typographic idea.</p></div>
+    <div class="not"><b>Emoji as graphic</b><p>One leading decorative emoji is stripped from every slide string. They stay in the caption.</p></div>
+    <div class="not"><b>Body text on slides</b><p>Slides carry headlines and figures. The reporting lives in the caption, where it is searchable.</p></div>
+    <div class="not"><b>Invented numbers</b><p>Every figure comes from the channel or from arithmetic on channel figures — and the chart note says which.</p></div>
+    <div class="not"><b>A shrinking font floor</b><p>When content overflows, the fix is fewer rows. The build fails rather than clipping a slide.</p></div>
+  </div>
+</div></div></section>
+
+<footer>Rendered live from builder.js · specimens built from the 21:00–21:15 window,
+24.08.26 · @marketalert.il</footer>
+</div>

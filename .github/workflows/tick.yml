@@ -1,0 +1,82 @@
+name: tick
+
+# Hourly, a few minutes past the hour so the window has fully closed.
+# Cron is UTC; Israel is UTC+3 in summer, so 04:05-20:05 UTC covers
+# 07:05-23:05 local. In winter (UTC+2) it shifts an hour earlier -
+# harmless, because run.js enforces active hours in the real timezone.
+#
+# GitHub does not run scheduled workflows punctually: 5-20 minutes
+# late is normal and a tick can be skipped entirely under load. That
+# is survivable here because run.js picks the OLDEST unconsumed window
+# rather than the last one, and retires anything past
+# MAX_WINDOW_AGE_MIN instead of posting stale news.
+on:
+  schedule:
+    - cron: '5 4-20 * * *'
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'Dry run (build everything, do not publish)'
+        type: boolean
+        default: true
+      window:
+        description: 'Replay a specific window, e.g. 2026-08-26T08:00'
+        type: string
+
+# Never let two ticks overlap - they would fight over the same window.
+concurrency:
+  group: tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    # Chromium and its system libraries are already in this image.
+    # Installing them per run would double the billed minutes.
+    container: mcr.microsoft.com/playwright:v1.49.1-noble
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci --omit=dev
+
+      - name: run
+        env:
+          TZ: Asia/Jerusalem
+          PUBLISHER: api
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry && '1' || '0' }}
+          WINDOW_MINUTES: '60'
+          ACTIVE_FROM_HOUR: '7'
+          ACTIVE_TO_HOUR: '24'
+          MAX_POSTS_PER_DAY: '12'
+          MIN_MINUTES_BETWEEN_POSTS: '20'
+          MAX_WINDOW_AGE_MIN: '90'
+          PAUSE_AFTER_FAILURES: '2'
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_SESSION: ${{ secrets.TG_SESSION }}
+          TG_SOURCE_CHANNEL: ${{ secrets.TG_SOURCE_CHANNEL }}
+          TG_ALERT_TARGET: me
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_BUCKET: slides
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          node src/run.js --ingest ${{ inputs.window && format('--window={0}', inputs.window) || '' }}
+
+      # Only on failure, and only the rendered slides - never .env,
+      # never state. Makes a broken deck inspectable after the fact.
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slides-${{ github.run_id }}
+          path: out/**/*.jpeg
+          retention-days: 7
+          if-no-files-found: ignore

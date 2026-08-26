@@ -1,0 +1,184 @@
+// ─────────────────────────────────────────────────────────────
+// run.js — one window, end to end.
+//   pick -> compose -> render -> upload -> publish -> record
+//
+// Safe to run repeatedly and safe to run anywhere: all state lives in
+// Postgres, so a GitHub Actions runner that keeps nothing between
+// invocations behaves exactly like a long-lived machine.
+//
+//   node src/run.js --ingest                      pull new messages first
+//   node src/run.js --dry                         everything but publish
+//   node src/run.js --dry --window=2026-08-26T08:00
+// ─────────────────────────────────────────────────────────────
+import { existsSync } from 'fs';
+import { join } from 'path';
+import 'dotenv/config';
+import {
+  putMessages, messagesIn, messagesInAll, oldestUnconsumedBefore, markConsumed,
+  upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes,
+  logRun, getState, setState, getToken, setToken, close,
+} from './db.js';
+import { compose, windowOf, WIN } from './compose.js';
+import { renderDeck } from './render.js';
+import { connect, alert } from './tg.js';
+
+const DRY = process.argv.includes('--dry') || process.env.DRY_RUN === '1';
+const CARRY_KEY = 'tape-carry';
+const say = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+
+// ── rails ────────────────────────────────────────────────────
+async function blocked() {
+  const ks = process.env.KILL_SWITCH || './PAUSED';
+  if (existsSync(ks)) return `kill switch present (${ks})`;
+
+  const hour = Number(new Intl.DateTimeFormat('en-GB',
+    { timeZone: process.env.TZ || 'Asia/Jerusalem', hour: '2-digit', hour12: false })
+    .format(new Date()));
+  const from = Number(process.env.ACTIVE_FROM_HOUR ?? 7);
+  const to = Number(process.env.ACTIVE_TO_HOUR ?? 24);
+  if (hour < from || hour >= to) return `outside active hours (${hour}:00, active ${from}-${to})`;
+
+  const cap = Number(process.env.MAX_POSTS_PER_DAY || 12);
+  const n = await postsToday();
+  if (n >= cap) return `daily cap reached (${n}/${cap})`;
+
+  const gap = Number(process.env.MIN_MINUTES_BETWEEN_POSTS || 12);
+  const last = await lastPostAt();
+  if (last && (Date.now() / 1000 - last) < gap * 60)
+    return `only ${Math.round((Date.now() / 1000 - last) / 60)}min since last post (min ${gap})`;
+
+  const need = Number(process.env.PAUSE_AFTER_FAILURES || 2);
+  const recent = await recentOutcomes(need);
+  if (recent.length >= need && recent.every(s => s === 'failed'))
+    return `${need} consecutive failures — paused. Inspect, then clear the failed rows to resume.`;
+
+  return null;
+}
+
+// ── the window to work on ────────────────────────────────────
+// The OLDEST closed window still holding unconsumed messages, not
+// simply the last one. A scheduler that misses ticks (a sleeping
+// laptop, a late GitHub cron) would otherwise drop those bursts
+// permanently. MAX_WINDOW_AGE_MIN stops the catch-up from publishing
+// stale news.
+async function pickWindow() {
+  const arg = process.argv.find(a => a.startsWith('--window='));
+  if (arg) {
+    const key = arg.slice(9);
+    const start = Math.floor(Date.parse(key + ':00+03:00') / 1000);
+    if (!Number.isFinite(start)) throw new Error(`bad --window (want 2026-08-26T08:00): ${key}`);
+    return { key, start, end: start + WIN * 60, replay: true,
+      rows: await messagesInAll(start, start + WIN * 60) };
+  }
+  const nowWindow = windowOf(Math.floor(Date.now() / 1000)).start;   // still open, skip it
+  const oldest = await oldestUnconsumedBefore(nowWindow);
+  if (!oldest) return null;
+  const w = windowOf(Number(oldest));
+  return { key: w.key, start: w.start, end: w.end,
+    rows: await messagesIn(w.start, w.end),
+    backlog: Math.floor((nowWindow - w.start) / (WIN * 60)) };
+}
+
+async function main() {
+  if (process.argv.includes('--ingest')) {
+    try {
+      const { fetchRecent } = await import('./ingest.js');
+      const rows = await fetchRecent(80);
+      await putMessages(rows);
+      say('ingested', rows.length, 'message(s)');
+    } catch (e) { say('ingest failed (continuing):', e.message); }
+  }
+
+  // .env seeds the token once; after that Postgres holds the live one
+  // (refresh-token.js writes there, and a runner has no disk).
+  const stored = await getToken();
+  if (stored) process.env.IG_ACCESS_TOKEN = stored;
+  else if (process.env.IG_ACCESS_TOKEN) {
+    await setToken(process.env.IG_ACCESS_TOKEN, null);
+    say('seeded Instagram token into the database');
+  }
+
+  const stop = DRY ? null : await blocked();
+  if (stop) { say('SKIP —', stop); return; }
+
+  const w = await pickWindow();
+  if (!w) { say('SKIP — nothing unconsumed'); return; }
+
+  const ageMin = Math.floor((Date.now() / 1000 - w.end) / 60);
+  const maxAge = Number(process.env.MAX_WINDOW_AGE_MIN || 90);
+  if (!w.replay && ageMin > maxAge) {
+    say(`RETIRE — ${w.key} is ${ageMin}min old (max ${maxAge}); ${w.rows.length} msg(s) dropped`);
+    await upsertWindow(w.key, w.start, w.end);
+    await markConsumed(w.key, w.rows.map(r => Number(r.tg_id)));
+    await setWindow({ key: w.key, status: 'stale', slides: 0 });
+    return;
+  }
+  if (w.backlog > 1) say(`catching up — ${w.key} is ${w.backlog} window(s) behind`);
+
+  await upsertWindow(w.key, w.start, w.end);
+  if (!w.rows.length) { say(`SKIP — ${w.key} has no unconsumed messages`); return; }
+  if (!w.replay && (await getWindow(w.key))?.status === 'posted') {
+    say('SKIP —', w.key, 'already posted'); return;
+  }
+
+  const carry = (await getState(CARRY_KEY)) ?? {};
+  const deck = compose(w.rows, { carry });
+  if (deck.carry) await setState(CARRY_KEY, deck.carry);
+
+  const consumed = deck.consumed.map(Number);
+  if (deck.skip) {
+    say('SKIP —', w.key, `(${deck.skip})`);
+    if (!w.replay) {
+      await markConsumed(w.key, consumed);
+      await setWindow({ key: w.key, status: deck.skip, slides: deck.slides.length });
+    }
+    return;
+  }
+
+  say(`${w.key} — ${w.rows.length} msgs -> ${deck.slides.length} slides [${deck.slides.map(s => s.type)}]`);
+
+  const api = (process.env.PUBLISHER || 'api') === 'api';
+  const dir = join('./out', w.key.replace(/:/g, ''));
+  const { files, shed } = await renderDeck(deck, dir, { format: api ? 'jpeg' : 'png' });
+  if (shed.length) say('tripwire shed', shed.length, 'row(s):', shed.map(s => s.headline.slice(0, 40)));
+  say('rendered', files.length, 'slide(s)');
+
+  let result;
+  try {
+    if (!api) throw new Error('browser publisher not implemented — set PUBLISHER=api');
+    const { upload, remove, publish } = await import('./publish/api.js');
+    const prefix = w.key.replace(/:/g, '');
+    const urls = await upload(files, prefix);
+    say('uploaded', urls.length);
+    try {
+      result = await publish(urls, deck.caption, { dryRun: DRY });
+      say(DRY ? `DRY RUN OK — carousel ${result.carousel} built, NOT published`
+              : `POSTED ${result.permalink ?? result.id}`);
+    } finally {
+      await remove(files, prefix);
+    }
+  } catch (e) {
+    say('FAILED —', e.message);
+    await setWindow({ key: w.key, status: 'failed', slides: deck.slides.length, shed, error: e.message });
+    await logRun(w.key, 'publish', false, e.message);
+    await notify(`❌ ${w.key}\n${e.message}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  if (DRY) { say('dry run — window left open'); return; }
+  await markConsumed(w.key, consumed);
+  await setWindow({ key: w.key, status: 'posted', slides: deck.slides.length, shed,
+    posted_at: Math.floor(Date.now() / 1000) });
+  await logRun(w.key, 'publish', true, result.permalink ?? result.id);
+  await notify(`✅ ${w.key} — ${deck.slides.length} slides\n${result.permalink ?? ''}`);
+}
+
+async function notify(text) {
+  try {
+    const c = await connect(); await c.connect();
+    await alert(c, text); await c.disconnect();
+  } catch (e) { console.warn('telegram alert failed:', e.message); }
+}
+
+try { await main(); } finally { await close(); }

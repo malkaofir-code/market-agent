@@ -1,0 +1,17 @@
+.env
+state.db
+out/
+node_modules/
+PAUSED
+*.session
+chrome-profile/
+logs/
+.env.bak
+
+# stray artefacts
+DRY_RUN=0
+.fuse_hidden*
+.DS_Store
+*.plist
+state.db-shm
+state.db-wal
