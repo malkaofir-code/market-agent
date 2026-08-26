@@ -1,8 +1,9 @@
 name: tick
 
-# Hourly, a few minutes past the hour so the window has fully closed.
-# Cron is UTC; Israel is UTC+3 in summer, so 04:05-20:05 UTC covers
-# 07:05-23:05 local. In winter (UTC+2) it shifts an hour earlier -
+# Hourly at :15, giving the window a quarter of an hour to close
+# before the tick looks at it.
+# Cron is UTC; Israel is UTC+3 in summer, so 04:15-20:15 UTC covers
+# 07:15-23:15 local. In winter (UTC+2) it shifts an hour earlier -
 # harmless, because run.js enforces active hours in the real timezone.
 #
 # GitHub does not run scheduled workflows punctually: 5-20 minutes
@@ -12,7 +13,7 @@ name: tick
 # MAX_WINDOW_AGE_MIN instead of posting stale news.
 on:
   schedule:
-    - cron: '5 4-20 * * *'
+    - cron: '15 4-20 * * *'
   workflow_dispatch:
     inputs:
       dry:
