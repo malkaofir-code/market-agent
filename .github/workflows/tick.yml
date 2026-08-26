@@ -34,7 +34,13 @@ jobs:
     timeout-minutes: 12
     # Chromium and its system libraries are already in this image.
     # Installing them per run would double the billed minutes.
-    container: mcr.microsoft.com/playwright:v1.49.1-noble
+    #
+    # This tag MUST match the playwright version in package.json
+    # exactly. A caret range let npm resolve 1.49.1 -> 1.62.1 while
+    # this stayed put, and the browser binary path moved with the
+    # library: "Executable doesn't exist at .../chromium_headless_shell-1234".
+    # package.json now pins an exact version; bump both together.
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
     steps:
       - uses: actions/checkout@v4
 
