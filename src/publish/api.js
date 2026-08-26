@@ -52,16 +52,31 @@ async function call(path, params, method = 'POST', attempt = 0) {
   return json;
 }
 
-/** Poll a container until Meta has actually fetched and accepted the image. */
-async function ready(id, { tries = 20, gap = 1500 } = {}) {
+/**
+ * Wait for Meta to fetch and accept an image.
+ *
+ * This used to poll every 1.5s up to 20 times. A four-slide deck is
+ * five containers, so a single run could spend 100 calls just asking
+ * "are you done yet" - and a Development-mode app gets roughly 200
+ * calls per 24 HOURS. We exhausted the app's entire daily budget on
+ * status polling, then media_publish was refused with code 4
+ * ("Application request limit reached"). The publishing quota was
+ * never the constraint; our own chatter was.
+ *
+ * Images finish almost immediately, so: wait first, then poll with
+ * backoff, and cap hard. Worst case 5 calls instead of 20; the
+ * common case is 1.
+ */
+async function ready(id, { tries = 5 } = {}) {
+  const waits = [1200, 2500, 5000, 9000, 15000];
   for (let i = 0; i < tries; i++) {
-    const { status_code, status } = await call(`/${id}`, { fields: 'status_code,status' }, 'GET');
+    await sleep(waits[Math.min(i, waits.length - 1)]);
+    const { status_code, status } = await call(`/${id}`, { fields: 'status_code' }, 'GET');
     if (status_code === 'FINISHED') return true;
     if (status_code === 'ERROR' || status_code === 'EXPIRED')
       throw new Error(`container ${id} -> ${status_code}: ${status ?? ''}`);
-    await sleep(gap);
   }
-  throw new Error(`container ${id} still ${'IN_PROGRESS'} after ${tries * gap / 1000}s`);
+  throw new Error(`container ${id} not FINISHED after ${tries} checks`);
 }
 
 /**
@@ -93,6 +108,9 @@ export async function publish(urls, caption, { dryRun = false } = {}) {
   // FINISHED and only fails at media_publish, which is exactly the
   // symptom here; hiding this behind dryRun meant three live failures
   // taught us nothing.
+  // One extra call per run, and calls are the scarce resource on an
+  // unpublished app. Off unless PROBE_CONTAINER=1.
+  if (process.env.PROBE_CONTAINER === '1')
   // status_code is the ONLY field Meta documents on a container.
   // Asking for media_type or children returns "nonexisting field
   // (code 100)" - a container is not a media object, so there is no
