@@ -88,7 +88,21 @@ export async function publish(urls, caption, { dryRun = false } = {}) {
   });
   await ready(carousel);
 
-  if (dryRun) return { id: null, carousel, dryRun: true, children };
+  if (dryRun) {
+    // Interrogate the container Meta actually built. A carousel with
+    // no children attached still reports FINISHED and only fails at
+    // media_publish - which is exactly the symptom we are chasing.
+    let detail = {};
+    try {
+      detail = await call(`/${carousel}`,
+        { fields: 'id,status_code,media_type,children{id,media_type,media_url}' }, 'GET');
+    } catch (e) { detail = { probe_error: e.message }; }
+    const kids = detail?.children?.data ?? [];
+    console.log(`  carousel ${carousel}: media_type=${detail.media_type ?? '?'} ` +
+      `status=${detail.status_code ?? '?'} children_attached=${kids.length} (sent ${children.length})`);
+    if (detail.probe_error) console.log('  probe:', detail.probe_error);
+    return { id: null, carousel, dryRun: true, children, attached: kids.length };
+  }
 
   // 3 · publish
   const { id } = await call(`/${ig}/media_publish`, { creation_id: carousel });
