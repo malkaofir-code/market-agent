@@ -101,18 +101,28 @@ async function main() {
   const stop = DRY ? null : await blocked();
   if (stop) { say('SKIP —', stop); return; }
 
-  const w = await pickWindow();
+  let w = await pickWindow();
   if (!w) { say('SKIP — nothing unconsumed'); return; }
 
-  const ageMin = Math.floor((Date.now() / 1000 - w.end) / 60);
+  // Old news is worse than no news - but retire the whole stale
+  // backlog in ONE pass, not one window per run. The migration
+  // arrived carrying a week of unconsumed history, and retiring a
+  // single window per hourly tick would have spent three days
+  // replaying August before reaching today. The same loop absorbs
+  // any future outage.
   const maxAge = Number(process.env.MAX_WINDOW_AGE_MIN || 90);
-  if (!w.replay && ageMin > maxAge) {
-    say(`RETIRE — ${w.key} is ${ageMin}min old (max ${maxAge}); ${w.rows.length} msg(s) dropped`);
+  const stale = x => Math.floor((Date.now() / 1000 - x.end) / 60) > maxAge;
+  let retired = 0, dropped = 0;
+  while (w && !w.replay && stale(w)) {
     await upsertWindow(w.key, w.start, w.end);
     await markConsumed(w.key, w.rows.map(r => Number(r.tg_id)));
     await setWindow({ key: w.key, status: 'stale', slides: 0 });
-    return;
+    retired++; dropped += w.rows.length;
+    if (retired >= 500) { say('retire loop hit its 500-window guard'); break; }
+    w = await pickWindow();
   }
+  if (retired) say(`RETIRED ${retired} stale window(s), ${dropped} msg(s)`);
+  if (!w) { say('SKIP — nothing fresh left'); return; }
   if (w.backlog > 1) say(`catching up — ${w.key} is ${w.backlog} window(s) behind`);
 
   await upsertWindow(w.key, w.start, w.end);
