@@ -88,24 +88,36 @@ export async function publish(urls, caption, { dryRun = false } = {}) {
   });
   await ready(carousel);
 
-  if (dryRun) {
-    // Interrogate the container Meta actually built. A carousel with
-    // no children attached still reports FINISHED and only fails at
-    // media_publish - which is exactly the symptom we are chasing.
-    let detail = {};
-    try {
-      detail = await call(`/${carousel}`,
-        { fields: 'id,status_code,media_type,children{id,media_type,media_url}' }, 'GET');
-    } catch (e) { detail = { probe_error: e.message }; }
-    const kids = detail?.children?.data ?? [];
-    console.log(`  carousel ${carousel}: media_type=${detail.media_type ?? '?'} ` +
-      `status=${detail.status_code ?? '?'} children_attached=${kids.length} (sent ${children.length})`);
-    if (detail.probe_error) console.log('  probe:', detail.probe_error);
-    return { id: null, carousel, dryRun: true, children, attached: kids.length };
-  }
+  // Interrogate the container Meta actually built, on EVERY run - not
+  // just dry ones. A carousel with no children attached still reports
+  // FINISHED and only fails at media_publish, which is exactly the
+  // symptom here; hiding this behind dryRun meant three live failures
+  // taught us nothing.
+  let attached = null;
+  try {
+    const d = await call(`/${carousel}`,
+      { fields: 'id,status_code,media_type,children{id,media_type}' }, 'GET');
+    attached = d?.children?.data?.length ?? 0;
+    console.log(`  carousel ${carousel}: media_type=${d.media_type ?? '?'} ` +
+      `status=${d.status_code ?? '?'} children_attached=${attached} (sent ${children.length})`);
+  } catch (e) { console.log('  container probe failed:', e.message); }
+
+  if (dryRun) return { id: null, carousel, dryRun: true, children, attached };
 
   // 3 · publish
-  const { id } = await call(`/${ig}/media_publish`, { creation_id: carousel });
+  let id;
+  try {
+    ({ id } = await call(`/${ig}/media_publish`, { creation_id: carousel }));
+  } catch (e) {
+    // 2207085 is undocumented. Re-read the container after the refusal:
+    // whatever Meta objects to should be visible in its final state.
+    try {
+      const post = await call(`/${carousel}`,
+        { fields: 'id,status_code,status,media_type,children{id,status_code,status}' }, 'GET');
+      console.log('  container after refusal:', JSON.stringify(post));
+    } catch (p) { console.log('  post-mortem probe failed:', p.message); }
+    throw e;
+  }
   const { permalink } = await call(`/${id}`, { fields: 'permalink' }, 'GET').catch(() => ({}));
   return { id, permalink: permalink ?? null };
 }

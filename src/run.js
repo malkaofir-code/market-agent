@@ -116,7 +116,13 @@ async function main() {
   while (w && !w.replay && stale(w)) {
     await upsertWindow(w.key, w.start, w.end);
     await markConsumed(w.key, w.rows.map(r => Number(r.tg_id)));
-    await setWindow({ key: w.key, status: 'stale', slides: 0 });
+    // A failed publish leaves its messages unconsumed, so the next
+    // tick's retire loop used to sweep the window up and overwrite
+    // 'failed' with 'stale' - laundering the failure, so the
+    // auto-pause counted zero and never latched. Consume the
+    // messages, but never downgrade a recorded failure.
+    const prior = await getWindow(w.key);
+    if (prior?.status !== 'failed') await setWindow({ key: w.key, status: 'stale', slides: 0 });
     retired++; dropped += w.rows.length;
     if (retired >= 500) { say('retire loop hit its 500-window guard'); break; }
     w = await pickWindow();
