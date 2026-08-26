@@ -32,13 +32,17 @@ export async function putMessages(rows) {
   // to Frankfurt on every single query.
   const vals = [], params = [];
   rows.forEach((r, i) => {
-    const b = i * 4;
-    vals.push(`($${b + 1},$${b + 2},$${b + 3},$${b + 4})`);
-    params.push(r.tg_id, r.ts, r.text, r.has_media);
+    const b = i * 6;
+    vals.push(`($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6})`);
+    params.push(r.tg_id, r.ts, r.text, r.has_media, r.media_url ?? null, r.media_at ?? null);
   });
+  // coalesce on media_url: a re-ingest of an old message carries no
+  // buffer, and must not blank a URL we already harvested.
   const { rowCount } = await q(
-    `insert into agent.messages (tg_id, ts, text, has_media) values ${vals.join(',')}
-     on conflict (tg_id) do update set text = excluded.text`, params);
+    `insert into agent.messages (tg_id, ts, text, has_media, media_url, media_at) values ${vals.join(',')}
+     on conflict (tg_id) do update set text = excluded.text,
+       media_url = coalesce(agent.messages.media_url, excluded.media_url),
+       media_at  = coalesce(agent.messages.media_at,  excluded.media_at)`, params);
   return rowCount;
 }
 
@@ -84,6 +88,11 @@ export const lastPostAt = () =>
 export const recentOutcomes = n =>
   q(`select status from agent.windows where status in ('posted','failed')
      order by coalesce(posted_at, end_ts) desc limit $1`, [n]).then(r => r.rows.map(x => x.status));
+
+/** tg_ids whose photo is already in storage - so we never refetch. */
+export const withMedia = () =>
+  q(`select tg_id from agent.messages where media_url is not null`)
+    .then(r => new Set(r.rows.map(x => Number(x.tg_id))));
 
 export const logRun = (wkey, phase, ok, detail) =>
   q(`insert into agent.runs (wkey, phase, ok, detail) values ($1,$2,$3,$4)`,

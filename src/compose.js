@@ -125,9 +125,13 @@ export function compose(rows, { now = null, carry = {} } = {}) {
   const isCta = hhmm(w.start).startsWith('23');      // §05: once a day
   const cap = isCta ? MAX_CTA : MAX;
 
-  // 01 · cover — highest score, not most recent
+  // 01 · cover — highest score, not most recent.
+  // The framed treatment needs a photo to frame; without one it falls
+  // back to the plain cover, which reads as deliberate rather than
+  // broken because the text hangs off the bottom either way.
   const lead = take(() => true);
-  slides.push({ type: 'cover', headline: lead.headline, stand: lead.stand, source: lead.source });
+  slides.push({ type: lead.photo ? 'coverFramed' : 'cover',
+    headline: lead.headline, stand: lead.stand, source: lead.source, photo: lead.photo });
 
   // 02 · hero — "a sentence carrying four or more figures is a table
   // read aloud and is skipped; a hero number needs a claim attached."
@@ -136,7 +140,7 @@ export function compose(rows, { now = null, carry = {} } = {}) {
     const f = hero.figures[0];
     const sentence = `${hero.headline} ${hero.stand ?? ''}`;
     slides.push({ type: 'hero', figure: f.text.replace(/[−־]/g, '-'),
-      dir: direction(f.text, sentence),
+      dir: direction(f.text, sentence), photo: hero.photo,
       quote: hero.stand || hero.headline, source: hero.source });
   }
 
@@ -157,7 +161,21 @@ export function compose(rows, { now = null, carry = {} } = {}) {
   // hero figure instead."
   if (quotes.length >= 3) slides.push({ type: 'chart', series: quotes, stamp });
 
-  // 05 · list — everything left, balanced across pages, never chunked
+  // 05 · item slides — the redesign's point: a story that brought a
+  // photo gets a slide of its own rather than a line in a list. Capped
+  // so the tail still fits; whatever is left falls through to the list.
+  const room0 = cap - slides.length - (isCta ? 1 : 0);
+  let placed = 0;
+  for (const p of pool.filter(p => !used.has(p.tg_id) && p.photo)) {
+    if (placed >= Math.max(0, room0 - 1)) break;   // keep one slot for the list
+    used.add(p.tg_id);
+    slides.push({ type: 'item', n: slides.length + 1, headline: p.headline,
+      photo: p.photo, body: p.stand, source: p.source,
+      stat: p.figures.length && p.figureCount < 4 ? p.figures[0].text.replace(/[−־]/g, '-') : null });
+    placed++;
+  }
+
+  // 06 · list — everything left, balanced across pages, never chunked
   const rest = pool.filter(p => !used.has(p.tg_id));
   const room = cap - slides.length - (isCta ? 1 : 0);
   if (rest.length && room > 0) {

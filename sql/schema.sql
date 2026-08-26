@@ -59,3 +59,10 @@ alter table agent.messages enable row level security;
 alter table agent.windows  enable row level security;
 alter table agent.runs     enable row level security;
 alter table agent.state    enable row level security;
+
+-- ── media (added with the Direction A redesign) ──────────────
+-- 44% of source messages carry a photo or chart. The paper design
+-- discarded them; the dark one is built around them. We keep only the
+-- public URL of the copy pushed to storage - never the bytes.
+alter table agent.messages add column if not exists media_url text;
+alter table agent.messages add column if not exists media_at  bigint;

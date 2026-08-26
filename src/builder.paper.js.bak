@@ -42,78 +42,57 @@ function foot(i, n, src) {
 }
 
 // ── band B: the six archetypes ───────────────────────────────
-const photo = (p, stat) => p
-  ? `<div class="ph" style="height:${p.h ?? 452}px"><img src="${esc(p.src)}" alt="">${
-      stat ? `<span class="stat">${esc(stat)}</span>` : ''}</div>`
-  : '';
-
 const ARCHETYPES = {
-  // 01 · cover — the photo bleeds off the top and dissolves into the
-  // ground; the headline sits inside the fade rather than beside it.
-  cover: s => `<div class="a-cv">
-    <div class="txt"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
-    <h1>${bidi(s.headline)}</h1>
-    <p class="stand">${bidi(s.stand)}</p></div></div>`,
-
-  // 01b · cover, framed — the composition carried over from direction
-  // B: the photo as a physical object, headline block cutting across.
-  // Standing cover; `cover` above stays for windows with no image.
-  coverFramed: s => `<div class="a-cf">
-    ${s.photo ? `<div class="frame"><img src="${esc(s.photo.src)}" alt=""></div>` : ''}
-    <div class="block"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
-    <h1>${bidi(s.headline)}</h1></div>
+  // 01 · cover — hangs off the top rule like a front page
+  cover: s => `<div class="a-cv"><p class="eyeb">עדכון ${bidi(s.window)}</p><h1>${bidi(s.headline)}</h1>
     <p class="stand">${bidi(s.stand)}</p><div class="kick"></div></div>`,
 
   // 02 · hero figure — sized to its measure, not to a constant.
+  // At the four-character size a constant ran 1,100% off the frame.
   hero: s => {
-    const size = Math.min(224, Math.floor(880 / (String(s.figure).length * 0.62)));
+    const size = Math.min(256, Math.floor(940 / (String(s.figure).length * 0.62)));
+    const dir = s.dir ? ` ${s.dir}` : '';
     return `<div class="a-hr"><p class="eyeb">${bidi(s.eyebrow || 'המספר של החלון')}</p>
-    <p class="fig ${s.dir ?? ''}" style="font-size:${size}px">${esc(s.figure)}</p>
-    ${photo(s.photo && { ...s.photo, h: 300 })}
+    <p class="fig${dir}" style="font-size:${size}px">${esc(s.figure)}</p>
+    ${s.unit ? `<p class="unit">${bidi(s.unit)}</p>` : ''}
     <p class="quo">${bidi(s.quote)}</p></div>`;
   },
 
-  // 03 · item — one story, its photo, and the sentence under it.
-  item: s => `<div class="a-it">
-    <div class="hd"><span class="rowidx">${pad2(s.n)}</span><h2>${bidi(s.headline)}</h2></div>
-    ${photo(s.photo, s.stat)}
-    ${s.body ? `<p class="body">${bidi(s.body)}</p>` : ''}</div>`,
-
-  // 04 · interpretation — the one heavy frame in the system.
-  note: s => `<div class="a-nt"><p class="eyeb">MEANING · משמעות</p>
+  // 03 · interpretation — the one heavy frame in the system,
+  // spent here because this is the only original content.
+  note: s => `<div class="a-nt"><p class="lab">MEANING · משמעות</p>
     ${s.about ? `<p class="abt">${bidi(s.about)}</p>` : ''}
     <p class="txt">${bidi(s.text)}</p>
     <p class="dis">${bidi(s.disclaimer || 'פרשנות, לא המלצה.')}</p></div>`,
 
-  // 05 · tape chart — hand-built bars, pinned LTR.
+  // 04 · chart — hand-written SVG, pinned LTR (§06: bidi leaks
+  // into <text> and drops the label on top of its own bar).
   chart: s => `<div class="a-ch"><p class="eyeb">TAPE · חוזים עתידיים</p>
-    <h2>${bidi(s.title || 'התמונה בחוזים')}</h2>
-    <div class="bars">${s.series.map(d => {
-      const sg = sign(d.chg), w = Math.min(46, Math.abs(d.chg) * 36);
-      return `<div class="bar"><span class="sym">${esc(d.sym)}</span>
-      <div class="track"><div class="fill ${sg}" style="width:${w}%"></div><div class="zero"></div></div>
-      <span class="val ${sg}">${fmtPct(d.chg)}</span></div>`;
-    }).join('')}</div>
+    <h2>${bidi(s.title || 'התמונה בחוזים')}</h2><div class="chw">${barChart(s.series)}</div>
     <p class="note">נכון ל־${bidi(s.stamp)} · שעון ישראל</p></div>`,
 
-  // 06 · list — everything that did not earn its own photo slide.
-  list: s => `<div class="a-ls"><h2>${bidi(s.title || 'עוד מהחלון הזה')}</h2><div class="rows">${
-    s.rows.map(r => `<div class="row"><span class="row-n">${pad2(r.n)}</span>
+  // 05 · list — balanced pages, not fixed threes
+  list: s => {
+    const rows = s.rows.map(r =>
+      `<div class="row"><span class="row-n">${pad2(r.n)}</span>
     <span><p class="row-h">${bidi(r.headline)}</p>${
-      r.source ? `<span class="row-s">${bidi(r.source)}</span>` : ''}</span></div>`).join('')
-  }</div></div>`,
+      r.source ? `<span class="row-s">${bidi(r.source)}</span>` : ''}</span></div>`
+    ).join('');
+    return `<div class="a-ls"><h2>${bidi(s.title || 'עוד מהחלון הזה')}</h2><div class="rows">${rows}</div></div>`;
+  },
 
-  // 07 · what to watch — a single sentence, no furniture competing.
-  watch: s => `<div class="a-wt"><p class="eyeb">${bidi(s.eyebrow || 'מה לעקוב')}</p>
-    <p class="big">${bidi(s.text)}</p><div class="kick"></div></div>`,
-
-  // 08 · telegram — once a day, on the 23:00 deck.
-  telegram: s => `<div class="a-tg"><p class="eyeb">TELEGRAM · בזמן אמת</p>
-    <p class="big">${bidi(s.big)}</p>
-    <div class="sched">${(s.schedule || []).map(r =>
+  // 06 · telegram — once a day, on the 23:00 deck, and it costs
+  // a content slide. A CTA on every deck is how an account stops
+  // being read.
+  telegram: s => {
+    const sched = (s.schedule || []).map(r =>
       `<div class="sr"><span class="st">${esc(r.time)}</span><span class="se">${bidi(r.label)}</span></div>`
-    ).join('')}</div>
-    <div class="link">${esc(s.link)}</div></div>`,
+    ).join('');
+    return `<div class="a-tg"><p class="eyeb">TELEGRAM · בזמן אמת</p>
+    <p class="big">${bidi(s.big)}</p>
+    <div class="sched">${sched}</div>
+    <div class="link">${esc(s.link)}</div></div>`;
+  },
 };
 
 // ── chart geometry, reproduced from the specimen ─────────────
@@ -141,28 +120,11 @@ export function barChart(series) {
 }
 
 // ── assembly ─────────────────────────────────────────────────
-const NO_TAPE = new Set(['telegram']);
-const COVERS = new Set(['cover', 'coverFramed']);   // overlay grid
-const BLEED = new Set(['cover']);                  // photo escapes the band
-
-/**
- * A cover's photo has to bleed behind the masthead, so it cannot live
- * inside .sl-bd - that band is a grid row and clips it. Covers emit
- * the image as a SIBLING of the body, positioned against the slide,
- * and .slide--cover switches the grid to overlay.
- */
-const coverLayer = slide => {
-  if (!BLEED.has(slide.type) || !slide.photo) return '';
-  if (slide.type !== 'cover') return '';   // framed cover keeps its photo in flow
-  return `<div class="cv-bleed"><img src="${esc(slide.photo.src)}" alt=""></div>`;
-};
-
 export function buildSlide(slide, ctx, i, n) {
   const body = ARCHETYPES[slide.type];
   if (!body) throw new Error(`unknown archetype: ${slide.type}`);
-  const cover = COVERS.has(slide.type);
-  return `<div class="slide${cover ? ' slide--cover' : ''}" data-type="${slide.type}"><div class="bgm"></div>${coverLayer(slide)}
-${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window })}</main>${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
+  return `<div class="slide" data-type="${slide.type}"><div class="bgm"></div>
+${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window })}</main>${tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }
 

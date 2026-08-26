@@ -54,6 +54,7 @@ export function parse(row) {
   return {
     tg_id: row.tg_id,
     ts: row.ts,
+    photo: row.media_url ? { src: row.media_url } : null,
     headline,
     stand: reporting[0] ?? null,      // one standfirst sentence, never the whole body
     reporting,                         // caption material

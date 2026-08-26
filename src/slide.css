@@ -1,88 +1,154 @@
-/* ================= the slide system itself, scoped ================= */
+/* ─────────────────────────────────────────────────────────────
+   slide.css — Direction A · Dark Tape.
+   Replaces the warm-paper sheet (kept as slide.paper.css.bak).
+   Same four-band anatomy as design.html §04: the furniture never
+   moves, only the middle band changes. What changed is the ground,
+   and that photos from the source channel are now first-class.
+   ───────────────────────────────────────────────────────────── */
 *{box-sizing:border-box}
-:root{--paper:#F4EFE3;--ink:#12100B;--dim:#69614F;--dim2:#38332A;--pos:#0F6236;
-  --neg:#A11F13;--acc:#B2560F;--rule:#C6BCA6;--f-text:'Assistant',sans-serif;
-  --f-disp:'Frank Ruhl Libre',serif;--f-mono:'IBM Plex Mono',monospace;}
+:root{
+  --bg:#0B0D10; --fg:#F2F0EB; --dim:#9AA0AA; --dim2:#C3C7CE;
+  --acc:#FF6B1A; --rule:#262B33; --pos:#35D07F; --neg:#FF5A5A;
+  --f-text:'Assistant',sans-serif;
+  --f-disp:'Frank Ruhl Libre',serif;
+  --f-mono:'IBM Plex Mono',monospace;
+}
+html,body{margin:0;padding:0;background:var(--bg)}
 
-.slide{width:1080px;height:1350px;position:relative;overflow:hidden;background:var(--paper);
-color:var(--ink);direction:rtl;text-align:right;font-family:var(--f-text);display:grid;
-grid-template-rows:auto 1fr auto auto;padding:58px 64px 48px;transform-origin:center}
+.slide{width:1080px;height:1350px;position:relative;overflow:hidden;background:var(--bg);
+  color:var(--fg);direction:rtl;text-align:right;font-family:var(--f-text);display:grid;
+  grid-template-rows:auto 1fr auto;padding:52px 64px 34px}
 .slide>*{position:relative;z-index:2}
+.slide::after{content:"";position:absolute;inset:0 0 auto 0;height:10px;background:var(--acc);z-index:6}
 .bgm{position:absolute;inset:0;z-index:0;background-image:
-linear-gradient(to right,rgba(18,16,11,.055) 1px,transparent 1px),
-linear-gradient(to bottom,rgba(18,16,11,.055) 1px,transparent 1px);background-size:54px 54px}
-.slide::after{content:"";position:absolute;inset:0 0 auto 0;height:9px;background:var(--acc);z-index:3}
-.sl-hd{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-bottom:18px;
-border-bottom:4px double var(--ink)}
+  linear-gradient(to right,rgba(242,240,235,.035) 1px,transparent 1px),
+  linear-gradient(to bottom,rgba(242,240,235,.035) 1px,transparent 1px);background-size:54px 54px}
+
+/* ── band A · masthead ── */
+.sl-hd{display:flex;align-items:center;justify-content:space-between;gap:20px;
+  padding-bottom:22px;border-bottom:1.5px solid var(--rule)}
 .hd-l{display:flex;align-items:center;gap:14px}
-.hd-mark{width:38px;height:38px;display:block;color:var(--acc)}
-.hd-name{font-family:var(--f-mono);font-size:26px;font-weight:700;letter-spacing:.2em;white-space:nowrap}
-.hd-meta{font-family:var(--f-mono);font-size:25px;color:var(--dim);direction:ltr;unicode-bidi:isolate;white-space:nowrap}
-.sl-bd{min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding-top:44px}
-.sl-bd:has(.a-cv){justify-content:flex-start}
-.tick{display:flex;align-items:center;margin-top:26px;border-top:1.5px solid var(--rule);
-border-bottom:1.5px solid var(--rule);padding:16px 0;font-family:var(--f-mono);font-size:25px;
-direction:ltr;unicode-bidi:isolate;overflow:hidden;white-space:nowrap}
-.tick i{font-style:normal;padding:0 22px;border-inline-end:1.5px solid var(--rule)}
-.tick i:last-child{border:0;color:var(--dim)}
+.hd-mark{width:38px;height:38px;display:block;color:var(--acc);flex:0 0 auto}
+.hd-name{font-family:var(--f-mono);font-size:25px;font-weight:700;letter-spacing:.22em;white-space:nowrap}
+.hd-meta{font-family:var(--f-mono);font-size:24px;color:var(--dim);direction:ltr;unicode-bidi:isolate;white-space:nowrap}
+
+/* ── band B · body ── */
+.sl-bd{min-height:0;display:flex;flex-direction:column;justify-content:center;gap:34px;padding-top:18px;overflow:hidden}
+
+/* ── band C · tape ── */
+.tick{display:flex;align-items:center;border-top:1.5px solid var(--rule);border-bottom:1.5px solid var(--rule);
+  padding:16px 0;font-family:var(--f-mono);font-size:25px;direction:ltr;unicode-bidi:isolate;
+  overflow:hidden;white-space:nowrap;margin-top:26px}
+.tick i{font-style:normal;padding-inline-end:24px}
+.tick i+i{padding-inline-start:24px;border-inline-start:1.5px solid var(--rule)}
+.tick i:last-child{color:var(--dim)}
 .tick b{font-weight:700}
-.tick .pos{color:var(--pos)}
-.tick .neg{color:var(--neg)}
-.sl-ft{display:flex;align-items:baseline;justify-content:space-between;gap:18px;margin-top:20px;
-padding-top:16px;border-top:2.5px solid var(--ink)}
-.ft-ix{font-family:var(--f-mono);font-size:24px;color:var(--acc);font-weight:700;direction:ltr;
-unicode-bidi:isolate;letter-spacing:.08em}
+.tick .pos{color:var(--pos)} .tick .neg{color:var(--neg)}
+
+/* ── band D · footnote ── */
+.sl-ft{display:flex;align-items:baseline;justify-content:space-between;gap:18px;
+  padding-top:18px;border-top:2.5px solid var(--rule)}
+.ft-ix{font-family:var(--f-mono);font-size:24px;color:var(--acc);font-weight:700;direction:ltr;unicode-bidi:isolate}
 .ft-src{font-size:23px;color:var(--dim);flex:1;line-height:1.35}
-.ft-hd{font-family:var(--f-mono);font-size:23px;color:var(--dim);direction:ltr;unicode-bidi:isolate}
-.eyeb{font-family:var(--f-mono);font-size:24px;letter-spacing:.14em;color:var(--acc);margin:0 0 22px;font-weight:700}
-.num{direction:ltr;unicode-bidi:isolate;font-family:inherit}
+.ft-hd{font-family:var(--f-mono);font-size:24px;color:var(--dim);direction:ltr;unicode-bidi:isolate}
+
+.num{direction:ltr;unicode-bidi:isolate;font-family:inherit;font-feature-settings:"tnum"}
 .lat{unicode-bidi:isolate}
-.a-cv h1{margin:0;font-family:var(--f-disp);font-weight:800;font-size:102px;line-height:1.03;
-letter-spacing:-.028em;max-width:16ch}
-.a-cv .stand{font-size:36px;line-height:1.4;color:var(--dim2);margin:34px 0 0;max-width:26ch;
-border-top:1.5px solid var(--rule);padding-top:26px}
-.a-cv .kick{width:200px;height:7px;background:var(--acc);margin:38px 0 0}
+.eyeb{font-family:var(--f-mono);font-size:24px;letter-spacing:.16em;color:var(--acc);margin:0;font-weight:700}
+.rowidx{font-family:var(--f-mono);font-size:30px;font-weight:700;color:var(--acc);direction:ltr;unicode-bidi:isolate;padding-top:8px}
+
+/* ── photo: the thing the paper system threw away ── */
+.ph{overflow:hidden;border:1.5px solid var(--rule);position:relative}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph .stat{position:absolute;bottom:0;right:0;background:var(--acc);color:var(--bg);
+  font-family:var(--f-mono);font-size:44px;font-weight:700;padding:10px 22px;direction:ltr;unicode-bidi:isolate}
+
+/* ── cover overlay: the photo is a sibling of .sl-bd so it can bleed
+   behind the masthead; the body band stops being a grid row and
+   simply hangs at the bottom of the frame. ── */
+.slide--cover .sl-bd{justify-content:flex-end;padding-top:0}
+.cv-bleed{position:absolute;inset:0 0 auto 0;height:770px;overflow:hidden;z-index:1}
+.cv-bleed img{width:100%;height:100%;object-fit:cover;opacity:.92;display:block}
+.cv-bleed::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,
+  rgba(11,13,16,.15) 0%,rgba(11,13,16,.55) 55%,var(--bg) 100%)}
+/* ── 01 · cover (photo bleeds off the top, headline in the fade) ── */
+.a-cv{z-index:3}
+.a-cv h1{font-family:var(--f-disp);font-weight:900;font-size:104px;line-height:1.02;
+  letter-spacing:-.03em;margin:24px 0 0;max-width:15ch;text-wrap:balance}
+.a-cv .stand{font-size:34px;line-height:1.42;color:var(--dim2);margin:30px 0 0;max-width:26ch}
+
+/* ── 01b · cover, framed (the B composition, kept dark).
+   Laid out in FLOW with negative margins, not absolutely: an
+   absolute child of .sl-bd is measured against a grid row, which
+   put the headline block off the top of the frame entirely. ── */
+.a-cf{display:flex;flex-direction:column;position:relative;z-index:3}
+.a-cf .frame{width:700px;height:520px;align-self:flex-start;margin-inline-start:-12px;
+  transform:rotate(-1.6deg);border:14px solid var(--fg);overflow:hidden;flex:0 0 auto}
+.a-cf .frame img{width:100%;height:100%;object-fit:cover;display:block}
+/* In RTL flex-start is the RIGHT edge - the photo hangs off the right,
+   the headline block off the left, so they straddle rather than stack. */
+.a-cf .block{width:610px;align-self:flex-end;margin-top:-118px;margin-inline-end:-8px;
+  background:var(--acc);color:var(--bg);padding:30px 34px;position:relative;z-index:3;transform:rotate(1deg)}
+.a-cf .block .eyeb{color:var(--bg);opacity:.8;margin-bottom:16px}
+.a-cf .block h1{font-family:var(--f-disp);font-weight:900;font-size:78px;line-height:1.04;
+  letter-spacing:-.028em;margin:0}
+.a-cf .stand{font-size:34px;line-height:1.42;color:var(--dim2);
+  margin:0;max-width:30ch;border-top:1.5px solid var(--rule);padding-top:26px;z-index:3}
+.a-cf .kick{width:200px;height:7px;background:var(--acc);margin-top:30px}
+
+/* ── 02 · hero figure ── */
 .a-hr .fig{font-family:var(--f-mono);font-weight:600;line-height:.82;letter-spacing:-.05em;
-direction:ltr;unicode-bidi:isolate;margin:0;display:block}
-.a-hr .fig.up,.a-hr .fig.pos{color:var(--pos)}
-.a-hr .fig.dn,.a-hr .fig.neg{color:var(--neg)}
-.a-hr .unit{font-size:52px;font-weight:800;margin:6px 0 0}
-.a-hr .quo{font-size:36px;line-height:1.46;color:var(--dim2);margin:38px 0 0;max-width:31ch;
-border-top:1.5px solid var(--rule);padding-top:30px}
-.a-ls h2,.a-ch h2{margin:0 0 34px;font-family:var(--f-disp);font-weight:800;font-size:54px;letter-spacing:-.028em}
-.row{display:grid;grid-template-columns:56px 1fr;gap:26px;align-items:start;padding:30px 0;
-border-top:1.5px solid var(--rule)}
-.rows .row:last-child{border-bottom:1.5px solid var(--rule)}
-.row-n{font-family:var(--f-mono);font-size:28px;font-weight:700;color:var(--acc);direction:ltr;
-unicode-bidi:isolate;padding-top:6px}
-.row-h{font-size:40px;font-weight:800;line-height:1.24;margin:0}
-.row-s{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:12px 0 0;display:block}
-.a-nt .lab{font-family:var(--f-mono);font-size:25px;letter-spacing:.14em;color:var(--acc);margin:0 0 26px;font-weight:700}
-.a-nt .abt{font-size:29px;font-weight:700;color:var(--dim2);margin:0 0 26px;padding-bottom:24px;
-border-bottom:1.5px solid var(--rule);line-height:1.34}
-.a-nt .txt{font-size:50px;font-weight:800;line-height:1.34;margin:0;letter-spacing:-.015em;max-width:22ch;
-border-inline-start:9px solid var(--acc);padding-inline-start:34px}
-.a-nt .dis{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:40px 0 0}
-.ch{display:block;width:100%;height:auto;direction:ltr}
-.ch text{direction:ltr;unicode-bidi:isolate;font-family:var(--f-mono);fill:var(--ink)}
-.ch-bar{stroke:var(--ink);stroke-width:1.5}
-.ch-bar.pos{fill:var(--pos)}
-.ch-bar.neg{fill:var(--neg)}
-.ch-zero{stroke:var(--ink);stroke-width:2}
-.ch-tk{font-size:40px;font-weight:700}
-.ch-val{font-size:34px;font-weight:700}
-.ch-val.pos{fill:var(--pos)}
-.ch-val.neg{fill:var(--neg)}
-.a-ch .note{font-size:26px;color:var(--dim);margin:24px 0 0;line-height:1.4}
-.a-tg .big{font-family:var(--f-disp);font-weight:800;font-size:78px;line-height:1.08;margin:0 0 36px;max-width:16ch}
-.a-tg .sr{display:grid;grid-template-columns:160px 1fr;gap:22px;align-items:baseline;padding:20px 0;
-border-top:1.5px solid var(--rule)}
-.a-tg .sr:last-child{border-bottom:1.5px solid var(--rule)}
+  direction:ltr;unicode-bidi:isolate;margin:0;display:block}
+.a-hr .fig.up{color:var(--pos)} .a-hr .fig.dn{color:var(--neg)}
+.a-hr .quo{font-size:34px;line-height:1.44;color:var(--dim2);margin:0;max-width:29ch;
+  border-top:1.5px solid var(--rule);padding-top:26px}
+
+/* ── 03 · item + photo ── */
+.a-it .hd{display:flex;align-items:flex-start;gap:26px}
+.a-it h2{font-size:58px;font-weight:800;line-height:1.2;letter-spacing:-.02em;margin:0}
+.a-it .body{font-size:31px;line-height:1.45;color:var(--dim2);margin:0;max-width:34ch}
+
+/* ── 04 · interpretation ── */
+.a-nt .abt{font-size:29px;font-weight:700;color:var(--dim2);margin:0;padding-bottom:22px;
+  border-bottom:1.5px solid var(--rule);line-height:1.34}
+.a-nt .txt{font-size:52px;font-weight:800;line-height:1.32;margin:0;letter-spacing:-.015em;max-width:21ch;
+  border-inline-start:9px solid var(--acc);padding-inline-start:34px}
+.a-nt .dis{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:0}
+
+/* ── 05 · tape chart ── */
+.a-ch h2{font-family:var(--f-disp);font-weight:800;font-size:58px;letter-spacing:-.028em;margin:0}
+.a-ch .bars{display:flex;flex-direction:column;gap:30px;margin-top:10px}
+.a-ch .bar{display:grid;grid-template-columns:110px 1fr 150px;align-items:center;gap:22px;direction:ltr}
+.a-ch .sym{font-family:var(--f-mono);font-size:38px;font-weight:700}
+.a-ch .track{height:44px;background:var(--rule);position:relative}
+.a-ch .fill{position:absolute;top:0;bottom:0}
+.a-ch .fill.pos{background:var(--pos);left:50%} .a-ch .fill.neg{background:var(--neg);right:50%}
+.a-ch .zero{position:absolute;top:-6px;bottom:-6px;left:50%;width:2px;background:var(--fg)}
+.a-ch .val{font-family:var(--f-mono);font-size:34px;font-weight:700;text-align:right}
+.a-ch .val.pos{color:var(--pos)} .a-ch .val.neg{color:var(--neg)}
+.a-ch .note{font-size:26px;color:var(--dim);margin:14px 0 0}
+
+/* ── 06 · list ── */
+.a-ls h2{font-family:var(--f-disp);font-weight:800;font-size:58px;letter-spacing:-.028em;margin:0 0 12px}
+.a-ls .row{display:grid;grid-template-columns:60px 1fr;gap:26px;align-items:start;
+  padding:30px 0;border-top:1.5px solid var(--rule)}
+.a-ls .rows .row:last-child{border-bottom:1.5px solid var(--rule)}
+.a-ls .row-n{font-family:var(--f-mono);font-size:28px;font-weight:700;color:var(--acc);
+  direction:ltr;unicode-bidi:isolate;padding-top:6px}
+.a-ls .row-h{font-size:40px;font-weight:800;line-height:1.24;margin:0}
+.a-ls .row-s{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:12px 0 0;display:block}
+
+/* ── 07 · what to watch ── */
+.a-wt .big{font-family:var(--f-disp);font-weight:800;font-size:76px;line-height:1.12;
+  letter-spacing:-.03em;margin:0;max-width:16ch}
+.a-wt .kick{width:200px;height:7px;background:var(--acc)}
+
+/* ── 08 · telegram card ── */
+.a-tg .big{font-family:var(--f-disp);font-weight:800;font-size:78px;line-height:1.08;margin:0;max-width:16ch}
+.a-tg .sr{display:grid;grid-template-columns:160px 1fr;gap:22px;align-items:baseline;
+  padding:20px 0;border-top:1.5px solid var(--rule)}
+.a-tg .sched .sr:last-child{border-bottom:1.5px solid var(--rule)}
 .a-tg .st{font-family:var(--f-mono);font-size:34px;font-weight:700;color:var(--acc);direction:ltr;unicode-bidi:isolate}
 .a-tg .se{font-size:34px;font-weight:700}
 .a-tg .link{font-family:var(--f-mono);font-size:36px;font-weight:700;direction:ltr;unicode-bidi:isolate;
-text-align:center;padding:22px;margin-top:38px;background:var(--acc);color:var(--paper)}
-
-
-/* build-time: the slide renders full-size, no specimen scaling */
-html,body{margin:0;padding:0;background:#F4EFE3}
+  text-align:center;padding:22px;margin-top:38px;background:var(--acc);color:var(--bg)}

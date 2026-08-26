@@ -83,7 +83,8 @@ async function main() {
   if (process.argv.includes('--ingest')) {
     try {
       const { fetchRecent } = await import('./ingest.js');
-      const rows = await fetchRecent(80);
+      const { withMedia } = await import('./db.js');
+      const rows = await fetchRecent(80, await withMedia());
       await putMessages(rows);
       say('ingested', rows.length, 'message(s)');
     } catch (e) { say('ingest failed (continuing):', e.message); }
