@@ -77,46 +77,69 @@ export async function publish(files, caption, { dryRun = false } = {}) {
     }
     await shot('01-feed');
 
-    // Instagram exposes Create as an aria-labelled control before it is
-    // ever a text node, so try the label first and fall back to text.
-    // Click the clickable ancestor, not the <svg> — a click on the glyph
-    // itself is swallowed on some builds.
-    const createSvg = page.locator('svg[aria-label="New post"], svg[aria-label="פוסט חדש"]').first();
-    if (await createSvg.isVisible().catch(() => false)) {
-      const holder = createSvg.locator('xpath=ancestor::*[self::a or self::button or @role="button" or @role="link"][1]');
-      if (await holder.count()) await holder.first().click({ timeout: 10000 });
-      else await createSvg.click({ timeout: 10000, force: true });
-    } else {
-      await page.locator(rx(T.create)).first().click({ timeout: 15000 });
-    }
-    await page.waitForTimeout(1500);
-    await shot('02a-after-create');
+    // Getting into the composer. Three ways, cheapest first — the run
+    // log proved the sidebar click alone leaves us on the feed with the
+    // create menu still collapsed.
+    const composerOpen = async (ms) => {
+      try {
+        await page.waitForSelector('input[type="file"]', { timeout: ms, state: 'attached' });
+        return true;
+      } catch { return false; }
+    };
+    const clickHolder = async (sel) => {
+      const svg = page.locator(sel).first();
+      if (!(await svg.count())) return false;
+      const holder = svg.locator('xpath=ancestor::*[self::a or self::button or @role="button" or @role="link"][1]');
+      const target = (await holder.count()) ? holder.first() : svg;
+      try { await target.click({ timeout: 8000 }); return true; } catch { return false; }
+    };
 
-    // The Post / Reel / Story submenu — searched ONLY inside the popup.
-    // Unscoped, /post/i also matches the sidebar's own "New post" and we
-    // would click the dialog shut.
-    const menu = page.locator('div[role="dialog"], div[role="menu"]').last();
-    if (await menu.isVisible().catch(() => false)) {
-      const postItem = menu.locator('text=/^\\s*(post|פוסט)\\s*$/i').first();
-      if (await postItem.isVisible().catch(() => false)) { await postItem.click(); await page.waitForTimeout(1500); }
+    // 1. The composer has its own route. When it works it skips the menu
+    //    entirely, which is the part that keeps failing.
+    await page.goto('https://www.instagram.com/create/select/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2500);
+    let ready = await composerOpen(6000);
+    await shot('02a-create-route');
+
+    // 2. Sidebar "New post", then the "Post" item in the menu it opens.
+    if (!ready) {
+      await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2500);
+      await clickHolder('svg[aria-label="New post"], svg[aria-label="פוסט חדש"]');
+      await page.waitForTimeout(1500);
+      await shot('02b-menu');
+      ready = await composerOpen(4000);
+      if (!ready) {
+        // The menu item is aria-labelled too — click it by label, not by
+        // /post/i text, which also matches the sidebar entry above it.
+        await clickHolder('svg[aria-label="Post"], svg[aria-label="פוסט"]');
+        await page.waitForTimeout(1500);
+        ready = await composerOpen(6000);
+      }
+      await shot('02c-after-post');
+    }
+
+    // 3. Whatever state we are in, the composer may want the button
+    //    pressed before it mounts the input.
+    if (!ready) {
+      const sel = page.locator(rx(T.select)).first();
+      if (await sel.isVisible().catch(() => false)) {
+        const [chooser] = await Promise.all([
+          page.waitForEvent('filechooser', { timeout: 20000 }),
+          sel.click({ timeout: 10000 }),
+        ]);
+        await chooser.setFiles(files);
+        ready = 'chooser';
+      }
     }
     await shot('02-create');
 
-    // Upload. Prefer the hidden <input type=file>; if this build doesn't
-    // render one until the chooser opens, click "Select from computer"
-    // and catch the filechooser event instead — a runner has no OS dialog
-    // to click through either way.
-    const fileInput = await page.waitForSelector('input[type="file"]', { timeout: 8000, state: 'attached' }).catch(() => null);
-    if (fileInput) {
-      await fileInput.setInputFiles(files);
-    } else {
+    if (!ready) {
+      console.log('url:', page.url());
       console.log(dump(await page.content()));
-      const [chooser] = await Promise.all([
-        page.waitForEvent('filechooser', { timeout: 20000 }),
-        page.locator(rx(T.select)).first().click({ timeout: 15000 }),
-      ]);
-      await chooser.setFiles(files);
+      throw new Error('composer never opened — no file input and no "Select from computer"');
     }
+    if (ready !== 'chooser') await page.locator('input[type="file"]').first().setInputFiles(files);
     await page.waitForTimeout(3500);
     await shot('03-uploaded');
 
