@@ -36,6 +36,12 @@ const T = {
 // One regex, not a comma-joined list: `text="A", text="B"` is NOT
 // valid Playwright syntax — it matches nothing and times out looking
 // like a missing button. `text=/a|b/i` is the multi-language form.
+// The composer's input is the ONLY one that takes more than one file.
+// Instagram also ships a single-file profile-picture input on the same
+// page, and `.first()` picked that one — "Non-multiple file input can
+// only accept single file".
+const FILE_INPUT = 'input[type="file"][multiple]';
+
 const rx = names => `text=/${names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}/i`;
 
 // When a selector goes missing the log is the only witness the runner
@@ -99,7 +105,7 @@ async function run(files, caption, { dryRun = false } = {}) {
     // create menu still collapsed.
     const composerOpen = async (ms) => {
       try {
-        await page.waitForSelector('input[type="file"]', { timeout: ms, state: 'attached' });
+        await page.waitForSelector(FILE_INPUT, { timeout: ms, state: 'attached' });
         return true;
       } catch { return false; }
     };
@@ -156,7 +162,7 @@ async function run(files, caption, { dryRun = false } = {}) {
       console.log(dump(await page.content()));
       throw new Error('composer never opened — no file input and no "Select from computer"');
     }
-    if (ready !== 'chooser') await page.locator('input[type="file"]').first().setInputFiles(files);
+    if (ready !== 'chooser') await page.locator(FILE_INPUT).first().setInputFiles(files);
     await page.waitForTimeout(3500);
     await shot('03-uploaded');
 

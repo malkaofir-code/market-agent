@@ -202,4 +202,8 @@ async function notify(text) {
   } catch (e) { console.warn('telegram alert failed:', e.message); }
 }
 
+// gramJS keeps an update loop alive after the work is done — without an
+// explicit exit the process idles until the runner's job timeout, which
+// is how one failed tick ate seven minutes of a one-hour slot.
 try { await main(); } finally { await close(); }
+process.exit(process.exitCode ?? 0);
