@@ -27,6 +27,10 @@ on:
         description: 'Resume after a pause (retire the failed windows first)'
         type: boolean
         default: false
+      publish:
+        description: 'Publish for real (leave off to render for review only)'
+        type: boolean
+        default: false
 
 # Never let two ticks overlap - they would fight over the same window.
 concurrency:
@@ -71,6 +75,9 @@ jobs:
           # A pause that never expires is a silently dead agent.
           PAUSE_WINDOW_MIN: '180'
           RESUME: ${{ inputs.resume && '1' || '0' }}
+          # Scheduled ticks render and stop; only an explicit dispatch
+          # with publish ticked is allowed to reach Instagram.
+          REVIEW: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && '0' || '1' }}
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_SESSION: ${{ secrets.TG_SESSION }}
@@ -91,11 +98,14 @@ jobs:
 
       # Only on failure, and only the rendered slides - never .env,
       # never state. Makes a broken deck inspectable after the fact.
-      - if: failure()
+      # Always now, not only on failure: the artifact IS the review
+      # copy. PNG as well as JPEG - the browser publisher renders PNG.
+      - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: slides-${{ github.run_id }}
           path: |
+            out/**/*.png
             out/**/*.jpeg
             out/browser/**
           retention-days: 7

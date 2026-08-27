@@ -23,6 +23,8 @@ import { renderDeck } from './render.js';
 import { connect, alert } from './tg.js';
 
 const DRY = process.argv.includes('--dry') || process.env.DRY_RUN === '1';
+// Scheduled ticks render for review only; publishing needs a person.
+const REVIEW = process.env.REVIEW === '1';
 const CARRY_KEY = 'tape-carry';
 const say = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
@@ -101,7 +103,9 @@ async function main() {
     say('seeded Instagram token into the database');
   }
 
-  const stop = DRY ? null : await blocked();
+  // A review run publishes nothing, so the post-rate guards have no
+  // opinion about it — let it render even at the daily cap.
+  const stop = (DRY || REVIEW) ? null : await blocked();
   if (stop) { say('SKIP —', stop); return; }
 
   let w = await pickWindow();
@@ -178,6 +182,24 @@ async function main() {
   const { files, shed } = await renderDeck(deck, dir, { format: api ? 'jpeg' : 'png' });
   if (shed.length) say('tripwire shed', shed.length, 'row(s):', shed.map(s => s.headline.slice(0, 40)));
   say('rendered', files.length, 'slide(s)');
+
+  // ── the review gate ──────────────────────────────────────
+  // Scheduled ticks render and stop. The slides go up as a run
+  // artifact and the window is marked 'review'; nothing reaches
+  // Instagram until a person dispatches that window with publish
+  // ticked. The messages are consumed either way, so the next tick
+  // advances to fresh news instead of re-rendering the same deck
+  // every hour — a replay (--window=) ignores consumed_by, so an
+  // approved deck can still be published hours later.
+  if (REVIEW && !w.replay) {
+    say(`REVIEW — ${deck.slides.length} slides rendered for ${w.key}, NOT published`);
+    await markConsumed(w.key, consumed);
+    await setWindow({ key: w.key, status: 'review', slides: deck.slides.length, shed });
+    await logRun(w.key, 'review', true, `${files.length} slide(s)`);
+    await notify(`🖼️ ${w.key} — ${deck.slides.length} slides ready for review\n`
+      + `Actions → tick → window=${w.key}, publish ✔`);
+    return;
+  }
 
   let result;
   try {
