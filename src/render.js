@@ -12,6 +12,10 @@ import { buildSlide, page, CANVAS } from './builder.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(join(HERE, 'slide.css'), 'utf8');
 
+// How far the type may shrink before we admit defeat, and in what steps.
+const SQUEEZE_STEP = 0.06;
+const MIN_SQUEEZE = 0.76;
+
 /**
  * Shed-then-post (chosen over the spec's hard fail because the daemon
  * runs unattended): if a list slide overflows, drop its lowest-scoring
@@ -51,9 +55,31 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
           slide = { ...slide, rows: slide.rows.slice(0, -1) };
           continue;
         }
+
+        // Every other archetype: shrink the type before giving up. The
+        // spec's hard fail was written for a designer at a desk; here it
+        // threw away a whole window because a framed cover ran 115px
+        // long. Type that is 8% smaller is a rounding error to a reader
+        // and it fits — an hour of news missing is not.
+        if (slide.squeeze === undefined || slide.squeeze > MIN_SQUEEZE) {
+          const next = Math.max(MIN_SQUEEZE, (slide.squeeze ?? 1) - SQUEEZE_STEP);
+          slide = { ...slide, squeeze: next };
+          continue;
+        }
+
+        // Still over at the floor: a framed cover is the greediest
+        // layout in the system, so fall back to the plain one rather
+        // than lose the deck.
+        if (slide.type === 'coverFramed') {
+          shed.push({ slide: i + 1, headline: `${slide.headline ?? ''}`.slice(0, 60),
+            note: 'framed cover -> plain cover (would not fit)' });
+          slide = { ...slide, type: 'cover', squeeze: undefined };
+          continue;
+        }
+
         throw new Error(
-          `TRIPWIRE slide ${i + 1} (${slide.type}): needs ${fit.needs}px, room ${fit.room}px. ` +
-          `Nothing to shed on this archetype - the window is skipped rather than clipped.`);
+          `TRIPWIRE slide ${i + 1} (${slide.type}): needs ${fit.needs}px, room ${fit.room}px ` +
+          `even at ${Math.round(MIN_SQUEEZE * 100)}% type. Skipped rather than clipped.`);
       }
 
       // The API path needs JPEG (Meta accepts nothing else). Quality 95

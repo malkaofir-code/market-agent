@@ -32,6 +32,13 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .hd-name{font-family:var(--f-mono);font-size:25px;font-weight:700;letter-spacing:.22em;white-space:nowrap}
 .hd-meta{font-family:var(--f-mono);font-size:24px;color:var(--dim);direction:ltr;unicode-bidi:isolate;white-space:nowrap}
 
+/* When render.js hands down --sq, every type size in the body band
+   scales with it. font-size on .sl-bd alone is not enough: the
+   archetypes set absolute px, so the scale has to reach them through a
+   zoom on the band's own contents. */
+.slide{--sq:1}
+.sl-bd > *{zoom:var(--sq)}
+
 /* ── band B · body ── */
 .sl-bd{min-height:0;display:flex;flex-direction:column;justify-content:center;gap:34px;padding-top:18px;overflow:hidden}
 

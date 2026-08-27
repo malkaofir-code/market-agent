@@ -161,7 +161,12 @@ export function buildSlide(slide, ctx, i, n) {
   const body = ARCHETYPES[slide.type];
   if (!body) throw new Error(`unknown archetype: ${slide.type}`);
   const cover = COVERS.has(slide.type);
-  return `<div class="slide${cover ? ' slide--cover' : ''}" data-type="${slide.type}"><div class="bgm"></div>${coverLayer(slide)}
+  // render.js sets `squeeze` when a slide overruns its band: the body
+  // scales down a notch and is re-measured, instead of the whole window
+  // being thrown away for a headline that ran a hundred pixels long.
+  const sq = slide.squeeze && slide.squeeze < 1
+    ? ` style="--sq:${slide.squeeze}"` : '';
+  return `<div class="slide${cover ? ' slide--cover' : ''}"${sq} data-type="${slide.type}"><div class="bgm"></div>${coverLayer(slide)}
 ${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window })}</main>${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }
