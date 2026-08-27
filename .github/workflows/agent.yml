@@ -78,7 +78,9 @@ jobs:
           ACTIVE_TO_HOUR: '24'
           MAX_POSTS_PER_DAY: '12'
           MIN_MINUTES_BETWEEN_POSTS: '20'
-          MAX_WINDOW_AGE_MIN: '90'
+          # 0 = never retire. An unposted window waits its turn no
+          # matter how old it is.
+          MAX_WINDOW_AGE_MIN: '0'
           PAUSE_AFTER_FAILURES: '2'
           # A pause that never expires is a silently dead agent.
           PAUSE_WINDOW_MIN: '180'

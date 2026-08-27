@@ -117,8 +117,12 @@ async function main() {
   // single window per hourly tick would have spent three days
   // replaying August before reaching today. The same loop absorbs
   // any future outage.
-  const maxAge = Number(process.env.MAX_WINDOW_AGE_MIN || 90);
-  const stale = x => Math.floor((Date.now() / 1000 - x.end) / 60) > maxAge;
+  // MAX_WINDOW_AGE_MIN=0 disables retirement entirely: nothing that was
+  // never posted is ever thrown away, however far behind we are. The
+  // backlog then drains oldest-first, throttled by
+  // MIN_MINUTES_BETWEEN_POSTS and MAX_POSTS_PER_DAY.
+  const maxAge = Number(process.env.MAX_WINDOW_AGE_MIN ?? 0);
+  const stale = x => maxAge > 0 && Math.floor((Date.now() / 1000 - x.end) / 60) > maxAge;
   let retired = 0, dropped = 0;
   while (w && !w.replay && stale(w)) {
     await upsertWindow(w.key, w.start, w.end);
