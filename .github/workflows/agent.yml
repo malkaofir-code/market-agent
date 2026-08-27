@@ -1,4 +1,4 @@
-name: tick
+name: agent
 
 # Hourly at :15, giving the window a quarter of an hour to close
 # before the tick looks at it.
