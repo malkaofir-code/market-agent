@@ -15,7 +15,7 @@ import { join } from 'path';
 import 'dotenv/config';
 import {
   putMessages, messagesIn, messagesInAll, oldestUnconsumedBefore, markConsumed,
-  upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes,
+  upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
 import { compose, windowOf, WIN } from './compose.js';
@@ -48,9 +48,11 @@ async function blocked() {
     return `only ${Math.round((Date.now() / 1000 - last) / 60)}min since last post (min ${gap})`;
 
   const need = Number(process.env.PAUSE_AFTER_FAILURES || 2);
-  const recent = await recentOutcomes(need);
+  const within = Number(process.env.PAUSE_WINDOW_MIN || 180);
+  const recent = await recentOutcomes(need, within);
   if (recent.length >= need && recent.every(s => s === 'failed'))
-    return `${need} consecutive failures — paused. Inspect, then clear the failed rows to resume.`;
+    return `${need} consecutive failures in the last ${within}min — paused. `
+         + `Fix, then re-run with resume ticked (or wait ${within}min).`;
 
   return null;
 }
@@ -173,7 +175,8 @@ async function main() {
     say('uploaded', urls.length);
     try {
       result = await publish(urls, deck.caption, { dryRun: DRY });
-      say(DRY ? `DRY RUN OK — carousel ${result.carousel} built, NOT published`
+      say(DRY ? `DRY RUN OK — ${deck.slides.length} slides built, NOT published`
+              + (result.note ? ` (${result.note})` : '')
               : `POSTED ${result.permalink ?? result.id}`);
     } finally {
       await remove(files, prefix);
@@ -205,5 +208,13 @@ async function notify(text) {
 // gramJS keeps an update loop alive after the work is done — without an
 // explicit exit the process idles until the runner's job timeout, which
 // is how one failed tick ate seven minutes of a one-hour slot.
+// RESUME=1 lifts a pause without anyone touching SQL — it is a
+// checkbox on the workflow, because the person who needs it is
+// looking at a red run, not a psql prompt.
+if (process.env.RESUME === '1') {
+  const n = await clearFailed();
+  say(`resume — retired ${n} failed window(s)`);
+}
+
 try { await main(); } finally { await close(); }
 process.exit(process.exitCode ?? 0);

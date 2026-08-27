@@ -23,6 +23,10 @@ on:
       window:
         description: 'Replay a specific window, e.g. 2026-08-26T08:00'
         type: string
+      resume:
+        description: 'Resume after a pause (retire the failed windows first)'
+        type: boolean
+        default: false
 
 # Never let two ticks overlap - they would fight over the same window.
 concurrency:
@@ -64,6 +68,9 @@ jobs:
           MIN_MINUTES_BETWEEN_POSTS: '20'
           MAX_WINDOW_AGE_MIN: '90'
           PAUSE_AFTER_FAILURES: '2'
+          # A pause that never expires is a silently dead agent.
+          PAUSE_WINDOW_MIN: '180'
+          RESUME: ${{ inputs.resume && '1' || '0' }}
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_SESSION: ${{ secrets.TG_SESSION }}

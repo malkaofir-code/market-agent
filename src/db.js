@@ -85,9 +85,20 @@ export const postsToday = () =>
 export const lastPostAt = () =>
   q(`select max(posted_at) t from agent.windows where status='posted'`).then(r => r.rows[0].t);
 
-export const recentOutcomes = n =>
+// Only outcomes from the last `sinceMin` minutes count toward the
+// pause. A latch with no expiry is indistinguishable from a dead
+// agent: three plumbing failures at breakfast would silently kill
+// every window for the rest of the week.
+export const recentOutcomes = (n, sinceMin = 0) =>
   q(`select status from agent.windows where status in ('posted','failed')
-     order by coalesce(posted_at, end_ts) desc limit $1`, [n]).then(r => r.rows.map(x => x.status));
+     ${sinceMin ? 'and coalesce(posted_at, end_ts) > extract(epoch from now()) - $2' : ''}
+     order by coalesce(posted_at, end_ts) desc limit $1`,
+    sinceMin ? [n, sinceMin * 60] : [n]).then(r => r.rows.map(x => x.status));
+
+/** Operator reset: retire failed windows so the pause lifts now.
+ *  Deliberate and explicit — the retire loop must never do this. */
+export const clearFailed = () =>
+  q(`update agent.windows set status='stale' where status='failed'`).then(r => r.rowCount);
 
 /** tg_ids whose photo is already in storage - so we never refetch. */
 export const withMedia = () =>
