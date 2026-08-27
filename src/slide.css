@@ -58,8 +58,13 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .rowidx{font-family:var(--f-mono);font-size:30px;font-weight:700;color:var(--acc);direction:ltr;unicode-bidi:isolate;padding-top:8px}
 
 /* ── photo: the thing the paper system threw away ── */
-.ph{overflow:hidden;border:1.5px solid var(--rule);position:relative}
-.ph img{width:100%;height:100%;object-fit:cover;display:block}
+/* CONTAIN, not cover. These are screenshots of quote panels and
+   charts — the information IS the edges. `cover` on a wide screenshot
+   scaled to a 952x452 box sliced the ticker off both sides and left a
+   headline about SolarEdge above an image that read "olarEdge". A
+   letterbox is honest; a crop is a lie. */
+.ph{overflow:hidden;border:1.5px solid var(--rule);position:relative;background:#0F1216}
+.ph img{width:100%;height:100%;object-fit:contain;object-position:center;display:block}
 .ph .stat{position:absolute;bottom:0;right:0;background:var(--acc);color:var(--bg);
   font-family:var(--f-mono);font-size:44px;font-weight:700;padding:10px 22px;direction:ltr;unicode-bidi:isolate}
 
@@ -97,8 +102,11 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .a-cf .kick{width:200px;height:7px;background:var(--acc);margin-top:30px}
 
 /* ── 02 · hero figure ── */
+/* The -.05em tracking is applied after the LAST glyph too, so a
+   right-aligned figure ends its advance flush with the frame and the
+   ink of the % overhangs into the clip. Give it that width back. */
 .a-hr .fig{font-family:var(--f-mono);font-weight:600;line-height:.82;letter-spacing:-.05em;
-  direction:ltr;unicode-bidi:isolate;margin:0;display:block}
+  direction:ltr;unicode-bidi:isolate;margin:0;display:block;padding-inline-end:.09em}
 .a-hr .fig.up{color:var(--pos)} .a-hr .fig.dn{color:var(--neg)}
 .a-hr .quo{font-size:34px;line-height:1.44;color:var(--dim2);margin:0;max-width:29ch;
   border-top:1.5px solid var(--rule);padding-top:26px}

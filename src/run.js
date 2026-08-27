@@ -134,6 +134,23 @@ async function main() {
   if (!w) { say('SKIP — nothing fresh left'); return; }
   if (w.backlog > 1) say(`catching up — ${w.key} is ${w.backlog} window(s) behind`);
 
+  // A three-message window makes a four-slide post, and four slides
+  // read as an afterthought next to a full deck. Merge forward into
+  // the following CLOSED windows until there is enough to fill one.
+  // Deliberately after the retire loop: merging moves the end forward,
+  // so doing it earlier would make every stale window look fresh.
+  if (!w.replay) {
+    const minMsgs = Number(process.env.MIN_MESSAGES || 6);
+    const openStart = windowOf(Math.floor(Date.now() / 1000)).start;
+    let merged = 0;
+    while (w.rows.length < minMsgs && w.end < openStart) {
+      w.end += WIN * 60;
+      w.rows = await messagesIn(w.start, w.end);
+      merged++;
+    }
+    if (merged) say(`merged ${merged} following window(s) — ${w.rows.length} msg(s)`);
+  }
+
   await upsertWindow(w.key, w.start, w.end);
   if (!w.rows.length) { say(`SKIP — ${w.key} has no unconsumed messages`); return; }
   if (!w.replay && (await getWindow(w.key))?.status === 'posted') {
@@ -141,7 +158,7 @@ async function main() {
   }
 
   const carry = (await getState(CARRY_KEY)) ?? {};
-  const deck = compose(w.rows, { carry });
+  const deck = compose(w.rows, { carry, endTs: w.end });
   if (deck.carry) await setState(CARRY_KEY, deck.carry);
 
   const consumed = deck.consumed.map(Number);

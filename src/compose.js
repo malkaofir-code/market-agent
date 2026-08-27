@@ -96,7 +96,7 @@ export function dedupe(parsed) {
   return out.sort((a, b) => a.ts - b.ts);
 }
 
-export function compose(rows, { now = null, carry = {} } = {}) {
+export function compose(rows, { now = null, carry = {}, endTs = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
   const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
@@ -108,7 +108,11 @@ export function compose(rows, { now = null, carry = {} } = {}) {
   // a window of nothing but futures snapshots has no news in it
   if (!parsed.length) return nothing('snapshots-only');
 
-  const w = windowOf(parsed[0].ts);
+  // endTs lets run.js merge several thin windows into one deck and
+  // still stamp the true span on the masthead — otherwise a 14:00-16:00
+  // post would claim to cover only the first hour.
+  const w0m = windowOf(parsed[0].ts);
+  const w = endTs && endTs > w0m.end ? { ...w0m, end: endTs } : w0m;
   const { quotes, carry: nextCarry, stamp } = tape(all, carry);   // snapshots included
 
   // §04: "a story cannot appear on both the cover and a card" —
