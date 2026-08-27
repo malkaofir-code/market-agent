@@ -27,8 +27,8 @@ on:
         description: 'Resume after a pause (retire the failed windows first)'
         type: boolean
         default: false
-      publish:
-        description: 'Publish for real (leave off to render for review only)'
+      review:
+        description: 'Render for review only (do not publish)'
         type: boolean
         default: false
 
@@ -75,9 +75,11 @@ jobs:
           # A pause that never expires is a silently dead agent.
           PAUSE_WINDOW_MIN: '180'
           RESUME: ${{ inputs.resume && '1' || '0' }}
-          # Scheduled ticks render and stop; only an explicit dispatch
-          # with publish ticked is allowed to reach Instagram.
-          REVIEW: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && '0' || '1' }}
+          # Live: scheduled ticks publish on their own. The gate is
+          # still here, one checkbox away — tick 'review' on a dispatch
+          # to render an artifact without posting, or flip this default
+          # to '1' to put every scheduled tick behind it again.
+          REVIEW: ${{ inputs.review && '1' || '0' }}
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_SESSION: ${{ secrets.TG_SESSION }}
