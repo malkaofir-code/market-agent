@@ -33,7 +33,10 @@ const T = {
   share:   ['Share', 'שיתוף', 'שתף'],
   caption: ['Write a caption...', 'כתיבת כיתוב...', 'כתוב כיתוב...'],
 };
-const anyText = names => names.map(n => `text="${n}"`).join(', ');
+// One regex, not a comma-joined list: `text="A", text="B"` is NOT
+// valid Playwright syntax — it matches nothing and times out looking
+// like a missing button. `text=/a|b/i` is the multi-language form.
+const rx = names => `text=/${names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}/i`;
 
 function storageState() {
   const raw = process.env.IG_STORAGE_STATE;
@@ -58,16 +61,24 @@ export async function publish(files, caption, { dryRun = false } = {}) {
 
     // A dead session redirects to /accounts/login. Say so plainly —
     // this is the failure mode a datacenter IP produces.
-    if (/accounts\/login/.test(page.url())) {
+    // A dead session either redirects to /accounts/login or renders a
+    // password field inline — check both, or a logged-out run reads as
+    // a missing button instead.
+    const loginForm = await page.locator('input[name="password"]').first().isVisible().catch(() => false);
+    if (/accounts\/login/.test(page.url()) || loginForm) {
       await shot('00-logged-out');
       throw new Error('session rejected — Instagram logged us out. Re-run login-ig.js and update IG_STORAGE_STATE.');
     }
     await shot('01-feed');
 
-    await page.locator(anyText(T.create)).first().click({ timeout: 15000 });
+    // Instagram exposes Create as an aria-labelled control before it is
+// ever a text node, so try the label first and fall back to text.
+    const createBtn = page.locator('svg[aria-label="New post"], svg[aria-label="פוסט חדש"], a[href="#"]:has(svg[aria-label="New post"])').first();
+    if (await createBtn.isVisible().catch(() => false)) await createBtn.click({ timeout: 10000 });
+    else await page.locator(rx(T.create)).first().click({ timeout: 15000 });
     await page.waitForTimeout(1200);
     // Some accounts get a submenu (Post / Reel / Story), some go straight in.
-    const postItem = page.locator(anyText(T.post)).first();
+    const postItem = page.locator(rx(T.post)).first();
     if (await postItem.isVisible().catch(() => false)) { await postItem.click(); await page.waitForTimeout(1200); }
     await shot('02-create');
 
@@ -82,14 +93,14 @@ export async function publish(files, caption, { dryRun = false } = {}) {
     const crop = page.locator('svg[aria-label="Select crop"], svg[aria-label="בחירת חיתוך"]').first();
     if (await crop.isVisible().catch(() => false)) {
       await crop.click(); await page.waitForTimeout(700);
-      const orig = page.locator('text="Original", text="מקורי"').first();
+      const orig = page.locator(rx(['Original', 'מקורי'])).first();
       if (await orig.isVisible().catch(() => false)) await orig.click();
       await page.waitForTimeout(700);
       await shot('04-crop');
     }
 
     for (const step of ['05-next1', '06-next2']) {
-      await page.locator(anyText(T.next)).last().click({ timeout: 15000 });
+      await page.locator(rx(T.next)).last().click({ timeout: 15000 });
       await page.waitForTimeout(2200);
       await shot(step);
     }
@@ -105,7 +116,7 @@ export async function publish(files, caption, { dryRun = false } = {}) {
       return { id: null, dryRun: true, note: 'stopped before Share' };
     }
 
-    await page.locator(anyText(T.share)).last().click({ timeout: 15000 });
+    await page.locator(rx(T.share)).last().click({ timeout: 15000 });
     await page.waitForTimeout(9000);
     await shot('09-shared');
 
