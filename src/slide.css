@@ -107,6 +107,11 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .a-it .hd{display:flex;align-items:flex-start;gap:26px}
 .a-it h2{font-size:58px;font-weight:800;line-height:1.2;letter-spacing:-.02em;margin:0}
 .a-it .body{font-size:31px;line-height:1.45;color:var(--dim2);margin:0;max-width:34ch}
+/* No photo? The headline takes the room the image would have had,
+   rather than leaving a third of the frame empty. */
+.a-it:not(:has(.ph)) h2{font-size:76px;line-height:1.1;letter-spacing:-.03em}
+.a-it:not(:has(.ph)) .body{font-size:34px;max-width:30ch;
+  border-top:1.5px solid var(--rule);padding-top:26px}
 
 /* ── 04 · interpretation ── */
 .a-nt .abt{font-size:29px;font-weight:700;color:var(--dim2);margin:0;padding-bottom:22px;

@@ -161,33 +161,36 @@ export function compose(rows, { now = null, carry = {} } = {}) {
   // hero figure instead."
   if (quotes.length >= 3) slides.push({ type: 'chart', series: quotes, stamp });
 
-  // 05 · item slides — the redesign's point: a story that brought a
-  // photo gets a slide of its own rather than a line in a list. Capped
-  // so the tail still fits; whatever is left falls through to the list.
-  const room0 = cap - slides.length - (isCta ? 1 : 0);
-  let placed = 0;
-  for (const p of pool.filter(p => !used.has(p.tg_id) && p.photo)) {
-    if (placed >= Math.max(0, room0 - 1)) break;   // keep one slot for the list
+  // 05 · item slides — ONE SLIDE PER STORY. This is the rule: every
+  // distinct story in the window gets its own slide, photo or not.
+  // Lists exist only as overflow when a window runs past the cap.
+  //
+  // It used to give a slide only to photo-bearing stories and pack the
+  // rest three-to-a-list — so a 12-message window with no harvested
+  // photos collapsed to 5 slides. Wrong: dedupe decides what counts as
+  // a story, and after that nothing gets merged.
+  const rest = pool.filter(p => !used.has(p.tg_id));
+  const room = cap - slides.length - (isCta ? 1 : 0);
+
+  // Reserve one slot for a list only if there is genuine overflow.
+  const overflow = rest.length > room;
+  const solo = overflow ? Math.max(0, room - 1) : rest.length;
+
+  rest.slice(0, solo).forEach(p => {
     used.add(p.tg_id);
     slides.push({ type: 'item', n: slides.length + 1, headline: p.headline,
       photo: p.photo, body: p.stand, source: p.source,
-      stat: p.figures.length && p.figureCount < 4 ? p.figures[0].text.replace(/[−־]/g, '-') : null });
-    placed++;
-  }
+      stat: p.figures.length && p.figureCount < 4
+        ? p.figures[0].text.replace(/[−־]/g, '-') : null });
+  });
 
-  // 06 · list — everything left, balanced across pages, never chunked
-  const rest = pool.filter(p => !used.has(p.tg_id));
-  const room = cap - slides.length - (isCta ? 1 : 0);
-  if (rest.length && room > 0) {
-    const pages = Math.min(room, Math.ceil(rest.length / 3));
-    const per = Math.ceil(rest.length / pages);
-    for (let i = 0; i < pages; i++) {
-      const rows = rest.slice(i * per, (i + 1) * per);
-      if (!rows.length) break;
-      slides.push({ type: 'list',
-        title: i === 0 ? 'עוד מהחלון הזה' : 'עוד מהחלון הזה',
-        rows: rows.map((p, j) => ({ n: i * per + j + 1, headline: p.headline, source: p.source })) });
-    }
+  // 06 · list — only the tail that would not fit.
+  const tail = rest.slice(solo);
+  if (tail.length) {
+    tail.forEach(p => used.add(p.tg_id));
+    slides.push({ type: 'list', title: 'עוד מהחלון הזה',
+      rows: tail.slice(0, 4).map((p, j) => ({ n: solo + j + 1,
+        headline: p.headline, source: p.source })) });
   }
 
   // 06 · telegram CTA — 23:00 deck only

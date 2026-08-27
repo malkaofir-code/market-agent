@@ -162,8 +162,12 @@ async function main() {
 
   let result;
   try {
-    if (!api) throw new Error('browser publisher not implemented — set PUBLISHER=api');
-    const { upload, remove, publish } = await import('./publish/api.js');
+    // Both publishers expose the same upload/remove/publish, so
+    // everything above this line is identical. The browser one
+    // uploads nothing - it hands the local files to instagram.com.
+    const { upload, remove, publish } = api
+      ? await import('./publish/api.js')
+      : await import('./publish/browser.js');
     const prefix = w.key.replace(/:/g, '');
     const urls = await upload(files, prefix);
     say('uploaded', urls.length);
