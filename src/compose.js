@@ -12,6 +12,10 @@ const TZ = process.env.TZ || 'Asia/Jerusalem';
 // affords, and it makes richer decks (~10-12 messages, not ~4).
 export const WIN = Number(process.env.WINDOW_MINUTES || 60);
 const WIN_S = WIN * 60;
+// Minutes past the hour where a window starts and ends. 15 puts the
+// boundary at XX:15 so the deck covers a full hour of trading and the
+// tick at XX:16 always has a just-closed window to work on.
+const OFFSET = Number(process.env.WINDOW_OFFSET_MIN || 15) % WIN;
 const MAX = Number(process.env.MAX_SLIDES || 10);
 const MAX_CTA = Number(process.env.MAX_SLIDES_WITH_CTA || 9);
 
@@ -23,7 +27,11 @@ const ddmmyy = ts => fmt(ts, { day: '2-digit', month: '2-digit', year: '2-digit'
 /** Window key + bounds for any instant, snapped to the WIN grid. */
 export function windowOf(ts) {
   const mins = Number(fmt(ts, { minute: '2-digit' }));
-  const start = ts - (mins % WIN) * 60 - Number(fmt(ts, { second: '2-digit' }));
+  // Windows are snapped to the OFFSET, not to the top of the hour, so
+  // a window runs XX:15 -> XX+1:15 and the tick that closes it fires a
+  // minute later. `into` is how far past the last boundary we are.
+  const into = (mins - OFFSET + WIN) % WIN;
+  const start = ts - into * 60 - Number(fmt(ts, { second: '2-digit' }));
   return { key: `${fmt(start, { year: 'numeric', month: '2-digit', day: '2-digit' })
     .split('/').reverse().join('-')}T${hhmm(start)}`, start, end: start + WIN_S };
 }
