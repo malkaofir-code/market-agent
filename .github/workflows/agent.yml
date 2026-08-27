@@ -84,6 +84,9 @@ jobs:
           # 0 = never retire. An unposted window waits its turn no
           # matter how old it is.
           MAX_WINDOW_AGE_MIN: '0'
+          # A thin window waits this long for the next hour's news to
+          # join it, then posts alone rather than waiting forever.
+          WAIT_THIN_MIN: '180'
           PAUSE_AFTER_FAILURES: '2'
           # A pause that never expires is a silently dead agent.
           PAUSE_WINDOW_MIN: '180'

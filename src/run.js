@@ -173,6 +173,20 @@ async function main() {
   if (deck.skip) {
     say('SKIP —', w.key, `(${deck.skip})`);
     if (!w.replay) {
+      // 'empty' and 'snapshots-only' windows hold no news and never
+      // will — consume them. A 'thin' one holds real news, just not
+      // enough of it yet: leave its messages unconsumed so the next
+      // tick merges them into the following hour rather than throwing
+      // an hour of the channel away. WAIT_THIN_MIN is the backstop —
+      // past it, a thin deck goes out as it is rather than waiting
+      // forever for company that is not coming.
+      const waited = Math.floor((Date.now() / 1000 - w.end) / 60);
+      const wait = Number(process.env.WAIT_THIN_MIN ?? 180);
+      if (deck.skip === 'thin' && waited < wait) {
+        await setWindow({ key: w.key, status: 'waiting', slides: deck.slides.length });
+        say(`  held ${w.key} — ${waited}min old, merging forward until ${wait}min`);
+        return;
+      }
       await markConsumed(w.key, consumed);
       await setWindow({ key: w.key, status: deck.skip, slides: deck.slides.length });
     }
