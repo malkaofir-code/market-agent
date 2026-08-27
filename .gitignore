@@ -15,3 +15,4 @@ DRY_RUN=0
 *.plist
 state.db-shm
 state.db-wal
+ig-state.json

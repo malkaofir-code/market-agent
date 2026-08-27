@@ -55,7 +55,7 @@ jobs:
       - name: run
         env:
           TZ: Asia/Jerusalem
-          PUBLISHER: api
+          PUBLISHER: ${{ vars.PUBLISHER || 'browser' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry && '1' || '0' }}
           WINDOW_MINUTES: '60'
           ACTIVE_FROM_HOUR: '7'
@@ -71,6 +71,10 @@ jobs:
           TG_ALERT_TARGET: me
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_HANDLE: marketalert.il
+          # A live instagram.com session, captured by login-ig.js.
+          # Treat exactly like a password.
+          IG_STORAGE_STATE: ${{ secrets.IG_STORAGE_STATE }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           SUPABASE_BUCKET: slides
@@ -84,6 +88,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: slides-${{ github.run_id }}
-          path: out/**/*.jpeg
+          path: |
+            out/**/*.jpeg
+            out/browser/**
           retention-days: 7
           if-no-files-found: ignore
