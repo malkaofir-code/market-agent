@@ -51,7 +51,20 @@ function storageState() {
   throw new Error('no Instagram session — set IG_STORAGE_STATE or run node src/login-ig.js');
 }
 
-export async function publish(files, caption, { dryRun = false } = {}) {
+// A browser step that hangs costs a whole hourly slot and tells us
+// nothing. Cap the flow and fail with the step we died on.
+const WATCHDOG_MS = Number(process.env.BROWSER_TIMEOUT_MS ?? 240000);
+
+export async function publish(files, caption, opts = {}) {
+  let timer;
+  const guard = new Promise((_, rej) => {
+    timer = setTimeout(() => rej(new Error(`browser publish exceeded ${WATCHDOG_MS / 1000}s — see out/browser/`)), WATCHDOG_MS);
+  });
+  try { return await Promise.race([run(files, caption, opts), guard]); }
+  finally { clearTimeout(timer); }
+}
+
+async function run(files, caption, { dryRun = false } = {}) {
   mkdirSync(SHOTS, { recursive: true });
   const browser = await chromium.launch({ args: ['--disable-blink-features=AutomationControlled'] });
   const ctx = await browser.newContext({
@@ -59,6 +72,10 @@ export async function publish(files, caption, { dryRun = false } = {}) {
     viewport: { width: 1280, height: 900 },
   });
   const page = await ctx.newPage();
+  // Playwright's 30s default applies to every un-timed call; a flow with
+  // a dozen of them can hang a runner for minutes. Bound it once.
+  page.setDefaultTimeout(15000);
+  page.setDefaultNavigationTimeout(30000);
   const shot = async name => { try { await page.screenshot({ path: join(SHOTS, `${name}.png`) }); } catch {} };
 
   try {
