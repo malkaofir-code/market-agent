@@ -38,6 +38,12 @@ const T = {
 // like a missing button. `text=/a|b/i` is the multi-language form.
 const rx = names => `text=/${names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}/i`;
 
+// When a selector goes missing the log is the only witness the runner
+// leaves behind: print the aria-labels and button text actually on the
+// page rather than guessing at what Instagram rendered.
+const dump = html => 'PAGE DUMP — aria-labels: ' +
+  [...new Set((html.match(/aria-label="[^"]{1,40}"/g) ?? []))].slice(0, 60).join(' ');
+
 function storageState() {
   const raw = process.env.IG_STORAGE_STATE;
   if (raw) return JSON.parse(raw);
@@ -72,19 +78,45 @@ export async function publish(files, caption, { dryRun = false } = {}) {
     await shot('01-feed');
 
     // Instagram exposes Create as an aria-labelled control before it is
-// ever a text node, so try the label first and fall back to text.
-    const createBtn = page.locator('svg[aria-label="New post"], svg[aria-label="פוסט חדש"], a[href="#"]:has(svg[aria-label="New post"])').first();
-    if (await createBtn.isVisible().catch(() => false)) await createBtn.click({ timeout: 10000 });
-    else await page.locator(rx(T.create)).first().click({ timeout: 15000 });
-    await page.waitForTimeout(1200);
-    // Some accounts get a submenu (Post / Reel / Story), some go straight in.
-    const postItem = page.locator(rx(T.post)).first();
-    if (await postItem.isVisible().catch(() => false)) { await postItem.click(); await page.waitForTimeout(1200); }
+    // ever a text node, so try the label first and fall back to text.
+    // Click the clickable ancestor, not the <svg> — a click on the glyph
+    // itself is swallowed on some builds.
+    const createSvg = page.locator('svg[aria-label="New post"], svg[aria-label="פוסט חדש"]').first();
+    if (await createSvg.isVisible().catch(() => false)) {
+      const holder = createSvg.locator('xpath=ancestor::*[self::a or self::button or @role="button" or @role="link"][1]');
+      if (await holder.count()) await holder.first().click({ timeout: 10000 });
+      else await createSvg.click({ timeout: 10000, force: true });
+    } else {
+      await page.locator(rx(T.create)).first().click({ timeout: 15000 });
+    }
+    await page.waitForTimeout(1500);
+    await shot('02a-after-create');
+
+    // The Post / Reel / Story submenu — searched ONLY inside the popup.
+    // Unscoped, /post/i also matches the sidebar's own "New post" and we
+    // would click the dialog shut.
+    const menu = page.locator('div[role="dialog"], div[role="menu"]').last();
+    if (await menu.isVisible().catch(() => false)) {
+      const postItem = menu.locator('text=/^\\s*(post|פוסט)\\s*$/i').first();
+      if (await postItem.isVisible().catch(() => false)) { await postItem.click(); await page.waitForTimeout(1500); }
+    }
     await shot('02-create');
 
-    // Upload straight into the input rather than clicking through the
-    // OS file dialog, which no runner has.
-    await page.locator('input[type="file"]').first().setInputFiles(files);
+    // Upload. Prefer the hidden <input type=file>; if this build doesn't
+    // render one until the chooser opens, click "Select from computer"
+    // and catch the filechooser event instead — a runner has no OS dialog
+    // to click through either way.
+    const fileInput = await page.waitForSelector('input[type="file"]', { timeout: 8000, state: 'attached' }).catch(() => null);
+    if (fileInput) {
+      await fileInput.setInputFiles(files);
+    } else {
+      console.log(dump(await page.content()));
+      const [chooser] = await Promise.all([
+        page.waitForEvent('filechooser', { timeout: 20000 }),
+        page.locator(rx(T.select)).first().click({ timeout: 15000 }),
+      ]);
+      await chooser.setFiles(files);
+    }
     await page.waitForTimeout(3500);
     await shot('03-uploaded');
 
@@ -125,6 +157,8 @@ export async function publish(files, caption, { dryRun = false } = {}) {
     return { id: null, permalink: `https://www.instagram.com/${process.env.IG_HANDLE ?? ''}/` };
   } catch (e) {
     await shot('99-failed');
+    // The screenshot is an artifact; the log is immediate. Print both.
+    try { console.log('url:', page.url()); console.log(dump(await page.content())); } catch {}
     writeFileSync(join(SHOTS, 'error.txt'), `${e.message}\n\n${e.stack ?? ''}`);
     throw e;
   } finally {
