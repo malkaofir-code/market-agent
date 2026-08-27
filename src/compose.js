@@ -17,6 +17,7 @@ const WIN_S = WIN * 60;
 // tick at XX:16 always has a just-closed window to work on.
 const OFFSET = Number(process.env.WINDOW_OFFSET_MIN || 15) % WIN;
 const MAX = Number(process.env.MAX_SLIDES || 10);
+const MIN_DECK = Number(process.env.MIN_SLIDES ?? 1);
 const MAX_CTA = Number(process.env.MAX_SLIDES_WITH_CTA || 9);
 
 const fmt = (ts, o) => new Intl.DateTimeFormat('en-GB',
@@ -214,7 +215,10 @@ export function compose(rows, { now = null, carry = {}, endTs = null } = {}) {
 
   // Instagram needs >=2 images for a carousel, and a one-slide deck
   // is a window that had nothing to say. 7% of windows land here.
-  if (slides.length < 2) return { ...nothing('thin'), slides };
+  // One slide is a post. The old floor of two threw away whole hours
+  // of the channel for being quiet, which is not the agent's call to
+  // make — if there is anything at all to say, say it.
+  if (slides.length < MIN_DECK) return { ...nothing('thin'), slides };
 
   return {
     key: w.key,
