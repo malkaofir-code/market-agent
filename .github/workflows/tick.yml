@@ -6,14 +6,20 @@ name: tick
 # 07:15-23:15 local. In winter (UTC+2) it shifts an hour earlier -
 # harmless, because run.js enforces active hours in the real timezone.
 #
-# GitHub does not run scheduled workflows punctually: 5-20 minutes
-# late is normal and a tick can be skipped entirely under load. That
-# is survivable here because run.js picks the OLDEST unconsumed window
-# rather than the last one, and retires anything past
-# MAX_WINDOW_AGE_MIN instead of posting stale news.
+# GitHub runs schedules on a best-effort basis and drops them freely:
+# on 27 Aug it skipped six consecutive hourly slots while manual
+# dispatches ran fine. One cron an hour therefore means whole hours of
+# news are lost, because a window older than MAX_WINDOW_AGE_MIN is
+# retired rather than posted.
+#
+# So: three attempts an hour instead of one. The extra ticks cost
+# almost nothing - a tick with nothing unconsumed exits in seconds -
+# and run.js is already idempotent about it: it takes the OLDEST
+# unconsumed window, honours MIN_MINUTES_BETWEEN_POSTS, and the
+# concurrency group below stops two from overlapping.
 on:
   schedule:
-    - cron: '15 4-20 * * *'
+    - cron: '5,25,45 4-20 * * *'
   workflow_dispatch:
     inputs:
       dry:
