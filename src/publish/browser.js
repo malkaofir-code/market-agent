@@ -222,17 +222,44 @@ async function run(files, caption, { dryRun = false } = {}) {
       return { id: null, dryRun: true, note: `stopped before Share (composer via ${via})` };
     }
 
-    await dialog().locator(rx(T.share)).last().click({ timeout: 15000 });
+    // EXACT text, and the first match, not the last. The caption screen
+    // also carries a "Share to Facebook" row; `.last()` clicked that
+    // toggle instead of the header button, and the run sat on the
+    // caption screen for 90 seconds waiting for a post that was never
+    // submitted.
+    const SHARE = /^\s*(Share|שיתוף|שתף)\s*$/i;
+    const shareBtn = () => dialog().locator('div[role="button"], button')
+      .filter({ hasText: SHARE }).first();
 
-    // A ten-slide carousel is not instant. Wait for the confirmation
-    // instead of sleeping a guess, and treat the dialog tearing itself
-    // down as the second witness — Instagram leaves it up on failure.
-    const done = await page.locator('text=/your post has been shared|post shared|הפוסט שותף|הפוסט שלך שותף/i')
-      .first().waitFor({ state: 'visible', timeout: 90000 }).then(() => true).catch(() => false);
-    await shot('09-shared');
-    if (!done && (await dialog().isVisible().catch(() => false))) {
+    // Confirmed either by the toast or by the composer tearing itself
+    // down — Instagram leaves it up when the post did not go.
+    const settled = async ms => {
+      const toast = page.locator('text=/your post has been shared|post shared|הפוסט שותף|הפוסט שלך שותף/i')
+        .first().waitFor({ state: 'visible', timeout: ms }).then(() => 'toast');
+      const gone = dialog().waitFor({ state: 'detached', timeout: ms }).then(() => 'closed');
+      return Promise.any([toast, gone]).catch(() => null);
+    };
+
+    let done = null;
+    for (const attempt of [1, 2]) {
+      const btn = shareBtn();
+      if (!(await btn.count())) {
+        // No exact button — fall back to any Share-ish text in the dialog.
+        await dialog().locator(rx(T.share)).first().click({ timeout: 10000 }).catch(() => {});
+      } else {
+        await btn.click({ timeout: 15000 });
+      }
+      done = await settled(attempt === 1 ? 90000 : 120000);
+      await shot(`09-shared-${attempt}`);
+      if (done) break;
+      // Instagram refuses quietly when it is throttling. Say so.
+      const err = await page.locator('text=/something went wrong|try again|לא ניתן|נסה שוב|שגיאה/i')
+        .first().textContent({ timeout: 2000 }).catch(() => null);
+      if (err) throw new Error(`Instagram refused the post: ${err.trim().slice(0, 120)}`);
+    }
+    if (!done) {
       console.log(dump(await page.content()));
-      throw new Error('clicked Share but saw no confirmation and the composer is still open — see 09-shared.png');
+      throw new Error('clicked Share twice, composer never closed — see 09-shared-2.png');
     }
     return { id: null, permalink: `https://www.instagram.com/${process.env.IG_HANDLE ?? ''}/` };
   } catch (e) {

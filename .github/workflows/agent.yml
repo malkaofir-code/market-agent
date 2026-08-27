@@ -80,7 +80,10 @@ jobs:
           ACTIVE_FROM_HOUR: '7'
           ACTIVE_TO_HOUR: '24'
           MAX_POSTS_PER_DAY: '12'
-          MIN_MINUTES_BETWEEN_POSTS: '20'
+          # Instagram's web composer starts refusing quietly when posts
+          # come too fast. 35 minutes still clears a full backlog inside
+          # a trading day and stays well under its patience.
+          MIN_MINUTES_BETWEEN_POSTS: '35'
           # 0 = never retire. An unposted window waits its turn no
           # matter how old it is.
           MAX_WINDOW_AGE_MIN: '0'
