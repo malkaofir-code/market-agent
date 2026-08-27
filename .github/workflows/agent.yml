@@ -25,7 +25,10 @@ on:
       dry:
         description: 'Dry run (build everything, do not publish)'
         type: boolean
-        default: true
+        # false, because the Supabase cron dispatches this workflow with
+        # no inputs and the API applies these defaults. A default of
+        # true would make every scheduled run a silent no-op.
+        default: false
       window:
         description: 'Replay a specific window, e.g. 2026-08-26T08:00'
         type: string
