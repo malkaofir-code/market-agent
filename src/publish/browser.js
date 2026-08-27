@@ -100,106 +100,140 @@ async function run(files, caption, { dryRun = false } = {}) {
     }
     await shot('01-feed');
 
-    // Getting into the composer. Three ways, cheapest first — the run
-    // log proved the sidebar click alone leaves us on the feed with the
-    // create menu still collapsed.
-    const composerOpen = async (ms) => {
-      try {
-        await page.waitForSelector(FILE_INPUT, { timeout: ms, state: 'attached' });
-        return true;
-      } catch { return false; }
+    // Getting into the composer. Instagram ships several routes to the
+    // same dialog and which one works varies by build, so try them in
+    // order and stop at the first that mounts the multi-file input.
+    // A wrong guess costs seconds; a missing opener costs the slot.
+    const composerOpen = async (ms = 4000) => {
+      try { await page.waitForSelector(FILE_INPUT, { timeout: ms, state: 'attached' }); return true; }
+      catch { return false; }
     };
-    const clickHolder = async (sel) => {
+    const clickHolder = async (sel, ms = 6000) => {
       const svg = page.locator(sel).first();
       if (!(await svg.count())) return false;
       const holder = svg.locator('xpath=ancestor::*[self::a or self::button or @role="button" or @role="link"][1]');
       const target = (await holder.count()) ? holder.first() : svg;
-      try { await target.click({ timeout: 8000 }); return true; } catch { return false; }
+      try { await target.click({ timeout: ms }); return true; } catch { return false; }
     };
-
-    // 1. The composer has its own route. When it works it skips the menu
-    //    entirely, which is the part that keeps failing.
-    await page.goto('https://www.instagram.com/create/select/', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(2500);
-    let ready = await composerOpen(6000);
-    await shot('02a-create-route');
-
-    // 2. Sidebar "New post", then the "Post" item in the menu it opens.
-    if (!ready) {
-      await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2500);
-      await clickHolder('svg[aria-label="New post"], svg[aria-label="פוסט חדש"]');
-      await page.waitForTimeout(1500);
-      await shot('02b-menu');
-      ready = await composerOpen(4000);
-      if (!ready) {
-        // The menu item is aria-labelled too — click it by label, not by
-        // /post/i text, which also matches the sidebar entry above it.
-        await clickHolder('svg[aria-label="Post"], svg[aria-label="פוסט"]');
-        await page.waitForTimeout(1500);
-        ready = await composerOpen(6000);
+    // Interstitials swallow the click that follows them. Clear first.
+    const DISMISS = ['Not Now', 'Not now', 'לא עכשיו', 'Allow all cookies',
+                     'Decline optional cookies', 'Close', 'סגירה'];
+    const dismiss = async () => {
+      for (const label of DISMISS) {
+        const b = page.locator(`text=/^\\s*${label}\\s*$/i`).first();
+        if (await b.isVisible().catch(() => false)) {
+          await b.click({ timeout: 4000 }).catch(() => {});
+          await page.waitForTimeout(600);
+        }
       }
-      await shot('02c-after-post');
+    };
+    const NEW = 'svg[aria-label="New post"], svg[aria-label="פוסט חדש"]';
+    const POST = 'svg[aria-label="Post"], svg[aria-label="פוסט"]';
+
+    const OPENERS = [
+      ['create-route', async () => {
+        await page.goto('https://www.instagram.com/create/select/', { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(2500);
+      }],
+      ['sidebar-new', async () => { await clickHolder(NEW); }],
+      ['menu-post',   async () => { await clickHolder(POST); }],
+      ['create-text', async () => { await page.locator(rx(T.create)).first().click({ timeout: 6000 }).catch(() => {}); }],
+      ['home-new-post', async () => {
+        await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(2500);
+        await clickHolder(NEW);
+        await page.waitForTimeout(1200);
+        await clickHolder(POST);
+      }],
+    ];
+
+    let ready = false, via = null;
+    await dismiss();
+    for (const [name, open] of OPENERS) {
+      await open().catch(() => {});
+      await page.waitForTimeout(1200);
+      await shot(`02-${name}`);
+      if (await composerOpen(4000)) { ready = true; via = name; break; }
+      await dismiss();
     }
 
-    // 3. Whatever state we are in, the composer may want the button
-    //    pressed before it mounts the input.
+    // Last resort: the button that opens an OS file dialog. A runner has
+    // no OS dialog, but Playwright can answer the event itself.
     if (!ready) {
       const sel = page.locator(rx(T.select)).first();
       if (await sel.isVisible().catch(() => false)) {
         const [chooser] = await Promise.all([
-          page.waitForEvent('filechooser', { timeout: 20000 }),
-          sel.click({ timeout: 10000 }),
+          page.waitForEvent('filechooser', { timeout: 15000 }),
+          sel.click({ timeout: 8000 }),
         ]);
         await chooser.setFiles(files);
-        ready = 'chooser';
+        ready = true; via = 'filechooser';
       }
     }
-    await shot('02-create');
-
     if (!ready) {
       console.log('url:', page.url());
       console.log(dump(await page.content()));
-      throw new Error('composer never opened — no file input and no "Select from computer"');
+      throw new Error('composer never opened — no multi-file input and no "Select from computer"');
     }
-    if (ready !== 'chooser') await page.locator(FILE_INPUT).first().setInputFiles(files);
-    await page.waitForTimeout(3500);
+    console.log('composer opened via', via);
+    if (via !== 'filechooser') await page.locator(FILE_INPUT).first().setInputFiles(files);
+    await page.waitForTimeout(4000);
     await shot('03-uploaded');
 
-    // Crop: default is 1:1 and would destroy a 4:5 deck. Pick the
-    // original ratio if the control is there.
-    const crop = page.locator('svg[aria-label="Select crop"], svg[aria-label="בחירת חיתוך"]').first();
-    if (await crop.isVisible().catch(() => false)) {
-      await crop.click(); await page.waitForTimeout(700);
-      const orig = page.locator(rx(['Original', 'מקורי'])).first();
-      if (await orig.isVisible().catch(() => false)) await orig.click();
-      await page.waitForTimeout(700);
+    // Crop. The composer opens on 1:1 and the deck is 4:5 — taking the
+    // default would slice the top and bottom off every slide. Ask for
+    // the original ratio, and settle for an explicit 4:5 if this build
+    // labels it that way instead.
+    const CROP = 'svg[aria-label="Select crop"], svg[aria-label="בחירת חיתוך"], svg[aria-label="Crop"]';
+    if (await page.locator(CROP).first().isVisible().catch(() => false)) {
+      await clickHolder(CROP);
+      await page.waitForTimeout(900);
+      for (const want of [['Original', 'מקורי'], ['4:5']]) {
+        const opt = page.locator(rx(want)).first();
+        if (await opt.isVisible().catch(() => false)) { await opt.click({ timeout: 5000 }).catch(() => {}); break; }
+      }
+      await page.waitForTimeout(900);
       await shot('04-crop');
     }
 
+    // Two Nexts: crop -> edit, edit -> caption. Scoped to the dialog, so
+    // a stray "Next" in the stories tray cannot win the click.
+    const dialog = () => page.locator('div[role="dialog"]').last();
     for (const step of ['05-next1', '06-next2']) {
-      await page.locator(rx(T.next)).last().click({ timeout: 15000 });
-      await page.waitForTimeout(2200);
+      await dialog().locator(rx(T.next)).last().click({ timeout: 15000 });
+      await page.waitForTimeout(2500);
       await shot(step);
     }
 
-    const box = page.locator('div[contenteditable="true"], textarea').first();
-    await box.click();
-    await box.fill(caption.slice(0, 2200));
-    await page.waitForTimeout(800);
+    // Caption. aria-label first — a bare contenteditable also matches
+    // the search box on some builds.
+    const box = dialog().locator(
+      'div[aria-label*="aption"][contenteditable="true"], div[aria-label*="כיתוב"][contenteditable="true"], ' +
+      'div[contenteditable="true"], textarea').first();
+    await box.click({ timeout: 10000 });
+    const text = caption.slice(0, 2200);
+    // fill() throws on some contenteditable builds; typing always works.
+    await box.fill(text).catch(async () => { await page.keyboard.insertText(text); });
+    await page.waitForTimeout(900);
     await shot('07-caption');
 
     if (dryRun) {
       await shot('08-would-share');
-      return { id: null, dryRun: true, note: 'stopped before Share' };
+      return { id: null, dryRun: true, note: `stopped before Share (composer via ${via})` };
     }
 
-    await page.locator(rx(T.share)).last().click({ timeout: 15000 });
-    await page.waitForTimeout(9000);
-    await shot('09-shared');
+    await dialog().locator(rx(T.share)).last().click({ timeout: 15000 });
 
-    const done = await page.locator('text=/shared|הפוסט שותף|הועלה/i').first().isVisible().catch(() => false);
-    if (!done) throw new Error('clicked Share but saw no confirmation — check 09-shared.png');
+    // A ten-slide carousel is not instant. Wait for the confirmation
+    // instead of sleeping a guess, and treat the dialog tearing itself
+    // down as the second witness — Instagram leaves it up on failure.
+    const done = await page.locator('text=/your post has been shared|post shared|הפוסט שותף|הפוסט שלך שותף/i')
+      .first().waitFor({ state: 'visible', timeout: 90000 }).then(() => true).catch(() => false);
+    await shot('09-shared');
+    if (!done && (await dialog().isVisible().catch(() => false))) {
+      console.log(dump(await page.content()));
+      throw new Error('clicked Share but saw no confirmation and the composer is still open — see 09-shared.png');
+    }
     return { id: null, permalink: `https://www.instagram.com/${process.env.IG_HANDLE ?? ''}/` };
   } catch (e) {
     await shot('99-failed');
