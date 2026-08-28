@@ -110,11 +110,24 @@ async function ready(id, { tries = 5 } = {}) {
  */
 export async function publish(urls, caption, { dryRun = false } = {}) {
   const { id: ig } = creds();
-  if (urls.length < 2 || urls.length > 10)
-    throw new Error(`carousel needs 2-10 images, got ${urls.length}`);
+  if (urls.length < 1 || urls.length > 10)
+    throw new Error(`a post needs 1-10 images, got ${urls.length}`);
 
   // 1 · one container per slide
   await preflight(urls);
+
+  // A quiet hour is still a post — MIN_SLIDES is 1 by decision. A
+  // single image is NOT a carousel of one: Meta refuses CAROUSEL with
+  // one child, so the lone slide is published as a plain image, with
+  // the caption on the image container itself.
+  if (urls.length === 1) {
+    const { id: single } = await call(`/${ig}/media`, { image_url: urls[0], caption });
+    await ready(single);
+    if (dryRun) return { id: null, carousel: single, dryRun: true, children: [single] };
+    const { id: one } = await call(`/${ig}/media_publish`, { creation_id: single });
+    const { permalink: link } = await call(`/${one}`, { fields: 'permalink' }, 'GET').catch(() => ({}));
+    return { id: one, permalink: link ?? null };
+  }
 
   const children = [];
   for (const image_url of urls) {
