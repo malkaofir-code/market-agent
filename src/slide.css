@@ -86,9 +86,9 @@ html,body{margin:0;padding:0;background:var(--bg)}
   rgba(11,13,16,.15) 0%,rgba(11,13,16,.55) 55%,var(--bg) 100%)}
 /* ── 01 · cover (photo bleeds off the top, headline in the fade) ── */
 .a-cv{z-index:3}
-.a-cv h1{font-family:var(--f-disp);font-weight:900;font-size:104px;line-height:1.02;
+.a-cv h1{font-family:var(--f-disp);font-weight:900;font-size:112px;line-height:1.02;
   letter-spacing:-.03em;margin:24px 0 0;max-width:15ch;text-wrap:balance}
-.a-cv .stand{font-size:34px;line-height:1.42;color:var(--dim2);margin:30px 0 0;max-width:26ch}
+.a-cv .stand{font-size:36px;line-height:1.42;color:var(--dim2);margin:30px 0 0;max-width:26ch}
 
 /* ── 01b · cover, framed (the B composition, kept dark).
    Laid out in FLOW with negative margins, not absolutely: an
@@ -103,7 +103,7 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .a-cf .block{width:610px;align-self:flex-end;margin-top:-118px;margin-inline-end:-8px;
   background:var(--acc);color:var(--bg);padding:30px 34px;position:relative;z-index:3;transform:rotate(1deg)}
 .a-cf .block .eyeb{color:var(--bg);opacity:.8;margin-bottom:16px}
-.a-cf .block h1{font-family:var(--f-disp);font-weight:900;font-size:78px;line-height:1.04;
+.a-cf .block h1{font-family:var(--f-disp);font-weight:900;font-size:86px;line-height:1.04;
   letter-spacing:-.028em;margin:0}
 .a-cf .stand{font-size:34px;line-height:1.42;color:var(--dim2);
   margin:0;max-width:30ch;border-top:1.5px solid var(--rule);padding-top:26px;z-index:3}
@@ -121,8 +121,8 @@ html,body{margin:0;padding:0;background:var(--bg)}
 
 /* ── 03 · item + photo ── */
 .a-it .hd{display:flex;align-items:flex-start;gap:26px}
-.a-it h2{font-size:58px;font-weight:800;line-height:1.2;letter-spacing:-.02em;margin:0}
-.a-it .body{font-size:31px;line-height:1.45;color:var(--dim2);margin:0;max-width:34ch}
+.a-it h2{font-size:62px;font-weight:800;line-height:1.2;letter-spacing:-.02em;margin:0}
+.a-it .body{font-size:33px;line-height:1.45;color:var(--dim2);margin:0;max-width:34ch}
 /* No photo? The headline takes the room the image would have had,
    rather than leaving a third of the frame empty. */
 .a-it:not(:has(.ph)) h2{font-size:76px;line-height:1.1;letter-spacing:-.03em}
@@ -132,7 +132,7 @@ html,body{margin:0;padding:0;background:var(--bg)}
 /* ── 04 · interpretation ── */
 .a-nt .abt{font-size:29px;font-weight:700;color:var(--dim2);margin:0;padding-bottom:22px;
   border-bottom:1.5px solid var(--rule);line-height:1.34}
-.a-nt .txt{font-size:52px;font-weight:800;line-height:1.32;margin:0;letter-spacing:-.015em;max-width:21ch;
+.a-nt .txt{font-size:60px;font-weight:800;line-height:1.32;margin:0;letter-spacing:-.015em;max-width:21ch;
   border-inline-start:9px solid var(--acc);padding-inline-start:34px}
 .a-nt .dis{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:0}
 
@@ -156,16 +156,16 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .a-ls .rows .row:last-child{border-bottom:1.5px solid var(--rule)}
 .a-ls .row-n{font-family:var(--f-mono);font-size:28px;font-weight:700;color:var(--acc);
   direction:ltr;unicode-bidi:isolate;padding-top:6px}
-.a-ls .row-h{font-size:40px;font-weight:800;line-height:1.24;margin:0}
+.a-ls .row-h{font-size:44px;font-weight:800;line-height:1.24;margin:0}
 .a-ls .row-s{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:12px 0 0;display:block}
 
 /* ── 07 · what to watch ── */
-.a-wt .big{font-family:var(--f-disp);font-weight:800;font-size:76px;line-height:1.12;
+.a-wt .big{font-family:var(--f-disp);font-weight:800;font-size:84px;line-height:1.12;
   letter-spacing:-.03em;margin:0;max-width:16ch}
 .a-wt .kick{width:200px;height:7px;background:var(--acc)}
 
 /* ── 08 · telegram card ── */
-.a-tg .big{font-family:var(--f-disp);font-weight:800;font-size:78px;line-height:1.08;margin:0;max-width:16ch}
+.a-tg .big{font-family:var(--f-disp);font-weight:800;font-size:84px;line-height:1.08;margin:0;max-width:16ch}
 .a-tg .sr{display:grid;grid-template-columns:160px 1fr;gap:22px;align-items:baseline;
   padding:20px 0;border-top:1.5px solid var(--rule)}
 .a-tg .sched .sr:last-child{border-bottom:1.5px solid var(--rule)}
@@ -215,12 +215,13 @@ html,body{margin:0;padding:0;background:var(--bg)}
    capped at its height so a crop can only ever take torso. Each
    archetype places him differently: same person, never the same
    composition twice running. */
-.a-cf .ofir,.a-cv .ofir{right:-64px; height:700px}
-.a-hr .ofir{left:-56px; height:560px}
-.a-nt .ofir{left:-86px; height:820px}
-.a-ch .ofir{left:-40px; height:430px}
-.a-wt .ofir{left:-70px; height:600px}
-.a-tg .ofir{left:-76px; height:720px}
+.slide[data-type="coverFramed"] .ofir,
+.slide[data-type="cover"] .ofir{right:-64px; height:700px}
+.slide[data-type="hero"]  .ofir{left:-56px; height:560px}
+.slide[data-type="note"]  .ofir{left:-86px; height:820px}
+.slide[data-type="chart"] .ofir{left:-40px; height:430px}
+.slide[data-type="watch"] .ofir{left:-70px; height:600px}
+.slide[data-type="telegram"] .ofir{left:-76px; height:720px}
 
 
 /* ── making room for him ─────────────────────────────────────────

@@ -66,7 +66,7 @@ const ARCHETYPES = {
 
   // 02 · hero figure — sized to its measure, not to a constant.
   hero: s => {
-    const size = Math.min(224, Math.floor(880 / (String(s.figure).length * 0.62)));
+    const size = Math.min(258, Math.floor(940 / (String(s.figure).length * 0.62)));
     return `<div class="a-hr"><p class="eyeb">${bidi(s.eyebrow || 'המספר של החלון')}</p>
     <p class="fig ${s.dir ?? ''}" data-protect="the figure" style="font-size:${size}px">${esc(s.figure)}</p>
     ${photo(s.photo && { ...s.photo, h: 300 })}
@@ -172,6 +172,10 @@ const NO_OFIR = new Set(['item', 'list']);   // boards carrying evidence
  */
 function ofirLayer(slide, ctx) {
   if (slide.ofir === null || NO_OFIR.has(slide.type)) return '';
+  // A slide already carrying a photo has its image. Ofir standing in
+  // front of a screenshot is two subjects fighting, and on the framed
+  // cover the frame landed across his face. One picture per board.
+  if (slide.photo) return '';
   const gesture = POSE[slide.type];
   const wardrobe = ctx.poses?.[gesture];
   if (!wardrobe?.length) return '';
