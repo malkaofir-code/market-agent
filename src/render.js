@@ -16,6 +16,9 @@ const CSS = readFileSync(join(HERE, 'slide.css'), 'utf8');
 const SQUEEZE_STEP = 0.06;
 const MIN_SQUEEZE = 0.76;
 
+// How Ofir gives way when he lands on data, in order.
+const MASCOT_RETRIES = ['smaller', 'far-edge', 'smaller-far-edge'];
+
 /**
  * Shed-then-post (chosen over the spec's hard fail because the daemon
  * runs unattended): if a list slide overflows, drop its lowest-scoring
@@ -80,6 +83,51 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
         throw new Error(
           `TRIPWIRE slide ${i + 1} (${slide.type}): needs ${fit.needs}px, room ${fit.room}px ` +
           `even at ${Math.round(MIN_SQUEEZE * 100)}% type. Skipped rather than clipped.`);
+      }
+
+      // ── the mascot review ────────────────────────────────────
+      // Ofir is placed by CSS, which knows nothing about how long a
+      // headline turned out or how many rows a table grew. So after
+      // layout, measure him against everything marked as data and
+      // move him if he is standing on it. Same shape as the overflow
+      // tripwire above: measure the real DOM, then act.
+      //
+      // He is a tight-cropped cut-out, so his element box IS his ink —
+      // a plain rectangle test is honest here.
+      const clash = await p.evaluate(() => {
+        const o = document.querySelector('.ofir');
+        if (!o) return null;
+        const a = o.getBoundingClientRect();
+        const hits = [];
+        for (const el of document.querySelectorAll('[data-protect]')) {
+          const b = el.getBoundingClientRect();
+          const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (w > 0 && h > 0) {
+            const area = w * h;
+            // A few pixels of a descender brushing his shoulder is not
+            // a collision. A tenth of the protected element is.
+            if (area > 0.1 * b.width * b.height || area > 0.25 * a.width * a.height)
+              hits.push({ what: el.dataset.protect, cover: Math.round(100 * area / (b.width * b.height)) });
+          }
+        }
+        return hits.length ? hits : null;
+      });
+
+      if (clash) {
+        // Retreat in order: shrink, then move to the opposite edge,
+        // then drop him. A slide without Ofir is fine; a number with a
+        // cartoon elbow through it is not.
+        const step = slide.ofirTry ?? 0;
+        if (step < MASCOT_RETRIES.length) {
+          shed.push({ slide: i + 1, headline: `Ofir vs ${clash.map(c => c.what).join(', ')}`,
+            note: `${MASCOT_RETRIES[step]} (covered ${clash[0].cover}%)` });
+          slide = { ...slide, ofirTry: step + 1, ofirPlace: MASCOT_RETRIES[step] };
+          continue;
+        }
+        shed.push({ slide: i + 1, headline: 'Ofir dropped', note: 'no placement clears the data' });
+        slide = { ...slide, photoOfir: null, ofir: null };
+        continue;
       }
 
       // The API path needs JPEG (Meta accepts nothing else). Quality 95

@@ -43,7 +43,7 @@ function foot(i, n, src) {
 
 // ── band B: the six archetypes ───────────────────────────────
 const photo = (p, stat) => p
-  ? `<div class="ph" style="height:${p.h ?? 452}px"><img src="${esc(p.src)}" alt="">${
+  ? `<div class="ph" data-protect="the source photo" style="height:${p.h ?? 452}px"><img src="${esc(p.src)}" alt="">${
       stat ? `<span class="stat">${esc(stat)}</span>` : ''}</div>`
   : '';
 
@@ -68,7 +68,7 @@ const ARCHETYPES = {
   hero: s => {
     const size = Math.min(224, Math.floor(880 / (String(s.figure).length * 0.62)));
     return `<div class="a-hr"><p class="eyeb">${bidi(s.eyebrow || 'המספר של החלון')}</p>
-    <p class="fig ${s.dir ?? ''}" style="font-size:${size}px">${esc(s.figure)}</p>
+    <p class="fig ${s.dir ?? ''}" data-protect="the figure" style="font-size:${size}px">${esc(s.figure)}</p>
     ${photo(s.photo && { ...s.photo, h: 300 })}
     <p class="quo">${bidi(s.quote)}</p></div>`;
   },
@@ -88,7 +88,7 @@ const ARCHETYPES = {
   // 05 · tape chart — hand-built bars, pinned LTR.
   chart: s => `<div class="a-ch"><p class="eyeb">TAPE · חוזים עתידיים</p>
     <h2>${bidi(s.title || 'התמונה בחוזים')}</h2>
-    <div class="bars">${s.series.map(d => {
+    <div class="bars" data-protect="the chart">${s.series.map(d => {
       const sg = sign(d.chg), w = Math.min(46, Math.abs(d.chg) * 36);
       return `<div class="bar"><span class="sym">${esc(d.sym)}</span>
       <div class="track"><div class="fill ${sg}" style="width:${w}%"></div><div class="zero"></div></div>
@@ -97,7 +97,7 @@ const ARCHETYPES = {
     <p class="note">נכון ל־${bidi(s.stamp)} · שעון ישראל</p></div>`,
 
   // 06 · list — everything that did not earn its own photo slide.
-  list: s => `<div class="a-ls"><h2>${bidi(s.title || 'עוד מהחלון הזה')}</h2><div class="rows">${
+  list: s => `<div class="a-ls"><h2>${bidi(s.title || 'עוד מהחלון הזה')}</h2><div class="rows" data-protect="the list">${
     s.rows.map(r => `<div class="row"><span class="row-n">${pad2(r.n)}</span>
     <span><p class="row-h">${bidi(r.headline)}</p>${
       r.source ? `<span class="row-s">${bidi(r.source)}</span>` : ''}</span></div>`).join('')
@@ -164,9 +164,12 @@ export function buildSlide(slide, ctx, i, n) {
   // render.js sets `squeeze` when a slide overruns its band: the body
   // scales down a notch and is re-measured, instead of the whole window
   // being thrown away for a headline that ran a hundred pixels long.
+  // render.js may hand back an ofirPlace after the mascot review; the
+  // class is what CSS reads to shrink him or send him to the far edge.
+  const place = slide.ofirPlace ? ` of-${slide.ofirPlace}` : '';
   const sq = slide.squeeze && slide.squeeze < 1
     ? ` style="--sq:${slide.squeeze}"` : '';
-  return `<div class="slide${cover ? ' slide--cover' : ''}"${sq} data-type="${slide.type}"><div class="bgm"></div>${coverLayer(slide)}
+  return `<div class="slide${cover ? ' slide--cover' : ''}${place}"${sq} data-type="${slide.type}"><div class="bgm"></div>${coverLayer(slide)}
 ${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window })}</main>${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }

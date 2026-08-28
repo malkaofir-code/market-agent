@@ -172,3 +172,14 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .a-tg .se{font-size:34px;font-weight:700}
 .a-tg .link{font-family:var(--f-mono);font-size:36px;font-weight:700;direction:ltr;unicode-bidi:isolate;
   text-align:center;padding:22px;margin-top:38px;background:var(--acc);color:var(--bg)}
+
+
+/* ── the mascot review's fallbacks ───────────────────────────────
+   render.js measures Ofir against every [data-protect] element and,
+   when he overlaps, re-renders with one of these. They are applied in
+   order; if none of them clears the data he is dropped from the slide
+   entirely. A slide without him is fine — a percentage with a cartoon
+   elbow through it is not. */
+.slide.of-smaller .ofir{height:64%}
+.slide.of-far-edge .ofir{left:auto; right:-28px}
+.slide.of-smaller-far-edge .ofir{height:58%; left:auto; right:-20px}
