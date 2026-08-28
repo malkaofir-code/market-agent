@@ -72,7 +72,12 @@ jobs:
       - name: run
         env:
           TZ: Asia/Jerusalem
-          PUBLISHER: ${{ vars.PUBLISHER || 'browser' }}
+          # Back to the API: it started working the moment the Instagram
+          # account was linked to a Facebook Page, which is a hard
+          # requirement we only satisfied on 28 Aug. The browser
+          # publisher stays in the tree as the fallback — set the
+          # PUBLISHER repo variable to 'browser' to switch back.
+          PUBLISHER: ${{ vars.PUBLISHER || 'api' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry && '1' || '0' }}
           WINDOW_MINUTES: '60'
           # Windows run XX:15 -> XX+1:15; the tick fires at XX:16.
