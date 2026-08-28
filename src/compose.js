@@ -238,7 +238,16 @@ export function compose(rows, { now = null, carry = {}, endTs = null } = {}) {
  * text — emoji kept, unlike on the slides.
  */
 export function caption(parsed, w) {
-  const LIMIT = 2200;                       // Instagram's caption ceiling
+  // Instagram's ceiling is 2200. Sit under it: Meta counts its own way
+  // (an emoji is not one character to everyone) and a caption that is
+  // four characters over costs the entire window — 36004/2207010, at
+  // the very last call, after eight slides have already been rendered
+  // and uploaded.
+  const LIMIT = 2120;
+  // The "+N in telegram" line is written AFTER the loop that decides
+  // what fits, so its length has to be reserved before it exists. Not
+  // reserving it is exactly how a caption lands a few chars over.
+  const RESERVE = 48;
   const foot = `\nעדכון ${hhmm(w.start)}–${hhmm(w.end)} · @marketalert.il`;
   const head = parsed[0].headline + '\n';
 
@@ -249,9 +258,19 @@ export function caption(parsed, w) {
     const block = [`▪ ${p.headline}`, ...p.reporting.map(clean),
       p.note ? `💡 ${p.note}` : null, p.source ? `מקור: ${p.source}` : null, '']
       .filter(Boolean).join('\n') + '\n';
-    if (head.length + body.length + block.length + foot.length > LIMIT) { dropped++; continue; }
+    if (head.length + body.length + block.length + foot.length + RESERVE > LIMIT) { dropped++; continue; }
     body += block;
   }
   const more = dropped ? `(+${dropped} עדכונים בטלגרם)\n` : '';
-  return head + body + more + foot;
+  let out = head + body + more + foot;
+
+  // Belt and braces. Everything above is arithmetic on estimates; this
+  // is the only line that guarantees the result. Whole lines go, never
+  // half a word.
+  if (out.length > LIMIT) {
+    const lines = (head + body).split('\n');
+    while (lines.length > 1 && lines.join('\n').length + more.length + foot.length > LIMIT) lines.pop();
+    out = lines.join('\n') + '\n' + more + foot;
+  }
+  return out;
 }
