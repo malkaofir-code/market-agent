@@ -180,6 +180,13 @@ html,body{margin:0;padding:0;background:var(--bg)}
    order; if none of them clears the data he is dropped from the slide
    entirely. A slide without him is fine — a percentage with a cartoon
    elbow through it is not. */
+/* The head is never cropped. He is anchored to the BOTTOM of the body
+   band and capped at its height, so overflow always takes torso. An
+   earlier version anchored him bottom at a height greater than the
+   band, which cut him at the eyebrows. */
+.ofir{position:absolute; bottom:0; z-index:2; pointer-events:none; max-height:100%}
+.ofir img{display:block; height:100%; width:auto}
+
 .slide.of-smaller .ofir{height:64%}
 .slide.of-far-edge .ofir{left:auto; right:-28px}
 .slide.of-smaller-far-edge .ofir{height:58%; left:auto; right:-20px}
