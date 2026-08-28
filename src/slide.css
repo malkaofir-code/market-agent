@@ -88,8 +88,14 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide--cover .sl-bd{justify-content:flex-end;padding-top:0}
 .cv-bleed{position:absolute;inset:0 0 auto 0;height:640px;overflow:hidden;z-index:1}
 .cv-bleed img{width:100%;height:100%;object-fit:cover;opacity:.92;display:block}
+/* The top of this gradient is the masthead's ground. At .62 a busy
+   screenshot — a Kalshi card, a headline in English — read straight
+   through it and tangled with "MARKET ALERT" and the window stamp.
+   It closes hard over the masthead band, opens where the picture is
+   supposed to be seen, then closes again into the page. */
 .cv-bleed::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,
-  rgba(11,13,16,.62) 0%,rgba(11,13,16,.82) 55%,var(--bg) 100%)}
+  rgba(11,13,16,.97) 0%,rgba(11,13,16,.93) 17%,rgba(11,13,16,.6) 34%,
+  rgba(11,13,16,.82) 70%,var(--bg) 100%)}
 /* ── 01 · cover (photo bleeds off the top, headline in the fade) ── */
 .a-cv{z-index:3}
 .a-cv h1{font-family:var(--f-disp);font-weight:900;font-size:112px;line-height:1.02;
