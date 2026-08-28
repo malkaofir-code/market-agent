@@ -46,6 +46,30 @@ const POSES = loadPoses();
 // How far the type may shrink before we admit defeat, and in what steps.
 const SQUEEZE_STEP = 0.06;
 const MIN_SQUEEZE = 0.76;
+// The other direction. A window with one short story used to leave a
+// third of the board empty; these grow the band's contents until they
+// fill it. The cap is where the type stops looking like a headline and
+// starts looking like a mistake.
+// Per archetype, because the ceiling is not the same everywhere: a bar
+// chart or a lone number scales cleanly, while prose in a column that
+// Ofir has already narrowed turns into one ragged word per line long
+// before it fills the board. Zoom scales the band's whole contents —
+// him included — so growing never changes the geometry, only the size.
+const GROW_CAP = {
+  watch: 1.28, hero: 1.22, telegram: 1.20, chart: 1.08,
+  note: 1.12, item: 1.12, list: 1.10, cover: 1.10, coverFramed: 1.10,
+};
+// With Ofir on the board the sums change. Zoom shrinks the band's own
+// width in CSS pixels while his lane stays the px it was, so every
+// notch of growth takes a bigger bite out of what is left for the
+// text — a watch slide grew itself down to four characters a line.
+// On a laned slide he IS the thing filling the board; the type stays
+// where the designer put it.
+const GROW_CAP_LANE = { watch: 1.20, telegram: 1.14, hero: 1.14, note: 1.12,
+                        chart: 1.06, cover: 1.08, coverFramed: 1.08 };
+const NO_GROW_LANED = 1.08;
+const GROW_STEP = 0.05;
+const FILL = 0.80;          // grow while the content uses less than this
 
 // How Ofir gives way when he lands on data, in order.
 const MASCOT_RETRIES = ['smaller', 'far-edge', 'smaller-far-edge'];
@@ -128,10 +152,25 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
         fit = await p.evaluate(() => {
           const bd = document.querySelector('.sl-bd');
           const a = bd.firstElementChild;
-          return { room: bd.clientHeight, needs: a.scrollHeight };
+          return { room: bd.clientHeight, needs: a.scrollHeight,
+                   laned: !!document.querySelector('.ofir') };
         });
-        // Fits. Now the second question: is Ofir standing on data?
+        // Fits. Two more questions before it is done.
         if (fit.needs <= fit.room) {
+          // One: is it swimming? A short window used to render as a
+          // line of type stranded in a third of a board of empty
+          // ground. The same zoom that rescues an overlong slide grows
+          // an underfull one — Ofir included, since he lives inside
+          // the band. `shrunk` stops it oscillating with the squeeze.
+          const z = slide.squeeze ?? 1;
+          const cap = fit.laned
+            ? (GROW_CAP_LANE[slide.type] ?? NO_GROW_LANED)
+            : (GROW_CAP[slide.type] ?? 1.12);
+          if (!slide.shrunk && z < cap && fit.needs < fit.room * FILL) {
+            slide = { ...slide, squeeze: Math.min(cap, z + GROW_STEP) };
+            continue;
+          }
+          // Two: is Ofir standing on data?
           if (await reviewMascot()) break;
           continue;
         }
@@ -150,7 +189,7 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
         // and it fits — an hour of news missing is not.
         if (slide.squeeze === undefined || slide.squeeze > MIN_SQUEEZE) {
           const next = Math.max(MIN_SQUEEZE, (slide.squeeze ?? 1) - SQUEEZE_STEP);
-          slide = { ...slide, squeeze: next };
+          slide = { ...slide, squeeze: next, shrunk: true };
           continue;
         }
 

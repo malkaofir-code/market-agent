@@ -38,7 +38,13 @@ html,body{margin:0;padding:0;background:var(--bg)}
    archetypes set absolute px, so the scale has to reach them through a
    zoom on the band's own contents. */
 .slide{--sq:1}
-.sl-bd > *{zoom:var(--sq)}
+/* Ofir is deliberately OUTSIDE the zoom. He is a fixed presence at a
+   fixed size; only the type grows and shrinks around him. Zooming him
+   too meant every notch of growth also widened his lane in real pixels
+   and narrowed the text column that the growth was supposed to fill —
+   type got bigger and lines got shorter at the same time, which is how
+   a slide ends up four characters wide. */
+.sl-bd > *:not(.ofir){zoom:var(--sq)}
 
 /* ── band B · body ── */
 .sl-bd{min-height:0;display:flex;flex-direction:column;justify-content:center;gap:34px;padding-top:18px;overflow:hidden;position:relative}
@@ -185,12 +191,20 @@ html,body{margin:0;padding:0;background:var(--bg)}
    band and capped at its height, so overflow always takes torso. An
    earlier version anchored him bottom at a height greater than the
    band, which cut him at the eyebrows. */
-.ofir{position:absolute; bottom:0; z-index:2; pointer-events:none; max-height:100%}
-.ofir img{display:block; height:100%; width:auto}
+/* He is sized by a BOX, not by a height. The ten poses run from 0.67
+   to 1.28 in aspect, so a single `height:700px` rendered one of them
+   469px wide and another 895px — which is how he ended up standing in
+   the middle of the cover with the headline across his face. A box
+   plus object-fit:contain makes his footprint the same whichever pose
+   the spin lands on, and the lane below is sized against that box. */
+.ofir{position:absolute; bottom:0; z-index:2; pointer-events:none;
+  width:var(--ofir-w,380px); height:var(--ofir-h,600px)}
+.ofir img{display:block; width:100%; height:100%;
+  object-fit:contain; object-position:bottom center}
 
-.slide.of-smaller .ofir{height:64%}
+.slide.of-smaller .ofir{width:calc(var(--ofir-w,380px) * .68); height:calc(var(--ofir-h,600px) * .68)}
 .slide.of-far-edge .ofir{left:auto; right:-28px}
-.slide.of-smaller-far-edge .ofir{height:58%; left:auto; right:-20px}
+.slide.of-smaller-far-edge .ofir{width:calc(var(--ofir-w,380px) * .6); height:calc(var(--ofir-h,600px) * .6); left:auto; right:-20px}
 
 
 /* ═══ THE FIVE GROUNDS ═══════════════════════════════════════════
@@ -216,23 +230,58 @@ html,body{margin:0;padding:0;background:var(--bg)}
    archetype places him differently: same person, never the same
    composition twice running. */
 .slide[data-type="coverFramed"] .ofir,
-.slide[data-type="cover"] .ofir{right:-64px; height:700px}
-.slide[data-type="hero"]  .ofir{left:-56px; height:560px}
-.slide[data-type="note"]  .ofir{left:-86px; height:700px}
-.slide[data-type="chart"] .ofir{left:-40px; height:430px}
-.slide[data-type="watch"] .ofir{left:-70px; height:600px}
-.slide[data-type="telegram"] .ofir{left:-76px; height:720px}
+.slide[data-type="cover"] .ofir{right:-44px; --ofir-w:430px; --ofir-h:700px; --lane:400px}
+.slide[data-type="hero"]  .ofir{left:-34px; --ofir-w:370px; --ofir-h:560px; --lane:350px}
+.slide[data-type="note"]  .ofir{left:-44px; --ofir-w:410px; --ofir-h:670px; --lane:380px}
+.slide[data-type="chart"] .ofir{left:-26px; --ofir-w:300px; --ofir-h:430px; --lane:290px}
+.slide[data-type="watch"] .ofir{left:-40px; --ofir-w:390px; --ofir-h:600px; --lane:365px}
+.slide[data-type="telegram"] .ofir{left:-46px; --ofir-w:430px; --ofir-h:700px; --lane:395px}
+/* --lane has to be readable from the CONTENT, which is a sibling of
+   .ofir, so it is declared again on the slide. Same numbers, one
+   source of truth would need a preprocessor. */
+.slide[data-ofir]{--lane:360px}
+.slide[data-ofir][data-type="coverFramed"],
+.slide[data-ofir][data-type="cover"]{--lane:400px}
+.slide[data-ofir][data-type="hero"]{--lane:350px}
+.slide[data-ofir][data-type="note"]{--lane:380px}
+.slide[data-ofir][data-type="chart"]{--lane:290px}
+.slide[data-ofir][data-type="watch"]{--lane:365px}
+.slide[data-ofir][data-type="telegram"]{--lane:395px}
 
 
 /* ── making room for him ─────────────────────────────────────────
-   Ofir is absolutely positioned, so the text has no idea he is there
-   and will happily run under his shoulder. These caps are the other
-   half of the review: the review stops him covering DATA, and these
-   stop the prose colliding with him in the first place. */
-.a-hr .quo{max-width:22ch}
-.a-nt .abt{max-width:18ch}
-.a-nt .txt{max-width:15ch}
-.a-wt .big{max-width:12ch}
-.a-tg .big{max-width:10ch}
-.a-ch .bars{max-width:640px;margin-inline-start:0}
-.a-cf .stand{max-width:20ch}
+   The old caps were max-width in ch, and they were wrong in a way
+   that only shows in Hebrew: the text runs RIGHT to left, so a cap
+   trims the LEFT edge. On the covers, where he stands on the right,
+   that trimmed the empty side and left the headline running straight
+   over his face. What clears him is padding on HIS side — inline-start
+   is the right edge in RTL — and it is only applied when he is
+   actually on the board, so a slide with a photo instead of a mascot
+   gets its full width back. */
+/* Divided by the zoom so the lane is the same number of REAL pixels
+   whatever the type is doing — it has to match him, and he does not
+   zoom. */
+.slide[data-ofir="right"] .sl-bd > :not(.ofir){padding-inline-start:calc(var(--lane) / var(--sq))}
+.slide[data-ofir="left"]  .sl-bd > :not(.ofir){padding-inline-end:calc(var(--lane) / var(--sq))}
+/* The chart's bars are a fixed-width plot, not prose: let the padding
+   move them rather than squeezing the track. */
+.slide[data-ofir] .a-ch .bars{max-width:none; margin-inline-start:0}
+/* The chart's row is two fixed columns and a track. Zooming the band
+   grows the fixed pair and starves the track, so the bars — the only
+   thing on the slide anyone reads — get thinner as the type gets
+   bigger. Give the track back what the lane took. */
+.slide[data-ofir] .a-ch .bar{grid-template-columns:92px 1fr 128px;gap:18px}
+
+/* The channel address is a single unbreakable LTR token. In its own
+   full-width plate it fit; inside the lane it ran off the right edge
+   of the plate and lost its last letter — an address that is wrong is
+   worse than an address that is small. Let the plate shrink to the
+   text and the text shrink to the column. */
+.slide[data-ofir] .a-tg .link{font-size:30px;padding:20px 24px;
+  width:fit-content;margin-inline-start:auto;white-space:nowrap;max-width:100%}
+
+/* The framed cover's headline plate is a fixed 610px, which predates
+   the lane and cheerfully overran it — the plate's corner landed on
+   his arm. Let it take the column it is given instead. */
+.slide[data-ofir] .a-cf .block{width:auto;max-width:100%;margin-inline-end:0}
+.slide[data-ofir] .a-cf .frame{max-width:100%}

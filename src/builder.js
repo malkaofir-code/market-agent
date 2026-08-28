@@ -66,7 +66,12 @@ const ARCHETYPES = {
 
   // 02 · hero figure — sized to its measure, not to a constant.
   hero: s => {
-    const size = Math.min(258, Math.floor(940 / (String(s.figure).length * 0.62)));
+    // The measure is the COLUMN, not the canvas. With Ofir on the board
+    // a lane is gone, and a figure sized against the full 1080 grew
+    // straight through him — the review then shrank him instead, which
+    // is the wrong end of the problem to fix.
+    const room = s.ofirSide ? 600 : 940;
+    const size = Math.min(s.ofirSide ? 208 : 258, Math.floor(room / (String(s.figure).length * 0.62)));
     return `<div class="a-hr"><p class="eyeb">${bidi(s.eyebrow || 'המספר של החלון')}</p>
     <p class="fig ${s.dir ?? ''}" data-protect="the figure" style="font-size:${size}px">${esc(s.figure)}</p>
     ${photo(s.photo && { ...s.photo, h: 300 })}
@@ -170,6 +175,16 @@ const NO_OFIR = new Set(['item', 'list']);   // boards carrying evidence
  * filesystem: { explain: [dataUri, dataUri, ...] } — one entry per
  * outfit for that gesture. `spin` rotates the wardrobe across the deck.
  */
+// Which side he stands on, per archetype. The content needs this to
+// leave him a lane, and the lane has to be on HIS side — in Hebrew the
+// text starts at the right edge, so a mascot on the right is standing
+// exactly where the first word lands.
+const SIDE = { cover: 'right', coverFramed: 'right' };   // everything else: left
+
+function ofirSide(slide, ctx) {
+  return ofirLayer(slide, ctx) ? (SIDE[slide.type] ?? 'left') : null;
+}
+
 function ofirLayer(slide, ctx) {
   if (slide.ofir === null || NO_OFIR.has(slide.type)) return '';
   // A slide already carrying a photo has its image. Ofir standing in
@@ -210,12 +225,18 @@ export function buildSlide(slide, ctx, i, n) {
   // render.js may hand back an ofirPlace after the mascot review; the
   // class is what CSS reads to shrink him or send him to the far edge.
   const place = slide.ofirPlace ? ` of-${slide.ofirPlace}` : '';
-  const sq = slide.squeeze && slide.squeeze < 1
+  // Now two-way: below 1 the band was overlong and is being squeezed,
+  // above 1 it was underfull and is being grown.
+  const sq = slide.squeeze && slide.squeeze !== 1
     ? ` style="--sq:${slide.squeeze}"` : '';
   const ground = slide.ground ?? GROUND[slide.type];
   const g = ground && ground !== 'ink' ? ` g-${ground}` : '';
-  return `<div class="slide${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"><div class="bgm"></div>${coverLayer(slide)}
-${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window })}${ofirLayer(slide, ctx)}</main>${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
+  // Stamped so the CSS can reserve his lane. Absent when he is not on
+  // the board — a slide carrying a photo instead gets its full width.
+  const side = ofirSide(slide, ctx);
+  const oa = side ? ` data-ofir="${side}"` : '';
+  return `<div class="slide${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${oa}><div class="bgm"></div>${coverLayer(slide)}
+${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window, ofirSide: side })}${ofirLayer(slide, ctx)}</main>${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }
 
