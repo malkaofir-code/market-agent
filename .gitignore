@@ -17,3 +17,6 @@ state.db-shm
 state.db-wal
 ig-state.json
 src/assets/*.zip.bak
+
+# downloaded run artefacts — inspection only, never part of the build
+review/
