@@ -27,9 +27,27 @@ export const PCT = /(?<![\w.,])((?:(?<![֐-׿])[+\-−־])?\d+(?:[.,]\d+)?%)/gu;
 // backwards, so the whole range goes in ONE span.
 const RANGE = /(?<![\w.])(\d{1,2}[:.]\d{2}\s*[–—\-־]\s*\d{1,2}[:.]\d{2})/gu;
 
+// Rule 2b — a NUMERIC range is one span for the same reason a time
+// range is. "ל-5-10 שנים" put a bare dash between two isolates and
+// published 10-5.
+const NRANGE = /(?<![\w.])(\d+(?:[.,]\d+)?\s*[–—\-־]\s*\d+(?:[.,]\d+)?%?)/gu;
+
 // Then one isolate per NUMBER — never per digit group, or 14/05
 // renders 05/14. Currency rides inside, or $325 renders 325$.
-const SINGLE = /(?<![\w.])([$€£₪]?[+\-−]?\d+(?:[.,:\/]\d+)*%?)/gu;
+//
+// Two things the first version got wrong, both published:
+//
+// (a) The leading sign. A hyphen after a Hebrew letter is a MAQAF —
+// "ל-51.7" is "to 51.7", not "minus 51.7" — and swallowing it into
+// the isolate moved it to the far side of the number, where it hung
+// off the end of the line attached to nothing. PCT already carried
+// this guard; SINGLE never did.
+//
+// (b) The magnitude suffix. "-79K" isolated as "-79" and left the K
+// loose in the Hebrew run, which parked it on the wrong side: K-79.
+// One letter is below LATIN's floor, so it has to ride inside the
+// number.
+const SINGLE = /(?<![\w.])((?:(?<![֐-׿])[+\-−])?[$€£₪]?\d+(?:[.,:\/]\d+)*%?(?:[KMBkmb](?![A-Za-z]))?)/gu;
 
 // Latin runs need isolating too, or NVDA inside Hebrew drifts.
 // An ampersand pair is ONE run: isolating "NQ" and "ES" separately
@@ -53,6 +71,11 @@ export const stripLeadEmoji = s => clean(s).replace(LEAD_EMOJI, '');
  */
 export function bidi(raw, { emoji = 'strip' } = {}) {
   let s = emoji === 'strip' ? stripLeadEmoji(raw) : clean(raw);
+  // A hyphen between a Hebrew letter and a digit is a maqaf doing
+  // prefix duty — "ל-51.7". Set it as one: same length, so every span
+  // index below still lines up, and the deck stops mixing an ASCII
+  // hyphen into Hebrew words while the masthead sets a proper maqaf.
+  s = s.replace(/(?<=[\u0590-\u05FF])-(?=[$€£₪]?\d)/gu, '\u05BE');
 
   const taken = [];
   const free = (a, b) => !taken.some(t => a < t.end && b > t.start);
@@ -63,6 +86,7 @@ export function bidi(raw, { emoji = 'strip' } = {}) {
     }
   };
   collect(RANGE, 'range');
+  collect(NRANGE, 'range');
   collect(SINGLE, 'num');
   collect(LATIN, 'lat');
   taken.sort((a, b) => a.start - b.start);
