@@ -4,13 +4,44 @@
 // also owns the overflow tripwire (design.html §04).
 // ─────────────────────────────────────────────────────────────
 import { chromium } from 'playwright';
-import { readFileSync, mkdirSync } from 'fs';
+import { readFileSync, mkdirSync, readdirSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { buildSlide, page, CANVAS } from './builder.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(join(HERE, 'slide.css'), 'utf8');
+
+/**
+ * Ofir's wardrobe, read once per process.
+ *
+ * The slide HTML is handed to Chromium with setContent(), which has no
+ * base URL — a relative <img src> resolves against about:blank and a
+ * file:// path is blocked from it. Data URIs are the only thing that
+ * survives, so the poses are inlined. They are palette-quantised to
+ * ~50KB each, which is cheap next to a 1080x1350 screenshot.
+ *
+ * Filenames carry the gesture: 03-deep-teal-knit-EXPLAINING.png. The
+ * map is gesture -> [outfit, outfit, ...] so the deck can rotate the
+ * wardrobe without changing what he is doing.
+ */
+const GESTURES = {
+  point: /point-right|classic-point/, upward: /upward|presenting/,
+  explain: /explaining/, welcome: /welcome/, yes: /-yes|assured/,
+  pause: /pause|thinking|listening/,
+};
+function loadPoses() {
+  const dir = join(HERE, 'assets', 'ofir');
+  if (!existsSync(dir)) return {};
+  const out = {};
+  for (const f of readdirSync(dir).filter(f => f.endsWith('.png')).sort()) {
+    const uri = 'data:image/png;base64,' + readFileSync(join(dir, f)).toString('base64');
+    for (const [g, re] of Object.entries(GESTURES))
+      if (re.test(f)) (out[g] ??= []).push(uri);
+  }
+  return out;
+}
+const POSES = loadPoses();
 
 // How far the type may shrink before we admit defeat, and in what steps.
 const SQUEEZE_STEP = 0.06;
@@ -32,7 +63,11 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
     viewport: { width: CANVAS.w, height: CANVAS.h }, deviceScaleFactor: scale,
   });
   const p = await ctx.newPage();
-  const { slides, ...meta } = deck;
+  // `spin` rotates the wardrobe. Seeded from the window key so the same
+  // window always renders identically — a replay must reproduce the
+  // deck it replays — while consecutive windows dress him differently.
+  const spin = [...(deck.key ?? '')].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const { slides, ...meta } = { ...deck, poses: POSES, spin };
   const files = [], shed = [];
 
   try {

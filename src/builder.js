@@ -140,6 +140,45 @@ export function barChart(series) {
   </svg>`;
 }
 
+// ── ground and mascot ────────────────────────────────────────
+// Which ground each archetype stands on. Ink is the default, so only
+// the departures are listed. The rule behind the choices: narrative on
+// ink, Ofir explaining on deep teal, evidence on slate, data on the
+// document ground, and one board a deck allowed to shout in orange.
+const GROUND = {
+  coverFramed: 'deep',    // the digest opener, where he introduces
+  note:        'deep',    // interpretation — his board
+  item:        'slate',   // a story with a screenshot as evidence
+  list:        'doc',     // several headlines, read as a record
+  chart:       'doc',     // levels on paper
+  watch:       'flare',   // the one that shouts
+  telegram:    'deep',    // the sign-off
+};
+
+// Which pose suits which board. The wardrobe rotates on top of this —
+// same gesture, different outfit — so two consecutive decks never look
+// like reruns even when they use the same archetypes.
+const POSE = {
+  coverFramed: 'welcome', cover: 'welcome',
+  hero: 'point', note: 'explain', chart: 'upward',
+  watch: 'pause', telegram: 'yes',
+};
+const NO_OFIR = new Set(['item', 'list']);   // boards carrying evidence
+
+/**
+ * The mascot layer. `ctx.poses` is filled by render.js, which owns the
+ * filesystem: { explain: [dataUri, dataUri, ...] } — one entry per
+ * outfit for that gesture. `spin` rotates the wardrobe across the deck.
+ */
+function ofirLayer(slide, ctx) {
+  if (slide.ofir === null || NO_OFIR.has(slide.type)) return '';
+  const gesture = POSE[slide.type];
+  const wardrobe = ctx.poses?.[gesture];
+  if (!wardrobe?.length) return '';
+  const src = wardrobe[(ctx.spin ?? 0) % wardrobe.length];
+  return `<div class="ofir"><img src="${src}" alt=""></div>`;
+}
+
 // ── assembly ─────────────────────────────────────────────────
 const NO_TAPE = new Set(['telegram']);
 const COVERS = new Set(['cover', 'coverFramed']);   // overlay grid
@@ -169,8 +208,10 @@ export function buildSlide(slide, ctx, i, n) {
   const place = slide.ofirPlace ? ` of-${slide.ofirPlace}` : '';
   const sq = slide.squeeze && slide.squeeze < 1
     ? ` style="--sq:${slide.squeeze}"` : '';
-  return `<div class="slide${cover ? ' slide--cover' : ''}${place}"${sq} data-type="${slide.type}"><div class="bgm"></div>${coverLayer(slide)}
-${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window })}</main>${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
+  const ground = slide.ground ?? GROUND[slide.type];
+  const g = ground && ground !== 'ink' ? ` g-${ground}` : '';
+  return `<div class="slide${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"><div class="bgm"></div>${coverLayer(slide)}
+${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window })}${ofirLayer(slide, ctx)}</main>${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }
 

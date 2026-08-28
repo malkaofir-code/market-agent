@@ -9,6 +9,7 @@
 :root{
   --bg:#0B0D10; --fg:#F2F0EB; --dim:#9AA0AA; --dim2:#C3C7CE;
   --acc:#FF6B1A; --rule:#262B33; --pos:#35D07F; --neg:#FF5A5A;
+  --grid:rgba(242,240,235,.035);
   --f-text:'Assistant',sans-serif;
   --f-disp:'Frank Ruhl Libre',serif;
   --f-mono:'IBM Plex Mono',monospace;
@@ -21,8 +22,8 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide>*{position:relative;z-index:2}
 .slide::after{content:"";position:absolute;inset:0 0 auto 0;height:10px;background:var(--acc);z-index:6}
 .bgm{position:absolute;inset:0;z-index:0;background-image:
-  linear-gradient(to right,rgba(242,240,235,.035) 1px,transparent 1px),
-  linear-gradient(to bottom,rgba(242,240,235,.035) 1px,transparent 1px);background-size:54px 54px}
+  linear-gradient(to right,var(--grid) 1px,transparent 1px),
+  linear-gradient(to bottom,var(--grid) 1px,transparent 1px);background-size:54px 54px}
 
 /* ── band A · masthead ── */
 .sl-hd{display:flex;align-items:center;justify-content:space-between;gap:20px;
@@ -40,7 +41,7 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .sl-bd > *{zoom:var(--sq)}
 
 /* ── band B · body ── */
-.sl-bd{min-height:0;display:flex;flex-direction:column;justify-content:center;gap:34px;padding-top:18px;overflow:hidden}
+.sl-bd{min-height:0;display:flex;flex-direction:column;justify-content:center;gap:34px;padding-top:18px;overflow:hidden;position:relative}
 
 /* ── band C · tape ── */
 .tick{display:flex;align-items:center;border-top:1.5px solid var(--rule);border-bottom:1.5px solid var(--rule);
@@ -190,3 +191,33 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide.of-smaller .ofir{height:64%}
 .slide.of-far-edge .ofir{left:auto; right:-28px}
 .slide.of-smaller-far-edge .ofir{height:58%; left:auto; right:-20px}
+
+
+/* ═══ THE FIVE GROUNDS ═══════════════════════════════════════════
+   Every component rule above already reads these tokens, so a ground
+   is nothing but an override on .slide — no component knows which one
+   it is standing on. Ink is the default and stays as :root defines it.
+   The document and flare grounds also darken pos/neg, because #35D07F
+   on paper is a highlighter, not a number. */
+.slide.g-deep {--bg:#0E3540; --fg:#EFF6F6; --dim:#8FB6BE; --dim2:#CBE1E5; --rule:#1E5464}
+.slide.g-slate{--bg:#1A2029; --fg:#F0F1F3; --dim:#98A1AE; --dim2:#C9CFD8; --rule:#2E3846}
+.slide.g-doc  {--bg:#EDE8DE; --fg:#14161A; --dim:#6C6659; --dim2:#3C3A34; --rule:#C6BEAE;
+               --pos:#12833F; --neg:#B0271F; --grid:rgba(20,22,26,.05)}
+/* Flare spends the accent on the whole board, so nothing else may be
+   orange — the eyebrow, the index and the rules all go to near-black
+   or they vanish into the ground. */
+.slide.g-flare{--bg:#FF6B1A; --fg:#120A04; --dim:rgba(18,10,4,.62); --dim2:rgba(18,10,4,.84);
+               --rule:rgba(18,10,4,.3); --acc:#120A04; --pos:#120A04; --neg:#120A04;
+               --grid:rgba(20,22,26,.05)}
+
+/* ── Ofir on the board ───────────────────────────────────────────
+   A cut-out, never in a box. Anchored to the bottom of the band and
+   capped at its height so a crop can only ever take torso. Each
+   archetype places him differently: same person, never the same
+   composition twice running. */
+.a-cf .ofir,.a-cv .ofir{right:-64px; height:700px}
+.a-hr .ofir{left:-56px; height:560px}
+.a-nt .ofir{left:-86px; height:820px}
+.a-ch .ofir{left:-40px; height:430px}
+.a-wt .ofir{left:-70px; height:600px}
+.a-tg .ofir{left:-76px; height:720px}
