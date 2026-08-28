@@ -121,7 +121,7 @@ export async function publish(urls, caption, { dryRun = false } = {}) {
     console.log(`  carousel ${carousel}: status=${d.status_code ?? '?'}, ${children.length} child(ren) FINISHED`);
   } catch (e) { console.log('  container probe failed:', e.message); }
 
-  if (dryRun) return { id: null, carousel, dryRun: true, children, attached };
+  if (dryRun) return { id: null, carousel, dryRun: true, children };
 
   // 3 · publish
   let id;

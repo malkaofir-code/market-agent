@@ -74,7 +74,52 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
     for (let i = 0; i < slides.length; i++) {
       let slide = slides[i], fit = null;
 
-      for (let attempt = 0; attempt < 8; attempt++) {
+      // ── the mascot review ────────────────────────────────────
+      // Ofir is placed by CSS, which knows nothing about how long a
+      // headline turned out or how many rows a table grew. Returns
+      // true when the board is clean; otherwise it edits `slide` and
+      // the caller re-renders.
+      async function reviewMascot() {
+      const clash = await p.evaluate(() => {
+        const o = document.querySelector('.ofir');
+        if (!o) return null;
+        const a = o.getBoundingClientRect();
+        const hits = [];
+        for (const el of document.querySelectorAll('[data-protect]')) {
+          const b = el.getBoundingClientRect();
+          const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (w > 0 && h > 0) {
+            const area = w * h;
+            // A few pixels of a descender brushing his shoulder is not
+            // a collision. A tenth of the protected element is.
+            if (area > 0.1 * b.width * b.height || area > 0.25 * a.width * a.height)
+              hits.push({ what: el.dataset.protect, cover: Math.round(100 * area / (b.width * b.height)) });
+          }
+        }
+        return hits.length ? hits : null;
+      });
+
+      if (clash) {
+        // Retreat in order: shrink, then move to the opposite edge,
+        // then drop him. A slide without Ofir is fine; a number with a
+        // cartoon elbow through it is not.
+        const step = slide.ofirTry ?? 0;
+        if (step < MASCOT_RETRIES.length) {
+          shed.push({ slide: i + 1, headline: `Ofir vs ${clash.map(c => c.what).join(', ')}`,
+            note: `${MASCOT_RETRIES[step]} (covered ${clash[0].cover}%)` });
+          slide = { ...slide, ofirTry: step + 1, ofirPlace: MASCOT_RETRIES[step] };
+          return false;
+        }
+        shed.push({ slide: i + 1, headline: 'Ofir dropped', note: 'no placement clears the data' });
+        slide = { ...slide, ofir: null };
+        return false;
+      }
+      return true;
+      }
+
+
+      for (let attempt = 0; attempt < 14; attempt++) {
         await p.setContent(page(buildSlide(slide, meta, i, slides.length), CSS),
           { waitUntil: 'networkidle' });
         try { await p.evaluate(() => document.fonts.ready); } catch {}
@@ -85,7 +130,11 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
           const a = bd.firstElementChild;
           return { room: bd.clientHeight, needs: a.scrollHeight };
         });
-        if (fit.needs <= fit.room) break;
+        // Fits. Now the second question: is Ofir standing on data?
+        if (fit.needs <= fit.room) {
+          if (await reviewMascot()) break;
+          continue;
+        }
 
         if (slide.type === 'list' && slide.rows.length > 1) {
           const dropped = slide.rows[slide.rows.length - 1];
@@ -118,51 +167,6 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
         throw new Error(
           `TRIPWIRE slide ${i + 1} (${slide.type}): needs ${fit.needs}px, room ${fit.room}px ` +
           `even at ${Math.round(MIN_SQUEEZE * 100)}% type. Skipped rather than clipped.`);
-      }
-
-      // ── the mascot review ────────────────────────────────────
-      // Ofir is placed by CSS, which knows nothing about how long a
-      // headline turned out or how many rows a table grew. So after
-      // layout, measure him against everything marked as data and
-      // move him if he is standing on it. Same shape as the overflow
-      // tripwire above: measure the real DOM, then act.
-      //
-      // He is a tight-cropped cut-out, so his element box IS his ink —
-      // a plain rectangle test is honest here.
-      const clash = await p.evaluate(() => {
-        const o = document.querySelector('.ofir');
-        if (!o) return null;
-        const a = o.getBoundingClientRect();
-        const hits = [];
-        for (const el of document.querySelectorAll('[data-protect]')) {
-          const b = el.getBoundingClientRect();
-          const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
-          const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-          if (w > 0 && h > 0) {
-            const area = w * h;
-            // A few pixels of a descender brushing his shoulder is not
-            // a collision. A tenth of the protected element is.
-            if (area > 0.1 * b.width * b.height || area > 0.25 * a.width * a.height)
-              hits.push({ what: el.dataset.protect, cover: Math.round(100 * area / (b.width * b.height)) });
-          }
-        }
-        return hits.length ? hits : null;
-      });
-
-      if (clash) {
-        // Retreat in order: shrink, then move to the opposite edge,
-        // then drop him. A slide without Ofir is fine; a number with a
-        // cartoon elbow through it is not.
-        const step = slide.ofirTry ?? 0;
-        if (step < MASCOT_RETRIES.length) {
-          shed.push({ slide: i + 1, headline: `Ofir vs ${clash.map(c => c.what).join(', ')}`,
-            note: `${MASCOT_RETRIES[step]} (covered ${clash[0].cover}%)` });
-          slide = { ...slide, ofirTry: step + 1, ofirPlace: MASCOT_RETRIES[step] };
-          continue;
-        }
-        shed.push({ slide: i + 1, headline: 'Ofir dropped', note: 'no placement clears the data' });
-        slide = { ...slide, photoOfir: null, ofir: null };
-        continue;
       }
 
       // The API path needs JPEG (Meta accepts nothing else). Quality 95
