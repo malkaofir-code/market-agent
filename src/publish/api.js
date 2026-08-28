@@ -189,6 +189,25 @@ export async function publish(urls, caption, { dryRun = false } = {}) {
   return { id, permalink: permalink ?? null };
 }
 
+/**
+ * One story. 1080x1920, published on its own.
+ *
+ * Stories are not a carousel and take no caption — Instagram ignores
+ * one — so this is the plain three-step: container, wait for FINISHED,
+ * publish. Called once per story rather than once per set, because a
+ * set of three that fails on the second should still have told the
+ * first: an hour with one story on it beats an hour with none.
+ */
+export async function publishStory(url, { dryRun = false } = {}) {
+  const { id: ig } = creds();
+  await preflight([url]);
+  const { id: container } = await call(`/${ig}/media`, { image_url: url, media_type: 'STORIES' });
+  await ready(container);
+  if (dryRun) return { id: null, container, dryRun: true };
+  const { id } = await call(`/${ig}/media_publish`, { creation_id: container });
+  return { id, permalink: null };   // stories have no public permalink
+}
+
 /** Long-lived tokens last 60 days and are refreshable while still valid. */
 export async function refreshToken() {
   const { token } = creds();

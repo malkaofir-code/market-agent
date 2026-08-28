@@ -6,6 +6,11 @@
 import { bidi, esc } from './rtl.js';
 
 export const CANVAS = { w: 1080, h: 1350, body: 1118 };
+// A story is the same board, taller, with the top and bottom quarters
+// given away. Instagram draws its own furniture there — progress bars
+// and the avatar at the top, the reply box and the share row at the
+// bottom — and anything of ours underneath it is simply not read.
+export const STORY = { w: 1080, h: 1920, safeTop: 250, safeBottom: 250 };
 export const HANDLE = '@marketalert.il';
 
 const MARK = `<svg class="hd-mark" viewBox="0 0 100 100"><g fill="currentColor">
@@ -181,11 +186,11 @@ const NO_OFIR = new Set(['item', 'list']);   // boards carrying evidence
 // exactly where the first word lands.
 const SIDE = { cover: 'right', coverFramed: 'right' };   // everything else: left
 
-function ofirSide(slide, ctx) {
-  return ofirLayer(slide, ctx) ? (SIDE[slide.type] ?? 'left') : null;
+function ofirSide(slide, ctx, i = 0) {
+  return ofirLayer(slide, ctx, i) ? (SIDE[slide.type] ?? 'left') : null;
 }
 
-function ofirLayer(slide, ctx) {
+function ofirLayer(slide, ctx, i = 0) {
   if (slide.ofir === null || NO_OFIR.has(slide.type)) return '';
   // A slide already carrying a photo has its image. Ofir standing in
   // front of a screenshot is two subjects fighting, and on the framed
@@ -194,7 +199,10 @@ function ofirLayer(slide, ctx) {
   const gesture = POSE[slide.type];
   const wardrobe = ctx.poses?.[gesture];
   if (!wardrobe?.length) return '';
-  const src = wardrobe[(ctx.spin ?? 0) % wardrobe.length];
+  // The slide index is in the seed as well as the window's, or every
+  // board in a set that happens to want the same gesture puts him in
+  // the same shirt three times running.
+  const src = wardrobe[((ctx.spin ?? 0) + i) % wardrobe.length];
   return `<div class="ofir"><img src="${src}" alt=""></div>`;
 }
 
@@ -215,7 +223,7 @@ const coverLayer = slide => {
   return `<div class="cv-bleed"><img src="${esc(slide.photo.src)}" alt=""></div>`;
 };
 
-export function buildSlide(slide, ctx, i, n) {
+export function buildSlide(slide, ctx, i, n, { story = false } = {}) {
   const body = ARCHETYPES[slide.type];
   if (!body) throw new Error(`unknown archetype: ${slide.type}`);
   const cover = COVERS.has(slide.type);
@@ -227,16 +235,26 @@ export function buildSlide(slide, ctx, i, n) {
   const place = slide.ofirPlace ? ` of-${slide.ofirPlace}` : '';
   // Now two-way: below 1 the band was overlong and is being squeezed,
   // above 1 it was underfull and is being grown.
-  const sq = slide.squeeze && slide.squeeze !== 1
-    ? ` style="--sq:${slide.squeeze}"` : '';
+  // ofirK is the story board's first concession: before the type is
+  // squeezed for a long headline, HE gets smaller, because he is the
+  // decoration and the headline is the point.
+  const vars = [
+    slide.squeeze && slide.squeeze !== 1 ? `--sq:${slide.squeeze}` : null,
+    slide.ofirK && slide.ofirK !== 1 ? `--ofir-k:${slide.ofirK}` : null,
+    slide.ofirFit ? `--ofir-fit:${slide.ofirFit}px` : null,
+  ].filter(Boolean);
+  const sq = vars.length ? ` style="${vars.join(';')}"` : '';
   const ground = slide.ground ?? GROUND[slide.type];
   const g = ground && ground !== 'ink' ? ` g-${ground}` : '';
   // Stamped so the CSS can reserve his lane. Absent when he is not on
   // the board — a slide carrying a photo instead gets its full width.
-  const side = ofirSide(slide, ctx);
+  const side = ofirSide(slide, ctx, i);
   const oa = side ? ` data-ofir="${side}"` : '';
-  return `<div class="slide${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${oa}><div class="bgm"></div>${coverLayer(slide)}
-${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window, ofirSide: side })}${ofirLayer(slide, ctx)}</main>${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
+  // Three stories in a row should not be the same photograph three
+  // times: he changes sides down the set.
+  const alt = story && i % 2 === 1 ? ' of-alt' : '';
+  return `<div class="slide${story ? ' slide--story' + alt : ''}${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${oa}><div class="bgm"></div>${coverLayer(slide)}
+${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window, ofirSide: side })}${ofirLayer(slide, ctx, i)}</main>${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }
 

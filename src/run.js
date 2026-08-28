@@ -15,21 +15,27 @@ import { join } from 'path';
 import 'dotenv/config';
 import {
   putMessages, messagesIn, messagesInAll, oldestUnconsumedBefore, markConsumed,
+  storyMessagesIn, oldestUnstoriedBefore, markStoried, storiesToday,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
-import { compose, windowOf, WIN } from './compose.js';
+import { compose, composeStories, windowOf, WIN } from './compose.js';
 import { renderDeck } from './render.js';
 import { connect, alert } from './tg.js';
 
 const DRY = process.argv.includes('--dry') || process.env.DRY_RUN === '1';
+// Two tracks over the same channel. A digest summarises the hours
+// since the last one; stories tell the last hour as it happened. They
+// read the same messages through separate cursors, so neither one
+// starves the other.
+const STORIES = process.argv.includes('--stories') || process.env.MODE === 'stories';
 // Scheduled ticks render for review only; publishing needs a person.
 const REVIEW = process.env.REVIEW === '1';
 const CARRY_KEY = 'tape-carry';
 const say = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 // ── rails ────────────────────────────────────────────────────
-async function blocked() {
+async function blocked({ stories = false } = {}) {
   const ks = process.env.KILL_SWITCH || './PAUSED';
   if (existsSync(ks)) return `kill switch present (${ks})`;
 
@@ -40,14 +46,21 @@ async function blocked() {
   const to = Number(process.env.ACTIVE_TO_HOUR ?? 24);
   if (hour < from || hour >= to) return `outside active hours (${hour}:00, active ${from}-${to})`;
 
-  const cap = Number(process.env.MAX_POSTS_PER_DAY || 12);
-  const n = await postsToday();
-  if (n >= cap) return `daily cap reached (${n}/${cap})`;
+  // The post-rate rails are about POSTS. A story is a different thing
+  // on a different clock — three of them at :16 must not be silenced
+  // because a digest went out at 15:31, and they have their own cap
+  // inside runStories(). The kill switch, the active hours and the
+  // failure latch apply to both.
+  if (!stories) {
+    const cap = Number(process.env.MAX_POSTS_PER_DAY || 12);
+    const n = await postsToday();
+    if (n >= cap) return `daily cap reached (${n}/${cap})`;
 
-  const gap = Number(process.env.MIN_MINUTES_BETWEEN_POSTS || 12);
-  const last = await lastPostAt();
-  if (last && (Date.now() / 1000 - last) < gap * 60)
-    return `only ${Math.round((Date.now() / 1000 - last) / 60)}min since last post (min ${gap})`;
+    const gap = Number(process.env.MIN_MINUTES_BETWEEN_POSTS || 12);
+    const last = await lastPostAt();
+    if (last && (Date.now() / 1000 - last) < gap * 60)
+      return `only ${Math.round((Date.now() / 1000 - last) / 60)}min since last post (min ${gap})`;
+  }
 
   const need = Number(process.env.PAUSE_AFTER_FAILURES || 2);
   const within = Number(process.env.PAUSE_WINDOW_MIN || 180);
@@ -83,6 +96,105 @@ async function pickWindow() {
     backlog: Math.floor((nowWindow - w.start) / (WIN * 60)) };
 }
 
+/**
+ * The story track, end to end.
+ *
+ * Deliberately simpler than the digest: no retire loop, no
+ * merge-forward, no review gate. A story is about the hour it belongs
+ * to, so an hour that went by unstoried is not worth telling later —
+ * it is skipped, and the digest will still summarise it.
+ */
+async function runStories() {
+  const nowWindow = windowOf(Math.floor(Date.now() / 1000)).start;
+  const oldest = await oldestUnstoriedBefore(nowWindow);
+  if (oldest == null) { say('SKIP — nothing unstoried'); return; }
+
+  const w = windowOf(Number(oldest));
+  // Only the hour just gone. Anything older is news, not "now": mark
+  // it read on the story cursor so the track does not sit there
+  // re-deciding the same thing every hour, and move on.
+  const behind = Math.floor((nowWindow - w.start) / (WIN * 60));
+  const maxBehind = Number(process.env.MAX_STORY_LAG_WINDOWS ?? 2);
+  if (behind > maxBehind) {
+    const stale = await storyMessagesIn(w.start, w.end);
+    await markStoried(`S:${w.key}`, stale.map(r => Number(r.tg_id)));
+    say(`SKIP — ${w.key} is ${behind} window(s) behind; a story is about now`);
+    return;
+  }
+
+  const rows = await storyMessagesIn(w.start, w.end);
+  if (!rows.length) { say(`SKIP — ${w.key} has nothing unstoried`); return; }
+
+  const cap = Number(process.env.MAX_STORIES_PER_DAY || 40);
+  const told = await storiesToday();
+  if (!DRY && told >= cap) { say(`SKIP — story cap reached (${told}/${cap})`); return; }
+
+  const deck = composeStories(rows, { carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end });
+  const consumed = deck.consumed.map(Number);
+  if (deck.skip) {
+    say('SKIP —', w.key, `(${deck.skip})`);
+    await markStoried(deck.key ?? `S:${w.key}`, consumed);
+    return;
+  }
+  // The carry is the tape's running level and belongs to whichever
+  // track saw the snapshot last — both write it, and both are right.
+  if (deck.carry) await setState(CARRY_KEY, deck.carry);
+
+  say(`${deck.key} — ${rows.length} msgs -> ${deck.slides.length} story(ies) `
+    + `[${deck.slides.map(x => x.type)}]`);
+
+  const dir = join('./out', deck.key.replace(/[:]/g, '').replace('S', 'S-'));
+  const { files } = await renderDeck(deck, dir, { format: 'jpeg', story: true });
+  say('rendered', files.length, 'story board(s)');
+
+  if (REVIEW) {
+    say(`REVIEW — ${files.length} stories rendered for ${deck.key}, NOT published`);
+    await markStoried(deck.key, consumed);
+    await upsertWindow(deck.key, w.start, w.end);
+    await setWindow({ key: deck.key, status: 'review', slides: files.length });
+    return;
+  }
+
+  const { upload, remove, publishStory } = await import('./publish/api.js');
+  const prefix = deck.key.replace(/[:]/g, '');
+  const urls = await upload(files, prefix);
+  say('uploaded', urls.length);
+
+  // One at a time, and a failure on the third does not undo the first
+  // two. Instagram counts each story against the same 100-per-24h
+  // ceiling as a post, which is why they are capped separately above.
+  let posted = 0, failure = null;
+  try {
+    for (const [i, url] of urls.entries()) {
+      try {
+        const r = await publishStory(url, { dryRun: DRY });
+        posted++;
+        say(DRY ? `  DRY story ${i + 1}/${urls.length} built, NOT published`
+                : `  STORY ${i + 1}/${urls.length} posted ${r.id}`);
+      } catch (e) { failure = e; say(`  story ${i + 1} FAILED — ${e.message}`); break; }
+    }
+  } finally {
+    await remove(files, prefix);
+  }
+
+  if (DRY) { say(`DRY RUN OK — ${files.length} stories built`); return; }
+
+  await upsertWindow(deck.key, w.start, w.end);
+  if (posted) {
+    await markStoried(deck.key, consumed);
+    await setWindow({ key: deck.key, status: 'posted', slides: posted,
+      posted_at: Math.floor(Date.now() / 1000),
+      error: failure ? `${posted}/${urls.length}: ${failure.message}` : null });
+    await logRun(deck.key, 'stories', true, `${posted}/${urls.length}`);
+    say(`POSTED ${posted} story(ies)`);
+  } else {
+    await setWindow({ key: deck.key, status: 'failed', slides: 0, error: failure?.message });
+    await logRun(deck.key, 'stories', false, failure?.message ?? 'nothing posted');
+    await notify(`❌ stories ${deck.key}\n${failure?.message ?? 'nothing posted'}`);
+    process.exitCode = 1;
+  }
+}
+
 async function main() {
   if (process.argv.includes('--ingest')) {
     try {
@@ -105,8 +217,29 @@ async function main() {
 
   // A review run publishes nothing, so the post-rate guards have no
   // opinion about it — let it render even at the daily cap.
-  const stop = (DRY || REVIEW) ? null : await blocked();
+  const stop = (DRY || REVIEW) ? null : await blocked({ stories: STORIES });
   if (stop) { say('SKIP —', stop); return; }
+
+  // The story track shares the kill switch, the active hours and the
+  // failure latch above, and nothing else: its own cap lives inside.
+  if (STORIES) return runStories();
+
+  // Three digests a day, not one an hour — stories carry the hour now,
+  // and a digest that repeats them an hour later is the same news
+  // twice. The gate is HERE rather than in the cron expression
+  // because pg_cron thinks in UTC and Israel moves twice a year; this
+  // reads the local hour, so 08:31 stays 08:31 through the change.
+  const hours = (process.env.DIGEST_HOURS || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (hours.length && process.env.IGNORE_SCHEDULE !== '1' && !DRY
+      && !process.argv.some(a => a.startsWith('--window='))) {
+    const hour = new Intl.DateTimeFormat('en-GB',
+      { timeZone: process.env.TZ || 'Asia/Jerusalem', hour: '2-digit', hour12: false })
+      .format(new Date());
+    if (!hours.includes(String(Number(hour)))) {
+      say(`SKIP — ${hour}:xx is not a digest hour (${hours.join(', ')})`);
+      return;
+    }
+  }
 
   let w = await pickWindow();
   if (!w) { say('SKIP — nothing unconsumed'); return; }

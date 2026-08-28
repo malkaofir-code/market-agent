@@ -232,6 +232,90 @@ export function compose(rows, { now = null, carry = {}, endTs = null } = {}) {
   };
 }
 
+const MAX_STORIES = Number(process.env.MAX_STORIES || 3);
+
+/**
+ * The same hour, told as stories instead of summarised as a post.
+ *
+ * A digest answers "what happened between 15:15 and 21:15"; a story
+ * answers "what just happened". So this does not summarise: it takes
+ * the few highest-scoring updates of the window and gives each one a
+ * whole board. Up to three, because a viewer taps through stories and
+ * the fourth is where they leave.
+ *
+ * It reads the same messages as compose() and marks them on a
+ * separate cursor, so telling an hour as stories never costs the
+ * digest that will later summarise it.
+ */
+export function composeStories(rows, { carry = {}, endTs = null } = {}) {
+  const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
+  const w0 = all.length ? windowOf(all[0].ts) : null;
+  const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
+    consumed: all.map(p => p.tg_id), carry: tape(all, carry).carry });
+  if (!all.length) return nothing('empty');
+
+  const parsed = dedupe(all.filter(p => !isSnapshot(p)));
+  if (!parsed.length) return nothing('snapshots-only');
+
+  const w0m = windowOf(parsed[0].ts);
+  const w = endTs && endTs > w0m.end ? { ...w0m, end: endTs } : w0m;
+  const { quotes, carry: nextCarry, stamp } = tape(all, carry);
+
+  const picks = [...parsed].sort((a, b) => b.score - a.score || b.ts - a.ts)
+    .slice(0, MAX_STORIES);
+
+  // Each update is offered as whichever archetypes it can support, in
+  // order of preference — then the set is dealt so that two boards
+  // running never use the same one. Three heroes in a row is a viewer
+  // tapping through the same picture three times.
+  const options = p => {
+    const out = [];
+    const fig = p.figures?.[0];
+    if (fig && p.figureCount < 4)
+      out.push({ type: 'hero', figure: fig.text.replace(/[−־]/g, '-'),
+        dir: direction(fig.text, `${p.headline} ${p.stand ?? ''}`),
+        quote: p.stand || p.headline, source: p.source });
+    if (p.note) out.push({ type: 'note', text: p.note, source: p.source });
+    out.push({ type: 'cover', eyebrow: 'עכשיו', headline: p.headline,
+      stand: p.stand, source: p.source, photo: p.photo });
+    return out;
+  };
+
+  // Grounds rotate down the set as well as archetypes: an hour whose
+  // three updates all happen to be plain headlines should still look
+  // like three boards, not one board three times. Seeded from the
+  // window so a replay reproduces itself.
+  const GROUNDS = ['ink', 'deep', 'slate', 'doc', 'flare'];
+  const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
+
+  const slides = [];
+  let prev = null;
+  for (const [i, p] of picks.entries()) {
+    const opts = options(p);
+    const pick = opts.find(o => o.type !== prev) ?? opts[0];
+    // The cover's photo bleeds behind a scrim mixed for a dark ground.
+    // On paper or on orange that scrim is a smear, so a board carrying
+    // a picture keeps a dark ground.
+    const pool = pick.photo ? GROUNDS.slice(0, 3) : GROUNDS;
+    slides.push({ ...pick, ground: pool[(seed + i) % pool.length] });
+    prev = pick.type;
+  }
+
+  if (!slides.length) return { ...nothing('thin'), slides };
+
+  return {
+    key: `S:${w.key}`,
+    window: `${hhmm(w.start)}–${hhmm(w.end)}`,
+    date: ddmmyy(w.start),
+    stamp, quotes, slides,
+    // Every message in the window is marked, not just the three that
+    // were told — otherwise the two that lost would resurface as the
+    // "latest" news an hour after they stopped being it.
+    consumed: all.map(p => p.tg_id),
+    carry: nextCarry,
+  };
+}
+
 /**
  * §07: "Slides carry headlines and figures. The reporting lives in
  * the caption, where it is searchable." So the caption is the full

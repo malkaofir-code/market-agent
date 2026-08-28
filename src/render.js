@@ -7,7 +7,7 @@ import { chromium } from 'playwright';
 import { readFileSync, mkdirSync, readdirSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { buildSlide, page, CANVAS } from './builder.js';
+import { buildSlide, page, CANVAS, STORY } from './builder.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(join(HERE, 'slide.css'), 'utf8');
@@ -68,6 +68,8 @@ const GROW_CAP = {
 const GROW_CAP_LANE = { watch: 1.20, telegram: 1.14, hero: 1.14, note: 1.12,
                         chart: 1.06, cover: 1.08, coverFramed: 1.08 };
 const NO_GROW_LANED = 1.08;
+const STORY_GROW = 1.75;
+const OFIR_STEPS = [0.84, 0.68, 0.54];
 const GROW_STEP = 0.05;
 const FILL = 0.80;          // grow while the content uses less than this
 
@@ -80,11 +82,12 @@ const MASCOT_RETRIES = ['smaller', 'far-edge', 'smaller-far-edge'];
  * row and re-measure. Every other archetype still fails loudly - there
  * is nothing to shed on a cover.
  */
-export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {}) {
+export async function renderDeck(deck, outDir, { scale = 1, format = 'png', story = false } = {}) {
   mkdirSync(outDir, { recursive: true });
+  const size = story ? STORY : CANVAS;
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
-    viewport: { width: CANVAS.w, height: CANVAS.h }, deviceScaleFactor: scale,
+    viewport: { width: size.w, height: size.h }, deviceScaleFactor: scale,
   });
   const p = await ctx.newPage();
   // `spin` rotates the wardrobe. Seeded from the window key so the same
@@ -143,18 +146,44 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
       }
 
 
-      for (let attempt = 0; attempt < 14; attempt++) {
-        await p.setContent(page(buildSlide(slide, meta, i, slides.length), CSS),
+      for (let attempt = 0; attempt < 20; attempt++) {
+        await p.setContent(page(buildSlide(slide, meta, i, slides.length, { story }), CSS),
           { waitUntil: 'networkidle' });
         try { await p.evaluate(() => document.fonts.ready); } catch {}
         await p.waitForTimeout(120);
 
+        // Both numbers in REAL pixels. scrollHeight reports the child's
+        // own CSS pixels, which are not the band's once a zoom is in
+        // play — and the band's clientHeight counts padding that is
+        // deliberately reserved for Ofir. Comparing those two directly
+        // is how a story board decided it needed 1695px of a 1222px
+        // band and threw the window away.
         fit = await p.evaluate(() => {
           const bd = document.querySelector('.sl-bd');
           const a = bd.firstElementChild;
-          return { room: bd.clientHeight, needs: a.scrollHeight,
-                   laned: !!document.querySelector('.ofir') };
+          const cs = getComputedStyle(bd);
+          const room = bd.clientHeight
+            - parseFloat(cs.paddingTop || 0) - parseFloat(cs.paddingBottom || 0);
+          // What he actually DRAWS, not the box he is given. contain
+          // letterboxes him inside it, and on a story the box is what
+          // the reserve is cut from — so a box taller than the pose is
+          // a strip of empty ground under the headline.
+          let drawn = 0;
+          const img = document.querySelector('.ofir img');
+          if (img && img.naturalWidth) {
+            const b = img.getBoundingClientRect();
+            drawn = Math.min(b.height, b.width * img.naturalHeight / img.naturalWidth);
+          }
+          return { room, needs: a.getBoundingClientRect().height,
+                   laned: !!document.querySelector('.ofir'),
+                   reserve: parseFloat(cs.paddingBottom || 0), drawn };
         });
+
+        // Give back whatever the box reserved and the pose did not use.
+        if (story && fit.drawn && Math.abs(fit.reserve - 40 - fit.drawn) > 20) {
+          slide = { ...slide, ofirFit: Math.ceil(fit.drawn) };
+          continue;
+        }
         // Fits. Two more questions before it is done.
         if (fit.needs <= fit.room) {
           // One: is it swimming? A short window used to render as a
@@ -163,12 +192,22 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
           // an underfull one — Ofir included, since he lives inside
           // the band. `shrunk` stops it oscillating with the squeeze.
           const z = slide.squeeze ?? 1;
-          const cap = fit.laned
-            ? (GROW_CAP_LANE[slide.type] ?? NO_GROW_LANED)
+          // A story has the same width as a post and 570px more height,
+          // and the text is not in a lane there — so it can afford to
+          // be read from across a room.
+          const cap = story ? STORY_GROW
+            : fit.laned ? (GROW_CAP_LANE[slide.type] ?? NO_GROW_LANED)
             : (GROW_CAP[slide.type] ?? 1.12);
           if (!slide.shrunk && z < cap && fit.needs < fit.room * FILL) {
-            slide = { ...slide, squeeze: Math.min(cap, z + GROW_STEP) };
-            continue;
+            // Aim straight at the room rather than creeping toward it
+            // in 5% steps: a story wants to grow by 75% and there are
+            // only fourteen attempts in the budget, so creeping meant
+            // running out of them and shipping the type at its
+            // starting size. The leap is capped so an overshoot is
+            // one notch, not a cliff, and overflow catches it anyway.
+            const reach = Math.min(1.35, (fit.room * 0.94) / Math.max(fit.needs, 1));
+            const next = Math.min(cap, z * Math.max(reach, 1 + GROW_STEP / z));
+            if (next > z + 0.004) { slide = { ...slide, squeeze: next }; continue; }
           }
           // Two: is Ofir standing on data?
           if (await reviewMascot()) break;
@@ -180,6 +219,19 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
           shed.push({ slide: i + 1, headline: dropped.headline });
           slide = { ...slide, rows: slide.rows.slice(0, -1) };
           continue;
+        }
+
+        // A story reserves the bottom third for Ofir, and a long
+        // headline needs some of it back. He gives ground before the
+        // type does — he is the decoration, the headline is the point.
+        // ...but only while the type is still at or below its designed
+        // size. Once it has been GROWN, the overflow is the growth's
+        // fault, not his: shrinking him there let the type keep taking
+        // room until he was a thumbnail in the corner.
+        if (story && fit.laned && (slide.squeeze ?? 1) <= 1.0001) {
+          const k = slide.ofirK ?? 1;
+          const next = OFIR_STEPS.find(x => x < k - 1e-6);
+          if (next) { slide = { ...slide, ofirK: next }; continue; }
         }
 
         // Every other archetype: shrink the type before giving up. The

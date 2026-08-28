@@ -203,8 +203,10 @@ html,body{margin:0;padding:0;background:var(--bg)}
    the middle of the cover with the headline across his face. A box
    plus object-fit:contain makes his footprint the same whichever pose
    the spin lands on, and the lane below is sized against that box. */
+.slide{--ofir-k:1}
 .ofir{position:absolute; bottom:0; z-index:2; pointer-events:none;
-  width:var(--ofir-w,380px); height:var(--ofir-h,600px)}
+  width:calc(var(--ofir-w,380px) * var(--ofir-k));
+  height:calc(var(--ofir-h,600px) * var(--ofir-k))}
 .ofir img{display:block; width:100%; height:100%;
   object-fit:contain; object-position:bottom center}
 
@@ -235,24 +237,27 @@ html,body{margin:0;padding:0;background:var(--bg)}
    capped at its height so a crop can only ever take torso. Each
    archetype places him differently: same person, never the same
    composition twice running. */
+/* The box and the lane are declared on the SLIDE, not on .ofir. Both
+   he and the text need to know them — he is sized by the box, the text
+   is kept out of it — and the text is his sibling, so a var set on him
+   is invisible to it. Declaring them in two places is how the story
+   board ran its headline straight across his face. */
+.slide{--ofir-w:380px; --ofir-h:600px; --lane:360px}
+.slide[data-type="coverFramed"],
+.slide[data-type="cover"]{--ofir-w:430px; --ofir-h:700px; --lane:400px}
+.slide[data-type="hero"]  {--ofir-w:370px; --ofir-h:560px; --lane:350px}
+.slide[data-type="note"]  {--ofir-w:410px; --ofir-h:670px; --lane:380px}
+.slide[data-type="chart"] {--ofir-w:340px; --ofir-h:480px; --lane:325px}
+.slide[data-type="watch"] {--ofir-w:390px; --ofir-h:600px; --lane:365px}
+.slide[data-type="telegram"]{--ofir-w:430px; --ofir-h:700px; --lane:395px}
+
 .slide[data-type="coverFramed"] .ofir,
-.slide[data-type="cover"] .ofir{right:-44px; --ofir-w:430px; --ofir-h:700px; --lane:400px}
-.slide[data-type="hero"]  .ofir{left:-34px; --ofir-w:370px; --ofir-h:560px; --lane:350px}
-.slide[data-type="note"]  .ofir{left:-44px; --ofir-w:410px; --ofir-h:670px; --lane:380px}
-.slide[data-type="chart"] .ofir{left:-26px; --ofir-w:300px; --ofir-h:430px; --lane:290px}
-.slide[data-type="watch"] .ofir{left:-40px; --ofir-w:390px; --ofir-h:600px; --lane:365px}
-.slide[data-type="telegram"] .ofir{left:-46px; --ofir-w:430px; --ofir-h:700px; --lane:395px}
-/* --lane has to be readable from the CONTENT, which is a sibling of
-   .ofir, so it is declared again on the slide. Same numbers, one
-   source of truth would need a preprocessor. */
-.slide[data-ofir]{--lane:360px}
-.slide[data-ofir][data-type="coverFramed"],
-.slide[data-ofir][data-type="cover"]{--lane:400px}
-.slide[data-ofir][data-type="hero"]{--lane:350px}
-.slide[data-ofir][data-type="note"]{--lane:380px}
-.slide[data-ofir][data-type="chart"]{--lane:290px}
-.slide[data-ofir][data-type="watch"]{--lane:365px}
-.slide[data-ofir][data-type="telegram"]{--lane:395px}
+.slide[data-type="cover"] .ofir{right:-44px}
+.slide[data-type="hero"]  .ofir{left:-34px}
+.slide[data-type="note"]  .ofir{left:-44px}
+.slide[data-type="chart"] .ofir{left:-26px}
+.slide[data-type="watch"] .ofir{left:-40px}
+.slide[data-type="telegram"] .ofir{left:-46px}
 
 
 /* ── making room for him ─────────────────────────────────────────
@@ -276,7 +281,7 @@ html,body{margin:0;padding:0;background:var(--bg)}
    grows the fixed pair and starves the track, so the bars — the only
    thing on the slide anyone reads — get thinner as the type gets
    bigger. Give the track back what the lane took. */
-.slide[data-ofir] .a-ch .bar{grid-template-columns:92px 1fr 128px;gap:18px}
+.slide[data-ofir] .a-ch .bar{grid-template-columns:86px 1fr 120px;gap:16px}
 
 /* The channel address is a single unbreakable LTR token. In its own
    full-width plate it fit; inside the lane it ran off the right edge
@@ -291,3 +296,47 @@ html,body{margin:0;padding:0;background:var(--bg)}
    his arm. Let it take the column it is given instead. */
 .slide[data-ofir] .a-cf .block{width:auto;max-width:100%;margin-inline-end:0}
 .slide[data-ofir] .a-cf .frame{max-width:100%}
+
+
+/* ═══ THE STORY BOARD ═════════════════════════════════════════════
+   1080x1920, and the outer quarters are not ours: Instagram draws
+   progress bars and the avatar across the top and a reply box across
+   the bottom, so anything we put there is covered. The safe band is
+   what is left in the middle, and the furniture moves inside it —
+   the orange rule included, or it sits under the progress bars where
+   nobody sees it. */
+.slide--story{width:1080px;height:1920px;padding:250px 64px 250px}
+.slide--story::after{inset:250px 0 auto 0}
+.slide--story .sl-bd{gap:44px}
+
+/* On a post he stands BESIDE the text, because the board is wide and
+   short and a side lane is the only room there is. A story is the
+   opposite shape: 570 more pixels of height at exactly the same width.
+   Putting him in a lane there would keep the column as narrow as a
+   post's while throwing the extra height away on more short lines. So
+   on a story he stands UNDER the text — the headline runs the full
+   width, big, and he holds the bottom third. */
+/* The box is what the reserve is sized from, so a box much taller
+   than the pose inside it is a strip of empty ground between the
+   headline and his head. These are close to the wardrobe's own
+   proportions at this width. */
+.slide--story{--ofir-w:420px; --ofir-h:580px}
+.slide--story[data-type="cover"],
+.slide--story[data-type="coverFramed"]{--ofir-w:440px; --ofir-h:620px}
+.slide--story[data-type="hero"]{--ofir-w:400px; --ofir-h:560px}
+.slide--story .sl-bd{justify-content:flex-start}
+/* No lane on a story — the room he needs is taken off the BAND, not
+   off the text box. Padding on the band is outside the zoom, so the
+   reserve stays the same number of real pixels however big the type
+   grows, and he still sits at bottom:0 because absolute positioning
+   measures from the padding box. */
+.slide--story[data-ofir] .sl-bd{padding-bottom:calc(var(--ofir-fit, calc(var(--ofir-h) * var(--ofir-k))) + 40px)}
+.slide--story[data-ofir] .sl-bd > :not(.ofir){padding-inline-start:0; padding-inline-end:0}
+/* Alternating sides, so three stories in a row are not the same
+   photograph three times. */
+.slide--story .ofir{left:auto; right:-34px}
+.slide--story.of-alt .ofir{right:auto; left:-34px}
+
+/* A story carries ONE update, so the cover photo can afford to be a
+   band rather than a bleed — it stops competing with the headline. */
+.slide--story .cv-bleed{height:900px}

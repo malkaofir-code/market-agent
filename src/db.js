@@ -64,6 +64,25 @@ export const markConsumed = (key, ids) =>
   ids.length ? q(`update agent.messages set consumed_by = $1 where tg_id = any($2::bigint[])`,
     [key, ids]) : null;
 
+// ── the story track ──────────────────────────────────────────
+// Same messages, its own cursor. A window told as stories at 17:16 is
+// still there for the 21:15 digest to summarise, and a window already
+// summarised is still available to be told as a story — the two reads
+// are independent on purpose, because they say different things about
+// the same hour.
+export const storyMessagesIn = (from, to) =>
+  q(`select * from agent.messages
+     where ts >= $1 and ts < $2 and story_of is null order by ts asc`, [from, to])
+    .then(r => r.rows);
+
+export const oldestUnstoriedBefore = ts =>
+  q(`select min(ts) t from agent.messages where story_of is null and ts < $1`, [ts])
+    .then(r => r.rows[0]?.t ?? null);
+
+export const markStoried = (key, ids) =>
+  ids.length ? q(`update agent.messages set story_of = $1 where tg_id = any($2::bigint[])`,
+    [key, ids]) : null;
+
 // ── windows ──────────────────────────────────────────────────
 export const upsertWindow = (key, start, end) =>
   q(`insert into agent.windows (key, start_ts, end_ts) values ($1,$2,$3)
@@ -77,20 +96,33 @@ export const getWindow = key =>
   q(`select * from agent.windows where key=$1`, [key]).then(r => r.rows[0] ?? null);
 
 // ── rails ────────────────────────────────────────────────────
+// A story is not a post. It does not count toward the daily cap and it
+// does not open the minimum gap — otherwise one story at :16 would
+// silence the digest that follows it. The 'S:' prefix is what keeps
+// the two ledgers apart in one table.
 export const postsToday = () =>
   q(`select count(*)::int n from agent.windows
-     where status='posted' and posted_at > extract(epoch from now())::bigint - 86400`)
+     where status='posted' and key not like 'S:%'
+       and posted_at > extract(epoch from now())::bigint - 86400`)
     .then(r => r.rows[0].n);
 
 export const lastPostAt = () =>
-  q(`select max(posted_at) t from agent.windows where status='posted'`).then(r => r.rows[0].t);
+  q(`select max(posted_at) t from agent.windows
+     where status='posted' and key not like 'S:%'`).then(r => r.rows[0].t);
+
+/** Instagram's own ceiling is 100 published items per 24h, shared. */
+export const storiesToday = () =>
+  q(`select coalesce(sum(slides),0)::int n from agent.windows
+     where status='posted' and key like 'S:%'
+       and posted_at > extract(epoch from now())::bigint - 86400`)
+    .then(r => r.rows[0].n);
 
 // Only outcomes from the last `sinceMin` minutes count toward the
 // pause. A latch with no expiry is indistinguishable from a dead
 // agent: three plumbing failures at breakfast would silently kill
 // every window for the rest of the week.
 export const recentOutcomes = (n, sinceMin = 0) =>
-  q(`select status from agent.windows where status in ('posted','failed')
+  q(`select status from agent.windows where status in ('posted','failed') and key not like 'S:%'
      ${sinceMin ? 'and coalesce(posted_at, end_ts) > extract(epoch from now()) - $2' : ''}
      order by coalesce(posted_at, end_ts) desc limit $1`,
     sinceMin ? [n, sinceMin * 60] : [n]).then(r => r.rows.map(x => x.status));

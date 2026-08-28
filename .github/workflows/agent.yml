@@ -40,6 +40,15 @@ on:
         description: 'Render for review only (do not publish)'
         type: boolean
         default: false
+      mode:
+        description: 'digest = the carousel; stories = up to 3 story boards for the last hour'
+        type: choice
+        options: [digest, stories]
+        default: digest
+      now:
+        description: 'Ignore the digest schedule and post this one now'
+        type: boolean
+        default: false
 
 # Never let two ticks overlap - they would fight over the same window.
 concurrency:
@@ -79,6 +88,27 @@ jobs:
           # PUBLISHER repo variable to 'browser' to switch back.
           PUBLISHER: ${{ vars.PUBLISHER || 'api' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry && '1' || '0' }}
+          # Which track this tick is. The Supabase cron sends
+          # mode=stories on the hour and mode=digest three times a day;
+          # a dispatch with no inputs is a digest.
+          MODE: ${{ inputs.mode || 'digest' }}
+          # Up to three boards an hour, and a ceiling well under
+          # Instagram's own 100 published items per 24h.
+          MAX_STORIES: '3'
+          MAX_STORIES_PER_DAY: '40'
+          # A story is about the hour it belongs to. More than two
+          # windows behind and it is news, not "now".
+          MAX_STORY_LAG_WINDOWS: '2'
+          # Three digests a day, in Asia/Jerusalem: the morning, half an
+          # hour before the US open, and the evening. The hour gate is
+          # in run.js, not in the cron expression, because pg_cron
+          # thinks in UTC and Israel changes its clocks twice a year.
+          DIGEST_HOURS: '8,15,21'
+          IGNORE_SCHEDULE: ${{ inputs.now && '1' || '0' }}
+          # A digest now covers everything since the last one, so the
+          # merge-forward should never stop early: it absorbs every
+          # closed window up to the one still filling.
+          MIN_MESSAGES: '999'
           WINDOW_MINUTES: '60'
           # Windows run XX:15 -> XX+1:15; the tick fires at XX:16.
           WINDOW_OFFSET_MIN: '15'
