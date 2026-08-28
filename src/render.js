@@ -174,7 +174,7 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png' } = {
       // rules - exactly the content JPEG smears at the usual 80.
       const file = join(outDir, `slide-${String(i + 1).padStart(2, '0')}.${format}`);
       await p.locator('.slide').screenshot(
-        format === 'jpeg' ? { path: file, type: 'jpeg', quality: 95 } : { path: file });
+        format === 'jpeg' ? { path: file, type: 'jpeg', quality: 100 } : { path: file });
       files.push(file);
     }
   } finally {

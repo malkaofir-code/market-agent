@@ -53,6 +53,31 @@ async function call(path, params, method = 'POST', attempt = 0) {
 }
 
 /**
+ * Prove every URL serves an image before Meta is asked to fetch it.
+ *
+ * Meta's rejection for a URL it cannot read is "Only photo or video
+ * can be accepted as media type" — which names neither the slide nor
+ * the reason, and cost a whole run to interpret. Storage is also
+ * eventually consistent: an object uploaded a moment ago can 404 for
+ * a beat, so a single retry absorbs the propagation lag that a fast
+ * eight-slide deck can outrun.
+ */
+async function preflight(urls) {
+  for (const [i, url] of urls.entries()) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = await fetch(url, { method: 'GET', headers: { range: 'bytes=0-1023' } })
+        .catch(e => ({ ok: false, status: 0, statusText: e.message, headers: new Headers() }));
+      const type = r.headers?.get?.('content-type') ?? '';
+      if (r.ok && /^image\//.test(type)) break;
+      if (attempt === 0) { await sleep(1500); continue; }
+      throw new Error(
+        `slide ${i + 1} is not readable as an image — ${r.status} ${type || r.statusText || 'no content-type'}\n` +
+        `  ${url}\n  Meta would reject this with 2207052.`);
+    }
+  }
+}
+
+/**
  * Wait for Meta to fetch and accept an image.
  *
  * This used to poll every 1.5s up to 20 times. A four-slide deck is
@@ -89,6 +114,8 @@ export async function publish(urls, caption, { dryRun = false } = {}) {
     throw new Error(`carousel needs 2-10 images, got ${urls.length}`);
 
   // 1 · one container per slide
+  await preflight(urls);
+
   const children = [];
   for (const image_url of urls) {
     const { id } = await call(`/${ig}/media`, { image_url, is_carousel_item: 'true' });
