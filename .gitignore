@@ -16,3 +16,4 @@ DRY_RUN=0
 state.db-shm
 state.db-wal
 ig-state.json
+src/assets/*.zip.bak
