@@ -114,7 +114,7 @@ html,body{margin:0;padding:0;background:var(--bg)}
    right-aligned figure ends its advance flush with the frame and the
    ink of the % overhangs into the clip. Give it that width back. */
 .a-hr .fig{font-family:var(--f-mono);font-weight:600;line-height:.82;letter-spacing:-.05em;
-  direction:ltr;unicode-bidi:isolate;margin:0;display:block;padding-inline-end:.09em}
+  direction:ltr;unicode-bidi:isolate;margin:0;display:block;padding-inline-end:.09em;width:fit-content;margin-inline-start:auto}
 .a-hr .fig.up{color:var(--pos)} .a-hr .fig.dn{color:var(--neg)}
 .a-hr .quo{font-size:34px;line-height:1.44;color:var(--dim2);margin:0;max-width:29ch;
   border-top:1.5px solid var(--rule);padding-top:26px}
@@ -221,3 +221,17 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .a-ch .ofir{left:-40px; height:430px}
 .a-wt .ofir{left:-70px; height:600px}
 .a-tg .ofir{left:-76px; height:720px}
+
+
+/* ── making room for him ─────────────────────────────────────────
+   Ofir is absolutely positioned, so the text has no idea he is there
+   and will happily run under his shoulder. These caps are the other
+   half of the review: the review stops him covering DATA, and these
+   stop the prose colliding with him in the first place. */
+.a-hr .quo{max-width:16ch}
+.a-nt .abt{max-width:15ch}
+.a-nt .txt{max-width:11ch}
+.a-wt .big{max-width:12ch}
+.a-tg .big{max-width:10ch}
+.a-ch .bars{max-width:640px;margin-inline-start:0}
+.a-cf .stand{max-width:20ch}
