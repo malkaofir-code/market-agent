@@ -83,6 +83,20 @@ export const markStoried = (key, ids) =>
   ids.length ? q(`update agent.messages set story_of = $1 where tg_id = any($2::bigint[])`,
     [key, ids]) : null;
 
+/**
+ * Everything older than the story track cares about, in ONE statement.
+ *
+ * The cursor arrived NULL on every message in the table, so the track
+ * opened on a backlog of weeks. Draining it one window per run — which
+ * is what the loop below used to do — advances an hour per hour and
+ * never catches up: the story track would have stayed permanently in
+ * the middle of August. Stories are about now; the past is the
+ * digest's job, and it has already told it.
+ */
+export const retireStories = beforeTs =>
+  q(`update agent.messages set story_of = 'S:retired'
+     where story_of is null and ts < $1`, [beforeTs]).then(r => r.rowCount);
+
 // ── windows ──────────────────────────────────────────────────
 export const upsertWindow = (key, start, end) =>
   q(`insert into agent.windows (key, start_ts, end_ts) values ($1,$2,$3)

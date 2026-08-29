@@ -15,7 +15,7 @@ import { join } from 'path';
 import 'dotenv/config';
 import {
   putMessages, messagesIn, messagesInAll, oldestUnconsumedBefore, markConsumed,
-  storyMessagesIn, oldestUnstoriedBefore, markStoried, storiesToday,
+  storyMessagesIn, oldestUnstoriedBefore, markStoried, storiesToday, retireStories,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
@@ -106,21 +106,24 @@ async function pickWindow() {
  */
 async function runStories() {
   const nowWindow = windowOf(Math.floor(Date.now() / 1000)).start;
+  const maxBehind = Number(process.env.MAX_STORY_LAG_WINDOWS ?? 2);
+
+  // Everything too old to be "now", retired in one statement before
+  // anything else happens.
+  //
+  // This used to retire a SINGLE window per run and return. The cursor
+  // arrived null on every message in the table, so the track opened on
+  // a backlog of weeks and advanced one hour per hour — it would have
+  // spent a fortnight walking through August and never once reached
+  // today. That is why the first day of stories posted nothing at all.
+  const cutoff = nowWindow - maxBehind * WIN * 60;
+  const retired = await retireStories(cutoff);
+  if (retired) say(`retired ${retired} message(s) older than the story window`);
+
   const oldest = await oldestUnstoriedBefore(nowWindow);
   if (oldest == null) { say('SKIP — nothing unstoried'); return; }
 
   const w = windowOf(Number(oldest));
-  // Only the hour just gone. Anything older is news, not "now": mark
-  // it read on the story cursor so the track does not sit there
-  // re-deciding the same thing every hour, and move on.
-  const behind = Math.floor((nowWindow - w.start) / (WIN * 60));
-  const maxBehind = Number(process.env.MAX_STORY_LAG_WINDOWS ?? 2);
-  if (behind > maxBehind) {
-    const stale = await storyMessagesIn(w.start, w.end);
-    await markStoried(`S:${w.key}`, stale.map(r => Number(r.tg_id)));
-    say(`SKIP — ${w.key} is ${behind} window(s) behind; a story is about now`);
-    return;
-  }
 
   const rows = await storyMessagesIn(w.start, w.end);
   if (!rows.length) { say(`SKIP — ${w.key} has nothing unstoried`); return; }
@@ -187,6 +190,10 @@ async function runStories() {
       error: failure ? `${posted}/${urls.length}: ${failure.message}` : null });
     await logRun(deck.key, 'stories', true, `${posted}/${urls.length}`);
     say(`POSTED ${posted} story(ies)`);
+    // Stories used to report only their failures, which made "three
+    // went up" and "the track is stuck in August" look identical from
+    // the outside — for a whole day.
+    await notify(`📱 ${deck.key} — ${posted} story(ies) live`);
   } else {
     await setWindow({ key: deck.key, status: 'failed', slides: 0, error: failure?.message });
     await logRun(deck.key, 'stories', false, failure?.message ?? 'nothing posted');
