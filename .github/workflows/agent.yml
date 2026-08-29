@@ -17,9 +17,19 @@ name: agent
 # and run.js is already idempotent about it: it takes the OLDEST
 # unconsumed window, honours MIN_MINUTES_BETWEEN_POSTS, and the
 # concurrency group below stops two from overlapping.
+# No `schedule:` here any more. GitHub's cron is best-effort — it
+# skipped ~20 consecutive slots on 27 Aug, which is why the clock moved
+# into Supabase — and leaving it in place made it a SECOND, unreliable
+# one. A schedule event carries no inputs, so every run it started was
+# a digest, never stories; run #86 was its 20:46 UTC slot arriving 57
+# minutes late at 00:43 local, where it did nothing but burn a minute
+# being told it was outside active hours. Worse, its 05:16 / 12:16 /
+# 18:16 UTC slots land INSIDE the digest hours, so it would have posted
+# the digest fifteen minutes early and left pg_cron's own dispatch to
+# bounce off the minimum gap.
+#
+# pg_cron dispatches both tracks now: stories at :16, digest at :31.
 on:
-  schedule:
-    - cron: '16,46 4-20 * * *'
   workflow_dispatch:
     inputs:
       dry:
