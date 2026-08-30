@@ -34,6 +34,20 @@ const REVIEW = process.env.REVIEW === '1';
 const CARRY_KEY = 'tape-carry';
 const say = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
+// A stray rejection must never take the run down mid-publish.
+//
+// gramJS's update loop outlives the ingest that started it and throws
+// TIMEOUT into the void about forty seconds later. Node's default is
+// to treat that as fatal, so on 30 Aug it killed the process between
+// story 2 and story 3 — two boards on Instagram, the third never
+// built, and no row written to say any of it had happened.
+//
+// Every real failure path below is awaited and recorded. Nothing that
+// reaches here is load-bearing, so it is logged and stepped over.
+process.on('unhandledRejection', e => {
+  say('unhandled rejection ignored:', e?.message ?? e);
+});
+
 // ── rails ────────────────────────────────────────────────────
 async function blocked({ stories = false } = {}) {
   const ks = process.env.KILL_SWITCH || './PAUSED';
@@ -163,6 +177,23 @@ async function runStories() {
   const urls = await upload(files, prefix);
   say('uploaded', urls.length);
 
+  // Claim the hour BEFORE publishing, not after.
+  //
+  // The digest marks its messages once the post is safely up, because
+  // a digest that is lost can simply be told again. A story cannot:
+  // if the run dies part-way through the set — which is exactly what
+  // happened on 30 Aug — the messages stay unclaimed, the next tick
+  // finds the same hour still inside its lag window, and re-tells the
+  // boards that are already live. Duplicates on the account are worse
+  // than a missed hour, and the digest still carries the content
+  // either way.
+  // A dry run claims nothing — it is a rehearsal, and the hour still
+  // belongs to whoever tells it for real.
+  if (!DRY) {
+    await upsertWindow(deck.key, w.start, w.end);
+    await markStoried(deck.key, consumed);
+  }
+
   // One at a time, and a failure on the third does not undo the first
   // two. Instagram counts each story against the same 100-per-24h
   // ceiling as a post, which is why they are capped separately above.
@@ -182,9 +213,7 @@ async function runStories() {
 
   if (DRY) { say(`DRY RUN OK — ${files.length} stories built`); return; }
 
-  await upsertWindow(deck.key, w.start, w.end);
   if (posted) {
-    await markStoried(deck.key, consumed);
     await setWindow({ key: deck.key, status: 'posted', slides: posted,
       posted_at: Math.floor(Date.now() / 1000),
       error: failure ? `${posted}/${urls.length}: ${failure.message}` : null });
@@ -385,10 +414,14 @@ async function main() {
 }
 
 async function notify(text) {
+  let c = null;
   try {
-    const c = await connect(); await c.connect();
-    await alert(c, text); await c.disconnect();
+    c = await connect(); await c.connect();
+    await alert(c, text);
   } catch (e) { console.warn('telegram alert failed:', e.message); }
+  finally {
+    if (c) { try { await c.disconnect(); } catch {} try { await c.destroy(); } catch {} }
+  }
 }
 
 // gramJS keeps an update loop alive after the work is done — without an

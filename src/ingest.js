@@ -46,7 +46,14 @@ export async function fetchRecent(limit = 80, known = new Set()) {
     if (n) console.log(`  harvested ${n} photo(s)`);
     return rows;
   } finally {
-    await client.disconnect();
+    // disconnect() alone leaves gramJS's update loop running. It keeps
+    // retrying against a socket that is gone and, about forty seconds
+    // later, throws TIMEOUT as an UNHANDLED rejection — which under
+    // Node's default takes the whole process down. On 30 Aug that
+    // landed between story 2 and story 3: two boards live, the third
+    // never built, and nothing recorded. destroy() stops the loop.
+    try { await client.disconnect(); } catch {}
+    try { await client.destroy(); } catch {}
   }
 }
 
