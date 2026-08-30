@@ -306,7 +306,14 @@ html,body{margin:0;padding:0;background:var(--bg)}
    the orange rule included, or it sits under the progress bars where
    nobody sees it. */
 .slide--story{width:1080px;height:1920px;padding:250px 64px 250px}
-.slide--story::after{inset:250px 0 auto 0}
+/* The accent rule stays at the very top edge on a story, NOT at the
+   top of the safe band. Dropped to 250px it read as a line drawn
+   ACROSS the board — closing off the top quarter instead of edging
+   the page — because on a story that band is empty ground, not a
+   margin. At the edge it does what it does on a post: finishes the
+   sheet. Instagram's progress bars sit over part of it, which is
+   fine; it is trim, not information. */
+.slide--story::after{inset:0 0 auto 0}
 .slide--story .sl-bd{gap:44px}
 
 /* On a post he stands BESIDE the text, because the board is wide and
