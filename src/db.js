@@ -124,6 +124,11 @@ export const lastPostAt = () =>
   q(`select max(posted_at) t from agent.windows
      where status='posted' and key not like 'S:%'`).then(r => r.rows[0].t);
 
+/** When the last story went up — the other half of the spacing rule. */
+export const lastStoryAt = () =>
+  q(`select max(posted_at) t from agent.windows
+     where status='posted' and key like 'S:%'`).then(r => r.rows[0].t);
+
 /** Instagram's own ceiling is 100 published items per 24h, shared. */
 export const storiesToday = () =>
   q(`select coalesce(sum(slides),0)::int n from agent.windows

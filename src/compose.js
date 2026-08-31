@@ -106,6 +106,36 @@ export function dedupe(parsed) {
   return out.sort((a, b) => a.ts - b.ts);
 }
 
+/**
+ * The morning post opens with a question, not a headline.
+ *
+ * A headline on slide one hands the reader the whole story and they
+ * scroll on — a quarter of them leave on the first slide. A question
+ * opens a loop the rest of the deck closes, and the headline it would
+ * have been becomes the standfirst underneath, so nothing is hidden,
+ * only ordered.
+ *
+ * Deterministic, like the rest of this file: the frame is chosen by
+ * what the lead actually IS — a number, an interpretation, a policy
+ * move — and rotated by the window key so the same question does not
+ * open every Monday.
+ */
+const ASK = {
+  figure: ['המספר הזה משנה משהו?', 'כמה זה באמת אומר?', 'מה מסתתר מאחורי המספר?'],
+  policy: ['מי משלם על זה בסוף?', 'למה דווקא עכשיו?', 'מה זה עושה לכיס שלכם?'],
+  note:   ['מה השוק מתמחר עכשיו?', 'האם זה שינוי מגמה?', 'מה באמת קרה כאן?'],
+  plain:  ['מה צריך לדעת הבוקר?', 'על מה השוק מדבר היום?', 'מה פתח את היום?'],
+};
+
+function askCover(lead, seed) {
+  const kind = lead.figures?.length ? 'figure'
+    : /מכס|ריבית|פד\b|רגולצי|חוק|ממשל|טראמפ/.test(`${lead.headline} ${lead.stand ?? ''}`) ? 'policy'
+    : lead.note ? 'note'
+    : 'plain';
+  const bank = ASK[kind];
+  return bank[Math.abs(seed) % bank.length];
+}
+
 export function compose(rows, { now = null, carry = {}, endTs = null, template = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
@@ -164,8 +194,23 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   // A framed cover with nothing to frame is an empty frame. The ruled
   // opening is the natural stand-in: same weight, no picture needed.
   if (!lead.photo && coverType === 'coverFramed') coverType = 'coverRule';
+  // One of the three posts a day opens on a question — the morning
+  // one, which is the first thing anyone sees that day. The evening
+  // deck carries the Telegram card instead; the afternoon one is
+  // straight news, half an hour before the US bell, when a reader
+  // wants the fact and not a riddle.
+  const asks = hhmm(w.end).startsWith('08');
+  const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
   slides.push({ type: coverType,
-    headline: lead.headline, stand: lead.stand, source: lead.source,
+    // When the lead carries a number, the eyebrow IS the number — so
+    // the question has something concrete sitting above it instead of
+    // asking about a figure the reader cannot see.
+    eyebrow: asks
+      ? (lead.figures?.[0]?.text?.replace(/[−־]/g, '-') ?? 'הבוקר בשוק')
+      : undefined,
+    headline: asks ? askCover(lead, seed) : lead.headline,
+    stand: asks ? lead.headline : lead.stand,
+    source: lead.source,
     photo: PHOTO_COVERS.has(coverType) ? lead.photo : null });
 
   // 02 · hero — "a sentence carrying four or more figures is a table
@@ -190,7 +235,13 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   // donate its interpretation, and only a different message's
   // headline is barred from reappearing.
   const noted = lead.note ? lead : take(p => p.note);
-  if (noted) slides.push({ type: 'note', about: noted.headline, text: noted.note, source: noted.source });
+  // On a digest the interpretation is HIS board — same content, but
+  // presented by the character rather than set as an anonymous pull
+  // quote. A feed of headlines is a utility and utilities get muted;
+  // a character is a reason to follow. Stories keep the plain note:
+  // three seconds is not long enough to introduce anyone.
+  if (noted) slides.push({ type: 'voice', about: noted.headline,
+    text: noted.note, source: noted.source });
 
   // 04 · chart — "three real data points minimum. Fewer becomes a
   // hero figure instead."
@@ -376,6 +427,40 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
  * the caption, where it is searchable." So the caption is the full
  * text — emoji kept, unlike on the slides.
  */
+/**
+ * What this window is ABOUT, in the words people search.
+ *
+ * Instagram now ranks on keywords rather than hashtags, and Google
+ * indexes captions — so the terms have to appear in the prose, near
+ * the top, phrased like a sentence. The tags at the end are for
+ * categorisation, three to five of them; thirty reads as spam and has
+ * not driven discovery for years.
+ *
+ * Detection is deterministic, like everything else here: a term is in
+ * the caption because the window actually mentioned it.
+ */
+const TOPICS = [
+  { re: /נאסד|nasdaq|NQ\b/i,                    word: 'נאסד״ק',        tag: 'נאסדק' },
+  { re: /S&P|אס אנד פי|ES\b/i,                  word: 'S&P 500',       tag: 'SP500' },
+  { re: /דאו|YM\b/i,                            word: 'דאו ג׳ונס',     tag: 'דאוגונס' },
+  { re: /ריבית|הפד\b|פדרל|פאוול|FOMC/i,         word: 'ריבית הפד',     tag: 'ריביתהפד' },
+  { re: /אינפלצי|מדד המחירים|CPI|PCE/i,          word: 'אינפלציה',      tag: 'אינפלציה' },
+  { re: /נפט|ברנט|אופ"?ק|OPEC/i,                 word: 'נפט',           tag: 'נפט' },
+  { re: /זהב|gold/i,                             word: 'זהב',           tag: 'זהב' },
+  { re: /ביטקוין|קריפטו|bitcoin|BTC/i,           word: 'קריפטו',        tag: 'קריפטו' },
+  { re: /תשואו?ת|אג"?ח|אגרות חוב|treasury/i,     word: 'תשואות אג״ח',   tag: 'אגח' },
+  { re: /דולר|שקל|מטבע|forex/i,                  word: 'מט״ח',          tag: 'מטח' },
+  { re: /אנבידיה|NVDA|שבבים|semiconduct/i,       word: 'שבבים',         tag: 'שבבים' },
+  { re: /טראמפ|trump|מכס|tariff/i,               word: 'מכסים',         tag: 'מכסים' },
+  { re: /דוחות|earnings|רווחי/i,                 word: 'עונת הדוחות',   tag: 'דוחות' },
+];
+
+/** The topics this window genuinely touches, most-mentioned first. */
+function topicsIn(parsed) {
+  const hay = parsed.map(p => `${p.headline} ${p.stand ?? ''} ${p.note ?? ''}`).join(' ');
+  return TOPICS.filter(t => t.re.test(hay));
+}
+
 export function caption(parsed, w) {
   // Instagram's ceiling is 2200. Sit under it: Meta counts its own way
   // (an emoji is not one character to everyone) and a caption that is
@@ -387,14 +472,34 @@ export function caption(parsed, w) {
   // what fits, so its length has to be reserved before it exists. Not
   // reserving it is exactly how a caption lands a few chars over.
   const RESERVE = 48;
-  const foot = `\nעדכון ${hhmm(w.start)}–${hhmm(w.end)} · @marketalert.il`;
-  const head = parsed[0].headline + '\n';
+
+  // Keywords first, because that is where search looks and where a
+  // reader decides. One natural line naming what the window is about,
+  // then the lead headline.
+  const topics = topicsIn(parsed);
+  const named = topics.slice(0, 4).map(t => t.word).join(' · ');
+  const opener = named
+    ? `שוק ההון האמריקאי | ${named}\n\n`
+    : 'שוק ההון האמריקאי | עדכון מהמסחר\n\n';
+
+  // Three to five, and only ones the window earned. The two standing
+  // tags are what the account itself is, so it stays findable on days
+  // when nothing else matches.
+  const tags = ['שוקההון', 'מסחר', ...topics.slice(0, 3).map(t => t.tag)]
+    .filter((t, i, a) => a.indexOf(t) === i).slice(0, 5)
+    .map(t => '#' + t).join(' ');
+
+  const foot = `\nעדכון ${hhmm(w.start)}–${hhmm(w.end)} · @marketalert.il\n${tags}`;
+  const head = opener + parsed[0].headline + '\n';
 
   // Whole stories, never a half one. Slicing at 2200 cut mid-word on
   // every busy window; dropping the tail story is the honest version.
   let body = '', dropped = 0;
-  for (const p of parsed) {
-    const block = [`▪ ${p.headline}`, ...p.reporting.map(clean),
+  for (const [i, p] of parsed.entries()) {
+    // The lead's headline is already the line above; repeating it as
+    // the first bullet spent the two most valuable lines of the
+    // caption saying the same thing twice.
+    const block = [i === 0 ? null : `▪ ${p.headline}`, ...p.reporting.map(clean),
       p.note ? `💡 ${p.note}` : null, p.source ? `מקור: ${p.source}` : null, '']
       .filter(Boolean).join('\n') + '\n';
     if (head.length + body.length + block.length + foot.length + RESERVE > LIMIT) { dropped++; continue; }

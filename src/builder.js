@@ -151,6 +151,24 @@ const ARCHETYPES = {
     <p class="txt">${bidi(s.text)}</p>
     <p class="dis">${bidi(s.disclaimer || 'פרשנות, לא המלצה.')}</p></div>`,
 
+  // 04b · Ofir's board — the interpretation, with him presenting it.
+  //
+  // He is the one thing on this account nobody else can copy: a feed
+  // of market headlines is a utility, and utilities get muted, while
+  // a character is a reason to follow. So once a deck he stops being
+  // decoration and stands next to the day's "so what".
+  //
+  // The tail on the block points at him, which is what makes it read
+  // as speech rather than as a caption that happens to sit near a
+  // drawing. The source stays credited in the footer and the
+  // disclaimer stays on the board: he PRESENTS the interpretation,
+  // he is not being passed off as its author.
+  voice: s => `<div class="a-vo">
+    <p class="eyeb">אופיר מסביר</p>
+    <div class="say"><p class="txt">${bidi(s.text)}</p></div>
+    ${s.about ? `<p class="abt">${bidi(s.about)}</p>` : ''}
+    <p class="dis">${bidi(s.disclaimer || 'פרשנות, לא המלצה.')}</p></div>`,
+
   // 05 · tape chart — hand-built bars, pinned LTR.
   chart: s => `<div class="a-ch"><p class="eyeb">TAPE · חוזים עתידיים</p>
     <h2>${bidi(s.title || 'התמונה בחוזים')}</h2>
@@ -227,7 +245,7 @@ const GROUND = {
 const POSE = {
   coverFramed: 'welcome', cover: 'welcome',
   coverRule: 'explain', coverEdge: 'point', coverPoster: 'upward',
-  coverBand: 'welcome', coverStack: 'yes',
+  coverBand: 'welcome', coverStack: 'yes', voice: 'explain',
   hero: 'point', note: 'explain', chart: 'upward',
   watch: 'pause', telegram: 'yes',
 };

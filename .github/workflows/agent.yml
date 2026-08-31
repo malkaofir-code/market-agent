@@ -102,10 +102,13 @@ jobs:
           # mode=stories on the hour and mode=digest three times a day;
           # a dispatch with no inputs is a digest.
           MODE: ${{ inputs.mode || 'digest' }}
-          # Up to three boards an hour, and a ceiling well under
-          # Instagram's own 100 published items per 24h.
-          MAX_STORIES: '3'
-          MAX_STORIES_PER_DAY: '40'
+          # ONE board, every ninety minutes — eleven a day instead of
+          # fifty-one. Stories reach followers only, so volume there
+          # buys nothing until there is an audience to retain; the
+          # spacing is set by the cron, this is the belt.
+          MAX_STORIES: '1'
+          MIN_MINUTES_BETWEEN_STORIES: '80'
+          MAX_STORIES_PER_DAY: '14'
           # A story is about the hour it belongs to. More than two
           # windows behind and it is news, not "now".
           MAX_STORY_LAG_WINDOWS: '2'

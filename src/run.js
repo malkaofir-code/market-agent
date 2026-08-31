@@ -16,6 +16,7 @@ import 'dotenv/config';
 import {
   putMessages, messagesIn, messagesInAll, oldestUnconsumedBefore, markConsumed,
   storyMessagesIn, oldestUnstoriedBefore, markStoried, storiesToday, retireStories,
+  lastStoryAt,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
@@ -169,6 +170,18 @@ async function runStories() {
   const cap = Number(process.env.MAX_STORIES_PER_DAY || 40);
   const told = await storiesToday();
   if (!DRY && told >= cap) { say(`SKIP — story cap reached (${told}/${cap})`); return; }
+
+  // The cron sets the ninety-minute rhythm; this is the belt that
+  // holds it if a dispatch fires twice or a catch-up run lands early.
+  const gap = Number(process.env.MIN_MINUTES_BETWEEN_STORIES || 0);
+  if (!DRY && gap) {
+    const last = await lastStoryAt();
+    const since = last ? Math.round((Date.now() / 1000 - last) / 60) : null;
+    if (since != null && since < gap) {
+      say(`SKIP — only ${since}min since the last story (min ${gap})`);
+      return;
+    }
+  }
 
   const { t: tpl, recent: tplRecent } = await nextTemplate(`S:${w.key}`);
   const tally = Number((await getState(TALLY_KEY)) ?? 0);
