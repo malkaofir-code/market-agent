@@ -13,7 +13,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(join(HERE, 'slide.css'), 'utf8');
 
 /**
- * Ofir's wardrobe, read once per process.
+ * Ron's wardrobe, read once per process.
  *
  * The slide HTML is handed to Chromium with setContent(), which has no
  * base URL — a relative <img src> resolves against about:blank and a
@@ -31,7 +31,7 @@ const GESTURES = {
   pause: /pause|thinking|listening/,
 };
 function loadPoses() {
-  const dir = join(HERE, 'assets', 'ofir');
+  const dir = join(HERE, 'assets', 'ron');
   if (!existsSync(dir)) return {};
   const out = {};
   for (const f of readdirSync(dir).filter(f => f.endsWith('.png')).sort()) {
@@ -52,14 +52,14 @@ const MIN_SQUEEZE = 0.76;
 // starts looking like a mistake.
 // Per archetype, because the ceiling is not the same everywhere: a bar
 // chart or a lone number scales cleanly, while prose in a column that
-// Ofir has already narrowed turns into one ragged word per line long
+// Ron has already narrowed turns into one ragged word per line long
 // before it fills the board. Zoom scales the band's whole contents —
 // him included — so growing never changes the geometry, only the size.
 const GROW_CAP = {
   watch: 1.28, hero: 1.22, telegram: 1.20, chart: 1.08,
   note: 1.12, item: 1.12, list: 1.10, cover: 1.10, coverFramed: 1.10,
 };
-// With Ofir on the board the sums change. Zoom shrinks the band's own
+// With Ron on the board the sums change. Zoom shrinks the band's own
 // width in CSS pixels while his lane stays the px it was, so every
 // notch of growth takes a bigger bite out of what is left for the
 // text — a watch slide grew itself down to four characters a line.
@@ -69,11 +69,11 @@ const GROW_CAP_LANE = { watch: 1.20, telegram: 1.14, hero: 1.14, note: 1.12,
                         chart: 1.06, cover: 1.08, coverFramed: 1.08 };
 const NO_GROW_LANED = 1.08;
 const STORY_GROW = 1.75;
-const OFIR_STEPS = [0.84, 0.68, 0.54];
+const RON_STEPS = [0.84, 0.68, 0.54];
 const GROW_STEP = 0.05;
 const FILL = 0.80;          // grow while the content uses less than this
 
-// How Ofir gives way when he lands on data, in order.
+// How Ron gives way when he lands on data, in order.
 const MASCOT_RETRIES = ['smaller', 'far-edge', 'smaller-far-edge'];
 
 /**
@@ -102,13 +102,13 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
       let slide = slides[i], fit = null;
 
       // ── the mascot review ────────────────────────────────────
-      // Ofir is placed by CSS, which knows nothing about how long a
+      // Ron is placed by CSS, which knows nothing about how long a
       // headline turned out or how many rows a table grew. Returns
       // true when the board is clean; otherwise it edits `slide` and
       // the caller re-renders.
       async function reviewMascot() {
       const clash = await p.evaluate(() => {
-        const o = document.querySelector('.ofir');
+        const o = document.querySelector('.ron');
         if (!o) return null;
         const a = o.getBoundingClientRect();
         const hits = [];
@@ -129,17 +129,17 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
 
       if (clash) {
         // Retreat in order: shrink, then move to the opposite edge,
-        // then drop him. A slide without Ofir is fine; a number with a
+        // then drop him. A slide without Ron is fine; a number with a
         // cartoon elbow through it is not.
-        const step = slide.ofirTry ?? 0;
+        const step = slide.ronTry ?? 0;
         if (step < MASCOT_RETRIES.length) {
-          shed.push({ slide: i + 1, headline: `Ofir vs ${clash.map(c => c.what).join(', ')}`,
+          shed.push({ slide: i + 1, headline: `Ron vs ${clash.map(c => c.what).join(', ')}`,
             note: `${MASCOT_RETRIES[step]} (covered ${clash[0].cover}%)` });
-          slide = { ...slide, ofirTry: step + 1, ofirPlace: MASCOT_RETRIES[step] };
+          slide = { ...slide, ronTry: step + 1, ronPlace: MASCOT_RETRIES[step] };
           return false;
         }
-        shed.push({ slide: i + 1, headline: 'Ofir dropped', note: 'no placement clears the data' });
-        slide = { ...slide, ofir: null };
+        shed.push({ slide: i + 1, headline: 'Ron dropped', note: 'no placement clears the data' });
+        slide = { ...slide, ron: null };
         return false;
       }
       return true;
@@ -155,7 +155,7 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
         // Both numbers in REAL pixels. scrollHeight reports the child's
         // own CSS pixels, which are not the band's once a zoom is in
         // play — and the band's clientHeight counts padding that is
-        // deliberately reserved for Ofir. Comparing those two directly
+        // deliberately reserved for Ron. Comparing those two directly
         // is how a story board decided it needed 1695px of a 1222px
         // band and threw the window away.
         fit = await p.evaluate(() => {
@@ -169,19 +169,19 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
           // the reserve is cut from — so a box taller than the pose is
           // a strip of empty ground under the headline.
           let drawn = 0;
-          const img = document.querySelector('.ofir img');
+          const img = document.querySelector('.ron img');
           if (img && img.naturalWidth) {
             const b = img.getBoundingClientRect();
             drawn = Math.min(b.height, b.width * img.naturalHeight / img.naturalWidth);
           }
           return { room, needs: a.getBoundingClientRect().height,
-                   laned: !!document.querySelector('.ofir'),
+                   laned: !!document.querySelector('.ron'),
                    reserve: parseFloat(cs.paddingBottom || 0), drawn };
         });
 
         // Give back whatever the box reserved and the pose did not use.
         if (story && fit.drawn && Math.abs(fit.reserve - 40 - fit.drawn) > 20) {
-          slide = { ...slide, ofirFit: Math.ceil(fit.drawn) };
+          slide = { ...slide, ronFit: Math.ceil(fit.drawn) };
           continue;
         }
         // Fits. Two more questions before it is done.
@@ -189,7 +189,7 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
           // One: is it swimming? A short window used to render as a
           // line of type stranded in a third of a board of empty
           // ground. The same zoom that rescues an overlong slide grows
-          // an underfull one — Ofir included, since he lives inside
+          // an underfull one — Ron included, since he lives inside
           // the band. `shrunk` stops it oscillating with the squeeze.
           const z = slide.squeeze ?? 1;
           // A story has the same width as a post and 570px more height,
@@ -209,7 +209,7 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
             const next = Math.min(cap, z * Math.max(reach, 1 + GROW_STEP / z));
             if (next > z + 0.004) { slide = { ...slide, squeeze: next }; continue; }
           }
-          // Two: is Ofir standing on data?
+          // Two: is Ron standing on data?
           if (await reviewMascot()) break;
           continue;
         }
@@ -221,7 +221,7 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
           continue;
         }
 
-        // A story reserves the bottom third for Ofir, and a long
+        // A story reserves the bottom third for Ron, and a long
         // headline needs some of it back. He gives ground before the
         // type does — he is the decoration, the headline is the point.
         // ...but only while the type is still at or below its designed
@@ -229,9 +229,9 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
         // fault, not his: shrinking him there let the type keep taking
         // room until he was a thumbnail in the corner.
         if (story && fit.laned && (slide.squeeze ?? 1) <= 1.0001) {
-          const k = slide.ofirK ?? 1;
-          const next = OFIR_STEPS.find(x => x < k - 1e-6);
-          if (next) { slide = { ...slide, ofirK: next }; continue; }
+          const k = slide.ronK ?? 1;
+          const next = RON_STEPS.find(x => x < k - 1e-6);
+          if (next) { slide = { ...slide, ronK: next }; continue; }
         }
 
         // Every other archetype: shrink the type before giving up. The

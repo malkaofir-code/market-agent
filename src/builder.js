@@ -127,12 +127,12 @@ const ARCHETYPES = {
 
   // 02 · hero figure — sized to its measure, not to a constant.
   hero: s => {
-    // The measure is the COLUMN, not the canvas. With Ofir on the board
+    // The measure is the COLUMN, not the canvas. With Ron on the board
     // a lane is gone, and a figure sized against the full 1080 grew
     // straight through him — the review then shrank him instead, which
     // is the wrong end of the problem to fix.
-    const room = s.ofirSide ? 600 : 940;
-    const size = Math.min(s.ofirSide ? 208 : 258, Math.floor(room / (String(s.figure).length * 0.62)));
+    const room = s.ronSide ? 600 : 940;
+    const size = Math.min(s.ronSide ? 208 : 258, Math.floor(room / (String(s.figure).length * 0.62)));
     return `<div class="a-hr"><p class="eyeb">${bidi(s.eyebrow || 'המספר של החלון')}</p>
     <p class="fig ${s.dir ?? ''}" data-protect="the figure" style="font-size:${size}px">${esc(s.figure)}</p>
     ${photo(s.photo && { ...s.photo, h: 300 })}
@@ -151,7 +151,7 @@ const ARCHETYPES = {
     <p class="txt">${bidi(s.text)}</p>
     <p class="dis">${bidi(s.disclaimer || 'פרשנות, לא המלצה.')}</p></div>`,
 
-  // 04b · Ofir's board — the interpretation, with him presenting it.
+  // 04b · Ron's board — the interpretation, with him presenting it.
   //
   // He is the one thing on this account nobody else can copy: a feed
   // of market headlines is a utility, and utilities get muted, while
@@ -164,7 +164,7 @@ const ARCHETYPES = {
   // disclaimer stays on the board: he PRESENTS the interpretation,
   // he is not being passed off as its author.
   voice: s => `<div class="a-vo">
-    <p class="eyeb">אופיר מסביר</p>
+    <p class="eyeb">רון מסביר</p>
     <div class="say"><p class="txt">${bidi(s.text)}</p></div>
     ${s.about ? `<p class="abt">${bidi(s.about)}</p>` : ''}
     <p class="dis">${bidi(s.disclaimer || 'פרשנות, לא המלצה.')}</p></div>`,
@@ -227,7 +227,7 @@ export function barChart(series) {
 // ── ground and mascot ────────────────────────────────────────
 // Which ground each archetype stands on. Ink is the default, so only
 // the departures are listed. The rule behind the choices: narrative on
-// ink, Ofir explaining on deep teal, evidence on slate, data on the
+// ink, Ron explaining on deep teal, evidence on slate, data on the
 // document ground, and one board a deck allowed to shout in orange.
 const GROUND = {
   coverFramed: 'deep',    // the digest opener, where he introduces
@@ -253,7 +253,7 @@ const POSE = {
 // bar already owns the reading edge, and a mascot lane on the other
 // side left the headline a column six characters wide. One opening in
 // seven without him is variety, not a loss.
-const NO_OFIR = new Set(['item', 'list', 'coverEdge']);
+const NO_RON = new Set(['item', 'list', 'coverEdge']);
 
 /**
  * The mascot layer. `ctx.poses` is filled by render.js, which owns the
@@ -268,13 +268,13 @@ const SIDE = { cover: 'right', coverFramed: 'right', coverRule: 'right',
                coverBand: 'right', coverStack: 'right', coverPoster: 'right',
                coverEdge: 'left' };   // everything else: left
 
-function ofirSide(slide, ctx, i = 0) {
-  return ofirLayer(slide, ctx, i) ? (SIDE[slide.type] ?? 'left') : null;
+function ronSide(slide, ctx, i = 0) {
+  return ronLayer(slide, ctx, i) ? (SIDE[slide.type] ?? 'left') : null;
 }
 
-function ofirLayer(slide, ctx, i = 0) {
-  if (slide.ofir === null || NO_OFIR.has(slide.type)) return '';
-  // A slide already carrying a photo has its image. Ofir standing in
+function ronLayer(slide, ctx, i = 0) {
+  if (slide.ron === null || NO_RON.has(slide.type)) return '';
+  // A slide already carrying a photo has its image. Ron standing in
   // front of a screenshot is two subjects fighting, and on the framed
   // cover the frame landed across his face. One picture per board.
   if (slide.photo) return '';
@@ -285,7 +285,7 @@ function ofirLayer(slide, ctx, i = 0) {
   // board in a set that happens to want the same gesture puts him in
   // the same shirt three times running.
   const src = wardrobe[((ctx.spin ?? 0) + i) % wardrobe.length];
-  return `<div class="ofir"><img src="${src}" alt=""></div>`;
+  return `<div class="ron"><img src="${src}" alt=""></div>`;
 }
 
 // ── assembly ─────────────────────────────────────────────────
@@ -315,12 +315,12 @@ export function buildSlide(slide, ctx, i, n, { story = false } = {}) {
   // render.js sets `squeeze` when a slide overruns its band: the body
   // scales down a notch and is re-measured, instead of the whole window
   // being thrown away for a headline that ran a hundred pixels long.
-  // render.js may hand back an ofirPlace after the mascot review; the
+  // render.js may hand back an ronPlace after the mascot review; the
   // class is what CSS reads to shrink him or send him to the far edge.
-  const place = slide.ofirPlace ? ` of-${slide.ofirPlace}` : '';
+  const place = slide.ronPlace ? ` of-${slide.ronPlace}` : '';
   // Now two-way: below 1 the band was overlong and is being squeezed,
   // above 1 it was underfull and is being grown.
-  // ofirK is the story board's first concession: before the type is
+  // ronK is the story board's first concession: before the type is
   // squeezed for a long headline, HE gets smaller, because he is the
   // decoration and the headline is the point.
   // Which of the template's two grounds this board stands on. The
@@ -341,19 +341,19 @@ export function buildSlide(slide, ctx, i, n, { story = false } = {}) {
   const props = [
     pal ? vars(pal) : null,
     slide.squeeze && slide.squeeze !== 1 ? `--sq:${slide.squeeze}` : null,
-    slide.ofirK && slide.ofirK !== 1 ? `--ofir-k:${slide.ofirK}` : null,
-    slide.ofirFit ? `--ofir-fit:${slide.ofirFit}px` : null,
+    slide.ronK && slide.ronK !== 1 ? `--ron-k:${slide.ronK}` : null,
+    slide.ronFit ? `--ron-fit:${slide.ronFit}px` : null,
   ].filter(Boolean);
   const sq = props.length ? ` style="${props.join(';')}"` : '';
   // Stamped so the CSS can reserve his lane. Absent when he is not on
   // the board — a slide carrying a photo instead gets its full width.
-  const side = ofirSide(slide, ctx, i);
-  const oa = side ? ` data-ofir="${side}"` : '';
+  const side = ronSide(slide, ctx, i);
+  const oa = side ? ` data-ron="${side}"` : '';
   // Three stories in a row should not be the same photograph three
   // times: he changes sides down the set.
   const alt = story && i % 2 === 1 ? ' of-alt' : '';
   return `<div class="slide${story ? ' slide--story' + alt : ''}${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${oa}><div class="bgm"></div>${coverLayer(slide)}
-${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window, ofirSide: side })}${ofirLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
+${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }
 

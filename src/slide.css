@@ -38,13 +38,13 @@ html,body{margin:0;padding:0;background:var(--bg)}
    archetypes set absolute px, so the scale has to reach them through a
    zoom on the band's own contents. */
 .slide{--sq:1}
-/* Ofir is deliberately OUTSIDE the zoom. He is a fixed presence at a
+/* Ron is deliberately OUTSIDE the zoom. He is a fixed presence at a
    fixed size; only the type grows and shrinks around him. Zooming him
    too meant every notch of growth also widened his lane in real pixels
    and narrowed the text column that the growth was supposed to fill —
    type got bigger and lines got shorter at the same time, which is how
    a slide ends up four characters wide. */
-.sl-bd > *:not(.ofir){zoom:var(--sq)}
+.sl-bd > *:not(.ron){zoom:var(--sq)}
 
 /* ── band B · body ── */
 .sl-bd{min-height:0;display:flex;flex-direction:column;justify-content:center;gap:34px;padding-top:18px;overflow:hidden;position:relative}
@@ -188,7 +188,7 @@ html,body{margin:0;padding:0;background:var(--bg)}
 
 
 /* ── the mascot review's fallbacks ───────────────────────────────
-   render.js measures Ofir against every [data-protect] element and,
+   render.js measures Ron against every [data-protect] element and,
    when he overlaps, re-renders with one of these. They are applied in
    order; if none of them clears the data he is dropped from the slide
    entirely. A slide without him is fine — a percentage with a cartoon
@@ -203,16 +203,16 @@ html,body{margin:0;padding:0;background:var(--bg)}
    the middle of the cover with the headline across his face. A box
    plus object-fit:contain makes his footprint the same whichever pose
    the spin lands on, and the lane below is sized against that box. */
-.slide{--ofir-k:1}
-.ofir{position:absolute; bottom:0; z-index:2; pointer-events:none;
-  width:calc(var(--ofir-w,380px) * var(--ofir-k));
-  height:calc(var(--ofir-h,600px) * var(--ofir-k))}
-.ofir img{display:block; width:100%; height:100%;
+.slide{--ron-k:1}
+.ron{position:absolute; bottom:0; z-index:2; pointer-events:none;
+  width:calc(var(--ron-w,380px) * var(--ron-k));
+  height:calc(var(--ron-h,600px) * var(--ron-k))}
+.ron img{display:block; width:100%; height:100%;
   object-fit:contain; object-position:bottom center}
 
-.slide.of-smaller .ofir{width:calc(var(--ofir-w,380px) * .68); height:calc(var(--ofir-h,600px) * .68)}
-.slide.of-far-edge .ofir{left:auto; right:-28px}
-.slide.of-smaller-far-edge .ofir{width:calc(var(--ofir-w,380px) * .6); height:calc(var(--ofir-h,600px) * .6); left:auto; right:-20px}
+.slide.of-smaller .ron{width:calc(var(--ron-w,380px) * .68); height:calc(var(--ron-h,600px) * .68)}
+.slide.of-far-edge .ron{left:auto; right:-28px}
+.slide.of-smaller-far-edge .ron{width:calc(var(--ron-w,380px) * .6); height:calc(var(--ron-h,600px) * .6); left:auto; right:-20px}
 
 
 /* ═══ THE FIVE GROUNDS ═══════════════════════════════════════════
@@ -232,32 +232,32 @@ html,body{margin:0;padding:0;background:var(--bg)}
                --rule:rgba(18,10,4,.3); --acc:#120A04; --pos:#120A04; --neg:#120A04;
                --grid:rgba(20,22,26,.05)}
 
-/* ── Ofir on the board ───────────────────────────────────────────
+/* ── Ron on the board ───────────────────────────────────────────
    A cut-out, never in a box. Anchored to the bottom of the band and
    capped at its height so a crop can only ever take torso. Each
    archetype places him differently: same person, never the same
    composition twice running. */
-/* The box and the lane are declared on the SLIDE, not on .ofir. Both
+/* The box and the lane are declared on the SLIDE, not on .ron. Both
    he and the text need to know them — he is sized by the box, the text
    is kept out of it — and the text is his sibling, so a var set on him
    is invisible to it. Declaring them in two places is how the story
    board ran its headline straight across his face. */
-.slide{--ofir-w:380px; --ofir-h:600px; --lane:360px}
+.slide{--ron-w:380px; --ron-h:600px; --lane:360px}
 .slide[data-type="coverFramed"],
-.slide[data-type="cover"]{--ofir-w:430px; --ofir-h:700px; --lane:400px}
-.slide[data-type="hero"]  {--ofir-w:370px; --ofir-h:560px; --lane:350px}
-.slide[data-type="note"]  {--ofir-w:410px; --ofir-h:670px; --lane:380px}
-.slide[data-type="chart"] {--ofir-w:340px; --ofir-h:480px; --lane:325px}
-.slide[data-type="watch"] {--ofir-w:390px; --ofir-h:600px; --lane:365px}
-.slide[data-type="telegram"]{--ofir-w:430px; --ofir-h:700px; --lane:395px}
+.slide[data-type="cover"]{--ron-w:430px; --ron-h:700px; --lane:400px}
+.slide[data-type="hero"]  {--ron-w:370px; --ron-h:560px; --lane:350px}
+.slide[data-type="note"]  {--ron-w:410px; --ron-h:670px; --lane:380px}
+.slide[data-type="chart"] {--ron-w:340px; --ron-h:480px; --lane:325px}
+.slide[data-type="watch"] {--ron-w:390px; --ron-h:600px; --lane:365px}
+.slide[data-type="telegram"]{--ron-w:430px; --ron-h:700px; --lane:395px}
 
-.slide[data-type="coverFramed"] .ofir,
-.slide[data-type="cover"] .ofir{right:-44px}
-.slide[data-type="hero"]  .ofir{left:-34px}
-.slide[data-type="note"]  .ofir{left:-44px}
-.slide[data-type="chart"] .ofir{left:-26px}
-.slide[data-type="watch"] .ofir{left:-40px}
-.slide[data-type="telegram"] .ofir{left:-46px}
+.slide[data-type="coverFramed"] .ron,
+.slide[data-type="cover"] .ron{right:-44px}
+.slide[data-type="hero"]  .ron{left:-34px}
+.slide[data-type="note"]  .ron{left:-44px}
+.slide[data-type="chart"] .ron{left:-26px}
+.slide[data-type="watch"] .ron{left:-40px}
+.slide[data-type="telegram"] .ron{left:-46px}
 
 
 /* ── making room for him ─────────────────────────────────────────
@@ -272,30 +272,30 @@ html,body{margin:0;padding:0;background:var(--bg)}
 /* Divided by the zoom so the lane is the same number of REAL pixels
    whatever the type is doing — it has to match him, and he does not
    zoom. */
-.slide[data-ofir="right"] .sl-bd > :not(.ofir){padding-inline-start:calc(var(--lane) / var(--sq))}
-.slide[data-ofir="left"]  .sl-bd > :not(.ofir){padding-inline-end:calc(var(--lane) / var(--sq))}
+.slide[data-ron="right"] .sl-bd > :not(.ron){padding-inline-start:calc(var(--lane) / var(--sq))}
+.slide[data-ron="left"]  .sl-bd > :not(.ron){padding-inline-end:calc(var(--lane) / var(--sq))}
 /* The chart's bars are a fixed-width plot, not prose: let the padding
    move them rather than squeezing the track. */
-.slide[data-ofir] .a-ch .bars{max-width:none; margin-inline-start:0}
+.slide[data-ron] .a-ch .bars{max-width:none; margin-inline-start:0}
 /* The chart's row is two fixed columns and a track. Zooming the band
    grows the fixed pair and starves the track, so the bars — the only
    thing on the slide anyone reads — get thinner as the type gets
    bigger. Give the track back what the lane took. */
-.slide[data-ofir] .a-ch .bar{grid-template-columns:86px 1fr 120px;gap:16px}
+.slide[data-ron] .a-ch .bar{grid-template-columns:86px 1fr 120px;gap:16px}
 
 /* The channel address is a single unbreakable LTR token. In its own
    full-width plate it fit; inside the lane it ran off the right edge
    of the plate and lost its last letter — an address that is wrong is
    worse than an address that is small. Let the plate shrink to the
    text and the text shrink to the column. */
-.slide[data-ofir] .a-tg .link{font-size:30px;padding:20px 24px;
+.slide[data-ron] .a-tg .link{font-size:30px;padding:20px 24px;
   width:fit-content;margin-inline-start:auto;white-space:nowrap;max-width:100%}
 
 /* The framed cover's headline plate is a fixed 610px, which predates
    the lane and cheerfully overran it — the plate's corner landed on
    his arm. Let it take the column it is given instead. */
-.slide[data-ofir] .a-cf .block{width:auto;max-width:100%;margin-inline-end:0}
-.slide[data-ofir] .a-cf .frame{max-width:100%}
+.slide[data-ron] .a-cf .block{width:auto;max-width:100%;margin-inline-end:0}
+.slide[data-ron] .a-cf .frame{max-width:100%}
 
 
 /* ═══ THE STORY BOARD ═════════════════════════════════════════════
@@ -327,22 +327,22 @@ html,body{margin:0;padding:0;background:var(--bg)}
    than the pose inside it is a strip of empty ground between the
    headline and his head. These are close to the wardrobe's own
    proportions at this width. */
-.slide--story{--ofir-w:420px; --ofir-h:580px}
+.slide--story{--ron-w:420px; --ron-h:580px}
 .slide--story[data-type="cover"],
-.slide--story[data-type="coverFramed"]{--ofir-w:440px; --ofir-h:620px}
-.slide--story[data-type="hero"]{--ofir-w:400px; --ofir-h:560px}
+.slide--story[data-type="coverFramed"]{--ron-w:440px; --ron-h:620px}
+.slide--story[data-type="hero"]{--ron-w:400px; --ron-h:560px}
 .slide--story .sl-bd{justify-content:flex-start}
 /* No lane on a story — the room he needs is taken off the BAND, not
    off the text box. Padding on the band is outside the zoom, so the
    reserve stays the same number of real pixels however big the type
    grows, and he still sits at bottom:0 because absolute positioning
    measures from the padding box. */
-.slide--story[data-ofir] .sl-bd{padding-bottom:calc(var(--ofir-fit, calc(var(--ofir-h) * var(--ofir-k))) + 40px)}
-.slide--story[data-ofir] .sl-bd > :not(.ofir){padding-inline-start:0; padding-inline-end:0}
+.slide--story[data-ron] .sl-bd{padding-bottom:calc(var(--ron-fit, calc(var(--ron-h) * var(--ron-k))) + 40px)}
+.slide--story[data-ron] .sl-bd > :not(.ron){padding-inline-start:0; padding-inline-end:0}
 /* Alternating sides, so three stories in a row are not the same
    photograph three times. */
-.slide--story .ofir{left:auto; right:-34px}
-.slide--story.of-alt .ofir{right:auto; left:-34px}
+.slide--story .ron{left:auto; right:-34px}
+.slide--story.of-alt .ron{right:auto; left:-34px}
 
 /* A story carries ONE update, so the cover photo can afford to be a
    band rather than a bleed — it stops competing with the headline. */
@@ -403,22 +403,22 @@ html,body{margin:0;padding:0;background:var(--bg)}
   letter-spacing:-.03em;margin:0;max-width:15ch;text-wrap:balance}
 .a-ck .stand{font-size:33px;line-height:1.42;color:var(--dim2);margin:30px 0 0;max-width:30ch}
 
-/* Ofir's lane on the new openings — same rule as everywhere else: the
+/* Ron's lane on the new openings — same rule as everywhere else: the
    padding goes on HIS side, and inline-start is the right in Hebrew. */
 .slide[data-type="coverRule"],
 .slide[data-type="coverBand"],
-.slide[data-type="coverStack"]{--ofir-w:420px; --ofir-h:660px; --lane:390px}
-.slide[data-type="coverPoster"]{--ofir-w:400px; --ofir-h:620px; --lane:370px}
-.slide[data-type="coverEdge"]  {--ofir-w:400px; --ofir-h:640px; --lane:370px}
-.slide[data-type="coverRule"] .ofir,
-.slide[data-type="coverBand"] .ofir,
-.slide[data-type="coverStack"] .ofir,
-.slide[data-type="coverPoster"] .ofir{right:-44px}
-.slide[data-type="coverEdge"] .ofir{left:-40px}
+.slide[data-type="coverStack"]{--ron-w:420px; --ron-h:660px; --lane:390px}
+.slide[data-type="coverPoster"]{--ron-w:400px; --ron-h:620px; --lane:370px}
+.slide[data-type="coverEdge"]  {--ron-w:400px; --ron-h:640px; --lane:370px}
+.slide[data-type="coverRule"] .ron,
+.slide[data-type="coverBand"] .ron,
+.slide[data-type="coverStack"] .ron,
+.slide[data-type="coverPoster"] .ron{right:-44px}
+.slide[data-type="coverEdge"] .ron{left:-40px}
 /* The edge bar is furniture, not prose: it must not be pushed by the
    lane, only the words beside it. */
-.slide[data-ofir="left"] .a-ce{padding-inline-end:0}
-.slide[data-ofir="left"] .a-ce .txt{padding-inline-end:var(--lane)}
+.slide[data-ron="left"] .a-ce{padding-inline-end:0}
+.slide[data-ron="left"] .a-ce .txt{padding-inline-end:var(--lane)}
 
 /* ── the Telegram strip ──────────────────────────────────────────
    Printed on the news board itself, every sixth story. It is an
@@ -433,7 +433,7 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide--story .tg-strip{padding:18px 26px;margin-top:18px}
 .slide--story .tg-strip .tg-a{font-size:36px}
 
-/* ── Ofir's board ────────────────────────────────────────────────
+/* ── Ron's board ────────────────────────────────────────────────
    The interpretation, with him presenting it. The tail on the block
    points at him — that is the whole trick, and without it the words
    read as a caption that happens to sit near a drawing rather than
@@ -454,6 +454,6 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .a-vo .abt{font-size:27px;line-height:1.4;color:var(--dim);margin:26px 0 0;max-width:26ch}
 .a-vo .dis{font-family:var(--f-mono);font-size:21px;color:var(--dim);margin:20px 0 0}
 /* He stands taller on his own board than anywhere else. */
-.slide[data-type="voice"]{--ofir-w:430px; --ofir-h:700px; --lane:400px}
-.slide[data-type="voice"] .ofir{left:-46px}
-.slide--story[data-type="voice"]{--ofir-w:430px; --ofir-h:600px}
+.slide[data-type="voice"]{--ron-w:430px; --ron-h:700px; --lane:400px}
+.slide[data-type="voice"] .ron{left:-46px}
+.slide--story[data-type="voice"]{--ron-w:430px; --ron-h:600px}
