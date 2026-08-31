@@ -136,7 +136,16 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   };
 
   const slides = [];
-  const isCta = hhmm(w.start).startsWith('23');      // §05: once a day
+  // The Telegram card, once a day, on the evening deck.
+  //
+  // This used to key off the window's START being 23:xx, which was
+  // right when a deck was one hour and the last one went out at 23:00.
+  // Under three digests a day the evening deck STARTS wherever the
+  // afternoon one left off — 15:15 — so the test never fired again and
+  // the card silently stopped appearing. The window's END is the
+  // stable thing: the evening digest always closes on the 21:15
+  // boundary.
+  const isCta = hhmm(w.end).startsWith('21');
   const cap = isCta ? MAX_CTA : MAX;
 
   // 01 · cover — highest score, not most recent.
