@@ -4,6 +4,7 @@
 // (Overflow is measured in render.js, which owns a real browser.)
 // ─────────────────────────────────────────────────────────────
 import { bidi, esc } from './rtl.js';
+import { vars, byId } from './templates.js';
 
 export const CANVAS = { w: 1080, h: 1350, body: 1118 };
 // A story is the same board, taller, with the top and bottom quarters
@@ -68,6 +69,48 @@ const ARCHETYPES = {
     <div class="block"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
     <h1>${bidi(s.headline)}</h1></div>
     <p class="stand">${bidi(s.stand)}</p><div class="kick"></div></div>`,
+
+  // 01c · cover, ruled — the broadsheet opening. A heavy rule, a small
+  // eyebrow, and a headline given the whole width. No picture competes
+  // with it; when the window has one it goes on a later board.
+  coverRule: s => `<div class="a-cr">
+    <div class="cr-bar"></div>
+    <p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
+    <h1>${bidi(s.headline)}</h1>
+    <div class="cr-hr"></div>
+    <p class="stand">${bidi(s.stand)}</p></div>`,
+
+  // 01d · cover, edged — a full-height accent bar down the reading
+  // edge. In RTL that is the RIGHT, which is where the eye starts, so
+  // the bar is the first thing seen and the headline hangs off it.
+  coverEdge: s => `<div class="a-ce"><div class="ce-bar"></div>
+    <div class="txt"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
+    <h1>${bidi(s.headline)}</h1>
+    <p class="stand">${bidi(s.stand)}</p></div></div>`,
+
+  // 01e · cover, poster — one thing, enormous. Everything else is
+  // reduced to a caption. For the loud grounds, where a paragraph of
+  // standfirst on a field of orange is unreadable anyway.
+  coverPoster: s => `<div class="a-po">
+    <p class="eyeb">${bidi(s.eyebrow || 'עכשיו')}</p>
+    <h1>${bidi(s.headline)}</h1>
+    <p class="cap">${bidi(s.stand)}</p></div>`,
+
+  // 01f · cover, banded — the headline inverted inside a solid band
+  // across the middle, the picture above it, the standfirst below.
+  coverBand: s => `<div class="a-cb">
+    ${s.photo ? `<div class="cb-ph"><img src="${esc(s.photo.src)}" alt=""></div>` : ''}
+    <div class="cb-band"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
+    <h1>${bidi(s.headline)}</h1></div>
+    <p class="stand">${bidi(s.stand)}</p></div>`,
+
+  // 01g · cover, stacked — the headline boxed like something coming
+  // off a wire, with a stamped index. The most machine-like opening in
+  // the set, for the grounds that can carry it.
+  coverStack: s => `<div class="a-ck">
+    <div class="ck-tab">${bidi(s.eyebrow || 'עדכון')}</div>
+    <div class="ck-box"><h1>${bidi(s.headline)}</h1></div>
+    <p class="stand">${bidi(s.stand)}</p></div>`,
 
   // 02 · hero figure — sized to its measure, not to a constant.
   hero: s => {
@@ -170,10 +213,16 @@ const GROUND = {
 // like reruns even when they use the same archetypes.
 const POSE = {
   coverFramed: 'welcome', cover: 'welcome',
+  coverRule: 'explain', coverEdge: 'point', coverPoster: 'upward',
+  coverBand: 'welcome', coverStack: 'yes',
   hero: 'point', note: 'explain', chart: 'upward',
   watch: 'pause', telegram: 'yes',
 };
-const NO_OFIR = new Set(['item', 'list']);   // boards carrying evidence
+// Boards carrying evidence, plus the edged opening — there the accent
+// bar already owns the reading edge, and a mascot lane on the other
+// side left the headline a column six characters wide. One opening in
+// seven without him is variety, not a loss.
+const NO_OFIR = new Set(['item', 'list', 'coverEdge']);
 
 /**
  * The mascot layer. `ctx.poses` is filled by render.js, which owns the
@@ -184,7 +233,9 @@ const NO_OFIR = new Set(['item', 'list']);   // boards carrying evidence
 // leave him a lane, and the lane has to be on HIS side — in Hebrew the
 // text starts at the right edge, so a mascot on the right is standing
 // exactly where the first word lands.
-const SIDE = { cover: 'right', coverFramed: 'right' };   // everything else: left
+const SIDE = { cover: 'right', coverFramed: 'right', coverRule: 'right',
+               coverBand: 'right', coverStack: 'right', coverPoster: 'right',
+               coverEdge: 'left' };   // everything else: left
 
 function ofirSide(slide, ctx, i = 0) {
   return ofirLayer(slide, ctx, i) ? (SIDE[slide.type] ?? 'left') : null;
@@ -207,6 +258,9 @@ function ofirLayer(slide, ctx, i = 0) {
 }
 
 // ── assembly ─────────────────────────────────────────────────
+// Boards that carry evidence sit on the template's second ground.
+const SECONDARY = new Set(['item', 'list', 'chart', 'watch', 'telegram']);
+
 const NO_TAPE = new Set(['telegram']);
 const COVERS = new Set(['cover', 'coverFramed']);   // overlay grid
 const BLEED = new Set(['cover']);                  // photo escapes the band
@@ -238,14 +292,28 @@ export function buildSlide(slide, ctx, i, n, { story = false } = {}) {
   // ofirK is the story board's first concession: before the type is
   // squeezed for a long headline, HE gets smaller, because he is the
   // decoration and the headline is the point.
-  const vars = [
+  // Which of the template's two grounds this board stands on. The
+  // openings and the interpretive boards take the primary; the boards
+  // carrying evidence take the secondary, so a deck reads as two
+  // related worlds rather than one flat one.
+  const tpl = ctx.template ? byId(ctx.template) : null;
+  const pal = slide.palette
+    ?? (tpl ? (SECONDARY.has(slide.type) ? tpl.b : tpl.a) : null);
+  // Inline, not a class: thirty templates would otherwise be thirty
+  // near-identical blocks of CSS, and every component rule already
+  // reads these tokens without knowing where they came from.
+  const g = pal ? '' : (() => {
+    const ground = slide.ground ?? GROUND[slide.type];
+    return ground && ground !== 'ink' ? ` g-${ground}` : '';
+  })();
+
+  const props = [
+    pal ? vars(pal) : null,
     slide.squeeze && slide.squeeze !== 1 ? `--sq:${slide.squeeze}` : null,
     slide.ofirK && slide.ofirK !== 1 ? `--ofir-k:${slide.ofirK}` : null,
     slide.ofirFit ? `--ofir-fit:${slide.ofirFit}px` : null,
   ].filter(Boolean);
-  const sq = vars.length ? ` style="${vars.join(';')}"` : '';
-  const ground = slide.ground ?? GROUND[slide.type];
-  const g = ground && ground !== 'ink' ? ` g-${ground}` : '';
+  const sq = props.length ? ` style="${props.join(';')}"` : '';
   // Stamped so the CSS can reserve his lane. Absent when he is not on
   // the board — a slide carrying a photo instead gets its full width.
   const side = ofirSide(slide, ctx, i);

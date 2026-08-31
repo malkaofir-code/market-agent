@@ -347,3 +347,75 @@ html,body{margin:0;padding:0;background:var(--bg)}
 /* A story carries ONE update, so the cover photo can afford to be a
    band rather than a bleed — it stops competing with the headline. */
 .slide--story .cv-bleed{height:900px}
+
+
+/* ═══ THE NEW OPENINGS ════════════════════════════════════════════
+   Five more ways for a deck to start. The rotation in templates.js
+   never lets two windows in a row open the same way, so these are
+   what stops a profile grid reading as one post repeated. Each one
+   is a different COMPOSITION, not a recolour — the palette varies
+   underneath them independently. */
+
+/* ── 01c · ruled: the broadsheet ── */
+.a-cr{display:flex;flex-direction:column;z-index:3}
+.a-cr .cr-bar{height:14px;background:var(--acc);width:100%;margin-bottom:34px}
+.a-cr h1{font-family:var(--f-disp);font-weight:900;font-size:94px;line-height:1.04;
+  letter-spacing:-.032em;margin:20px 0 0;max-width:18ch;text-wrap:balance}
+.a-cr .cr-hr{height:1.5px;background:var(--rule);margin:34px 0 26px}
+.a-cr .stand{font-size:35px;line-height:1.42;color:var(--dim2);margin:0;max-width:30ch}
+
+/* ── 01d · edged: a bar down the reading edge ──
+   inline-start is the RIGHT in Hebrew, which is where the eye lands
+   first — so the bar is seen before the words, and the headline hangs
+   off it rather than sitting beside a decoration. */
+.a-ce{display:flex;gap:44px;align-items:stretch;z-index:3}
+.a-ce .ce-bar{flex:0 0 26px;background:var(--acc);align-self:stretch;min-height:300px}
+.a-ce .txt{flex:1;display:flex;flex-direction:column;justify-content:center}
+.a-ce h1{font-family:var(--f-disp);font-weight:900;font-size:86px;line-height:1.05;
+  letter-spacing:-.03em;margin:18px 0 0;max-width:18ch;text-wrap:balance}
+.a-ce .stand{font-size:34px;line-height:1.42;color:var(--dim2);margin:28px 0 0;max-width:28ch}
+
+/* ── 01e · poster: one thing, enormous ──
+   For the loud grounds. A paragraph of standfirst on a field of
+   orange is unreadable, so there isn't one — just a caption. */
+.a-po{display:flex;flex-direction:column;justify-content:center;z-index:3}
+.a-po h1{font-family:var(--f-disp);font-weight:900;font-size:112px;line-height:1.0;
+  letter-spacing:-.04em;margin:24px 0 0;max-width:13ch;text-wrap:balance}
+.a-po .cap{font-size:30px;line-height:1.38;color:var(--dim);margin:38px 0 0;max-width:26ch;
+  border-top:1.5px solid var(--rule);padding-top:22px}
+
+/* ── 01f · banded: the headline inverted in a solid band ── */
+.a-cb{display:flex;flex-direction:column;z-index:3}
+.a-cb .cb-ph{height:400px;overflow:hidden;flex:0 0 auto;margin-bottom:-26px}
+.a-cb .cb-ph img{width:100%;height:100%;object-fit:contain;object-position:center;display:block}
+.a-cb .cb-band{background:var(--acc);color:var(--bg);padding:34px 38px;position:relative;z-index:3}
+.a-cb .cb-band .eyeb{color:var(--bg);opacity:.78;margin:0 0 14px}
+.a-cb .cb-band h1{font-family:var(--f-disp);font-weight:900;font-size:88px;line-height:1.05;
+  letter-spacing:-.03em;margin:0;max-width:16ch}
+.a-cb .stand{font-size:33px;line-height:1.42;color:var(--dim2);margin:30px 0 0;max-width:30ch}
+
+/* ── 01g · stacked: off the wire ── */
+.a-ck{display:flex;flex-direction:column;z-index:3}
+.a-ck .ck-tab{align-self:flex-start;font-family:var(--f-mono);font-size:26px;font-weight:700;
+  letter-spacing:.16em;background:var(--acc);color:var(--bg);padding:10px 20px}
+.a-ck .ck-box{border:4px solid var(--fg);padding:32px 34px;margin-top:-2px}
+.a-ck .ck-box h1{font-family:var(--f-disp);font-weight:900;font-size:92px;line-height:1.04;
+  letter-spacing:-.03em;margin:0;max-width:15ch;text-wrap:balance}
+.a-ck .stand{font-size:33px;line-height:1.42;color:var(--dim2);margin:30px 0 0;max-width:30ch}
+
+/* Ofir's lane on the new openings — same rule as everywhere else: the
+   padding goes on HIS side, and inline-start is the right in Hebrew. */
+.slide[data-type="coverRule"],
+.slide[data-type="coverBand"],
+.slide[data-type="coverStack"]{--ofir-w:420px; --ofir-h:660px; --lane:390px}
+.slide[data-type="coverPoster"]{--ofir-w:400px; --ofir-h:620px; --lane:370px}
+.slide[data-type="coverEdge"]  {--ofir-w:400px; --ofir-h:640px; --lane:370px}
+.slide[data-type="coverRule"] .ofir,
+.slide[data-type="coverBand"] .ofir,
+.slide[data-type="coverStack"] .ofir,
+.slide[data-type="coverPoster"] .ofir{right:-44px}
+.slide[data-type="coverEdge"] .ofir{left:-40px}
+/* The edge bar is furniture, not prose: it must not be pushed by the
+   lane, only the words beside it. */
+.slide[data-ofir="left"] .a-ce{padding-inline-end:0}
+.slide[data-ofir="left"] .a-ce .txt{padding-inline-end:var(--lane)}

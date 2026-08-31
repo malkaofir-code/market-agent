@@ -20,6 +20,7 @@ import {
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
 import { compose, composeStories, windowOf, WIN } from './compose.js';
+import { pickTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
 import { connect, alert } from './tg.js';
 
@@ -32,6 +33,25 @@ const STORIES = process.argv.includes('--stories') || process.env.MODE === 'stor
 // Scheduled ticks render for review only; publishing needs a person.
 const REVIEW = process.env.REVIEW === '1';
 const CARRY_KEY = 'tape-carry';
+// One shared memory across BOTH tracks. Separate lists would let an
+// hour's stories and the digest that follows them land on the same
+// template, which is exactly the repetition the rotation exists to
+// prevent — the two appear side by side on the profile.
+const TPL_KEY = 'template-recent';
+
+/**
+ * The next look, and the promise not to reuse it.
+ *
+ * Seeded from the window key so a replay reproduces the deck it
+ * replayed instead of inventing a new one.
+ */
+async function nextTemplate(key) {
+  const recent = (await getState(TPL_KEY)) ?? [];
+  const seed = [...key].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const t = pickTemplate(recent, seed);
+  return { t, recent };
+}
+const keepTemplate = (recent, id) => setState(TPL_KEY, remember(recent, id));
 const say = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 // A stray rejection must never take the run down mid-publish.
@@ -146,7 +166,9 @@ async function runStories() {
   const told = await storiesToday();
   if (!DRY && told >= cap) { say(`SKIP — story cap reached (${told}/${cap})`); return; }
 
-  const deck = composeStories(rows, { carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end });
+  const { t: tpl, recent: tplRecent } = await nextTemplate(`S:${w.key}`);
+  const deck = composeStories(rows, {
+    carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end, template: tpl.id });
   const consumed = deck.consumed.map(Number);
   if (deck.skip) {
     say('SKIP —', w.key, `(${deck.skip})`);
@@ -158,7 +180,7 @@ async function runStories() {
   if (deck.carry) await setState(CARRY_KEY, deck.carry);
 
   say(`${deck.key} — ${rows.length} msgs -> ${deck.slides.length} story(ies) `
-    + `[${deck.slides.map(x => x.type)}]`);
+    + `[${deck.slides.map(x => x.type)}] · template ${tpl.id} ${tpl.name}`);
 
   const dir = join('./out', deck.key.replace(/[:]/g, '').replace('S', 'S-'));
   const { files } = await renderDeck(deck, dir, { format: 'jpeg', story: true });
@@ -214,6 +236,7 @@ async function runStories() {
   if (DRY) { say(`DRY RUN OK — ${files.length} stories built`); return; }
 
   if (posted) {
+    await keepTemplate(tplRecent, tpl.id);
     await setWindow({ key: deck.key, status: 'posted', slides: posted,
       posted_at: Math.floor(Date.now() / 1000),
       error: failure ? `${posted}/${urls.length}: ${failure.message}` : null });
@@ -335,7 +358,8 @@ async function main() {
   }
 
   const carry = (await getState(CARRY_KEY)) ?? {};
-  const deck = compose(w.rows, { carry, endTs: w.end });
+  const { t: tpl, recent: tplRecent } = await nextTemplate(w.key);
+  const deck = compose(w.rows, { carry, endTs: w.end, template: tpl.id });
   if (deck.carry) await setState(CARRY_KEY, deck.carry);
 
   const consumed = deck.consumed.map(Number);
@@ -351,7 +375,8 @@ async function main() {
     return;
   }
 
-  say(`${w.key} — ${w.rows.length} msgs -> ${deck.slides.length} slides [${deck.slides.map(s => s.type)}]`);
+  say(`${w.key} — ${w.rows.length} msgs -> ${deck.slides.length} slides `
+    + `[${deck.slides.map(s => s.type)}] · template ${tpl.id} ${tpl.name}`);
 
   const api = (process.env.PUBLISHER || 'api') === 'api';
   const dir = join('./out', w.key.replace(/:/g, ''));
@@ -407,6 +432,7 @@ async function main() {
 
   if (DRY) { say('dry run — window left open'); return; }
   await markConsumed(w.key, consumed);
+  await keepTemplate(tplRecent, tpl.id);
   await setWindow({ key: w.key, status: 'posted', slides: deck.slides.length, shed,
     posted_at: Math.floor(Date.now() / 1000) });
   await logRun(w.key, 'publish', true, result.permalink ?? result.id);

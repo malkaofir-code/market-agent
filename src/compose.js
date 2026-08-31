@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 import { parse, score, direction } from './parse.js';
 import { clean, stripLeadEmoji } from './rtl.js';
+import { byId } from './templates.js';
 import 'dotenv/config';
 
 const TZ = process.env.TZ || 'Asia/Jerusalem';
@@ -105,7 +106,7 @@ export function dedupe(parsed) {
   return out.sort((a, b) => a.ts - b.ts);
 }
 
-export function compose(rows, { now = null, carry = {}, endTs = null } = {}) {
+export function compose(rows, { now = null, carry = {}, endTs = null, template = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
   const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
@@ -143,8 +144,20 @@ export function compose(rows, { now = null, carry = {}, endTs = null } = {}) {
   // back to the plain cover, which reads as deliberate rather than
   // broken because the text hangs off the bottom either way.
   const lead = take(() => true);
-  slides.push({ type: lead.photo ? 'coverFramed' : 'cover',
-    headline: lead.headline, stand: lead.stand, source: lead.source, photo: lead.photo });
+  // The opening composition belongs to the TEMPLATE, not to whether
+  // this particular message happened to carry a photo. That was the
+  // whole complaint: every deck opened the same way, so the profile
+  // grid read as one post repeated. Three of the seven openings can
+  // hold a picture; the rest ignore it and it lands on a later board.
+  const tpl = template ? byId(template) : null;
+  const PHOTO_COVERS = new Set(['cover', 'coverFramed', 'coverBand']);
+  let coverType = tpl?.cover ?? (lead.photo ? 'coverFramed' : 'cover');
+  // A framed cover with nothing to frame is an empty frame. The ruled
+  // opening is the natural stand-in: same weight, no picture needed.
+  if (!lead.photo && coverType === 'coverFramed') coverType = 'coverRule';
+  slides.push({ type: coverType,
+    headline: lead.headline, stand: lead.stand, source: lead.source,
+    photo: PHOTO_COVERS.has(coverType) ? lead.photo : null });
 
   // 02 · hero — "a sentence carrying four or more figures is a table
   // read aloud and is skipped; a hero number needs a claim attached."
@@ -222,6 +235,7 @@ export function compose(rows, { now = null, carry = {}, endTs = null } = {}) {
 
   return {
     key: w.key,
+    template,
     window: `${hhmm(w.start)}–${hhmm(w.end - 1 + 1)}`,
     date: ddmmyy(w.start),
     stamp, quotes,
@@ -247,7 +261,7 @@ const MAX_STORIES = Number(process.env.MAX_STORIES || 3);
  * separate cursor, so telling an hour as stories never costs the
  * digest that will later summarise it.
  */
-export function composeStories(rows, { carry = {}, endTs = null } = {}) {
+export function composeStories(rows, { carry = {}, endTs = null, template = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
   const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
@@ -281,12 +295,14 @@ export function composeStories(rows, { carry = {}, endTs = null } = {}) {
     return out;
   };
 
-  // Grounds rotate down the set as well as archetypes: an hour whose
-  // three updates all happen to be plain headlines should still look
-  // like three boards, not one board three times. Seeded from the
-  // window so a replay reproduces itself.
-  const GROUNDS = ['ink', 'deep', 'slate', 'doc', 'flare'];
+  // Archetypes AND grounds rotate down the set: an hour whose three
+  // updates all happen to be plain headlines should still look like
+  // three boards, not one board three times. The two grounds come
+  // from the template, so a set is recognisably one hour's work while
+  // the next hour looks different.
+  const tpl = template ? byId(template) : null;
   const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const DARK = ['ink', 'deep', 'slate'];
 
   const slides = [];
   let prev = null;
@@ -294,10 +310,12 @@ export function composeStories(rows, { carry = {}, endTs = null } = {}) {
     const opts = options(p);
     const pick = opts.find(o => o.type !== prev) ?? opts[0];
     // The cover's photo bleeds behind a scrim mixed for a dark ground.
-    // On paper or on orange that scrim is a smear, so a board carrying
-    // a picture keeps a dark ground.
-    const pool = pick.photo ? GROUNDS.slice(0, 3) : GROUNDS;
-    slides.push({ ...pick, ground: pool[(seed + i) % pool.length] });
+    // On paper or on a colour field that scrim is a smear, so a board
+    // carrying a picture keeps a dark one.
+    const pal = pick.photo
+      ? DARK[(seed + i) % DARK.length]
+      : (tpl ? (i % 2 ? tpl.b : tpl.a) : DARK[(seed + i) % DARK.length]);
+    slides.push({ ...pick, palette: pal });
     prev = pick.type;
   }
 
@@ -305,6 +323,7 @@ export function composeStories(rows, { carry = {}, endTs = null } = {}) {
 
   return {
     key: `S:${w.key}`,
+    template,
     window: `${hhmm(w.start)}–${hhmm(w.end)}`,
     date: ddmmyy(w.start),
     stamp, quotes, slides,
