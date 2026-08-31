@@ -419,3 +419,16 @@ html,body{margin:0;padding:0;background:var(--bg)}
    lane, only the words beside it. */
 .slide[data-ofir="left"] .a-ce{padding-inline-end:0}
 .slide[data-ofir="left"] .a-ce .txt{padding-inline-end:var(--lane)}
+
+/* ── the Telegram strip ──────────────────────────────────────────
+   Printed on the news board itself, every sixth story. It is an
+   ADDRESS, not a button: Instagram's publishing API has no parameter
+   for a link sticker, so nothing here is tappable and the styling
+   does not imply otherwise. */
+.tg-strip{display:flex;align-items:center;gap:16px;justify-content:flex-end;
+  background:var(--acc);color:var(--bg);padding:14px 22px;margin-top:14px;position:relative;z-index:4}
+.tg-strip .tg-l{font-family:var(--f-mono);font-size:19px;font-weight:700;letter-spacing:.16em;opacity:.72}
+.tg-strip .tg-a{font-family:var(--f-mono);font-size:30px;font-weight:700;
+  direction:ltr;unicode-bidi:isolate;margin-inline-start:auto}
+.slide--story .tg-strip{padding:18px 26px;margin-top:18px}
+.slide--story .tg-strip .tg-a{font-size:36px}

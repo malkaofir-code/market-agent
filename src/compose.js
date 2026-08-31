@@ -333,27 +333,27 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
 
   if (!slides.length) return { ...nothing('thin'), slides };
 
-  // ── the Telegram card, every sixth board ──────────────────
+  // ── the Telegram strip, every sixth board ─────────────────
   //
-  // `tally` is how many boards have been told since the last card, and
-  // it survives between runs in Postgres — a set is only two or three
-  // boards, so a rule counted inside one set would fire either never
-  // or every time.
+  // Not a board of its own — the ask was for it ON the story — and
+  // not a link sticker either, because Instagram's publishing API has
+  // no parameter for one. Link stickers, polls and countdowns are all
+  // app-only; nothing written here can make a published story tappable.
+  // So the strip is the address, printed on the news board itself,
+  // where the tappable route is the profile and the bio link under it.
   //
-  // The card is an EXTRA board, not a replacement: an hour with three
-  // updates should still tell all three. It also carries no schedule
-  // list — a story is read in three seconds, and the address is the
-  // only thing anyone needs off it.
+  // `tally` is how many boards have been told since the last strip and
+  // it survives between runs in Postgres: a set is two or three boards,
+  // so a rule counted inside one set would fire either never or every
+  // single time.
   const every = Number(process.env.STORY_CTA_EVERY || 6);
-  const card = () => ({ type: 'telegram', big: 'הבית של סוחרי NQ & ES',
-    link: TG_LINK, schedule: [], palette: tpl ? tpl.a : 'ink' });
 
   const told = [];
   let t = tally;
   for (const s of slides) {
-    if (t >= every - 1) { told.push(card()); t = 0; }
-    told.push(s);
     t++;
+    told.push(t >= every ? { ...s, tgStrip: TG_LINK } : s);
+    if (t >= every) t = 0;
   }
 
   return {

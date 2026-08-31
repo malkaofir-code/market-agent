@@ -40,6 +40,19 @@ function tape(quotes, stamp) {
   return `<div class="tick">${cells}<i>${esc(stamp)}</i></div>`;
 }
 
+/**
+ * The Telegram strip — the channel address printed across the board.
+ *
+ * Instagram's publishing API cannot attach a link sticker, so this is
+ * not tappable and does not pretend to be: no arrow, no "swipe", no
+ * button shape. It is an address, set like an address, on the boards
+ * the rotation picks.
+ */
+function tgStrip(link) {
+  return `<div class="tg-strip"><span class="tg-l">TELEGRAM</span>
+<span class="tg-a">${esc(link)}</span></div>`;
+}
+
 // ── band D: footnote ─────────────────────────────────────────
 function foot(i, n, src) {
   return `<footer class="sl-ft"><span class="ft-ix">${pad2(i)}/${pad2(n)}</span>
@@ -322,7 +335,7 @@ export function buildSlide(slide, ctx, i, n, { story = false } = {}) {
   // times: he changes sides down the set.
   const alt = story && i % 2 === 1 ? ' of-alt' : '';
   return `<div class="slide${story ? ' slide--story' + alt : ''}${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${oa}><div class="bgm"></div>${coverLayer(slide)}
-${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window, ofirSide: side })}${ofirLayer(slide, ctx, i)}</main>${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
+${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window, ofirSide: side })}${ofirLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }
 
