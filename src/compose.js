@@ -230,7 +230,7 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
 
   // 06 · telegram CTA — 23:00 deck only
   if (isCta) slides.push({ type: 'telegram', big: 'הבית של סוחרי NQ & ES',
-    link: 't.me/nq_es_hunters',
+    link: TG_LINK,
     schedule: [
       { time: '08:00', label: 'סקירת בוקר' }, { time: '15:00', label: 'טרום־פתיחה' },
       { time: '18:00', label: 'סקירת פתיחה' }, { time: '23:00', label: 'סיכום יום' }] });
@@ -257,6 +257,9 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
 
 const MAX_STORIES = Number(process.env.MAX_STORIES || 3);
 
+/** The channel the account points at, in one place. */
+export const TG_LINK = 't.me/nq_es_hunters';
+
 /**
  * The same hour, told as stories instead of summarised as a post.
  *
@@ -270,7 +273,7 @@ const MAX_STORIES = Number(process.env.MAX_STORIES || 3);
  * separate cursor, so telling an hour as stories never costs the
  * digest that will later summarise it.
  */
-export function composeStories(rows, { carry = {}, endTs = null, template = null } = {}) {
+export function composeStories(rows, { carry = {}, endTs = null, template = null, tally = 0 } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
   const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
@@ -330,12 +333,36 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
 
   if (!slides.length) return { ...nothing('thin'), slides };
 
+  // ── the Telegram card, every sixth board ──────────────────
+  //
+  // `tally` is how many boards have been told since the last card, and
+  // it survives between runs in Postgres — a set is only two or three
+  // boards, so a rule counted inside one set would fire either never
+  // or every time.
+  //
+  // The card is an EXTRA board, not a replacement: an hour with three
+  // updates should still tell all three. It also carries no schedule
+  // list — a story is read in three seconds, and the address is the
+  // only thing anyone needs off it.
+  const every = Number(process.env.STORY_CTA_EVERY || 6);
+  const card = () => ({ type: 'telegram', big: 'הבית של סוחרי NQ & ES',
+    link: TG_LINK, schedule: [], palette: tpl ? tpl.a : 'ink' });
+
+  const told = [];
+  let t = tally;
+  for (const s of slides) {
+    if (t >= every - 1) { told.push(card()); t = 0; }
+    told.push(s);
+    t++;
+  }
+
   return {
     key: `S:${w.key}`,
     template,
+    tally: t,
     window: `${hhmm(w.start)}–${hhmm(w.end)}`,
     date: ddmmyy(w.start),
-    stamp, quotes, slides,
+    stamp, quotes, slides: told,
     // Every message in the window is marked, not just the three that
     // were told — otherwise the two that lost would resurface as the
     // "latest" news an hour after they stopped being it.

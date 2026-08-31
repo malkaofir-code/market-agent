@@ -38,6 +38,10 @@ const CARRY_KEY = 'tape-carry';
 // template, which is exactly the repetition the rotation exists to
 // prevent — the two appear side by side on the profile.
 const TPL_KEY = 'template-recent';
+// Boards told since the last Telegram card. A set is two or three
+// boards, so "every sixth" only means anything if the count survives
+// between runs.
+const TALLY_KEY = 'story-tally';
 
 /**
  * The next look, and the promise not to reuse it.
@@ -167,8 +171,9 @@ async function runStories() {
   if (!DRY && told >= cap) { say(`SKIP — story cap reached (${told}/${cap})`); return; }
 
   const { t: tpl, recent: tplRecent } = await nextTemplate(`S:${w.key}`);
+  const tally = Number((await getState(TALLY_KEY)) ?? 0);
   const deck = composeStories(rows, {
-    carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end, template: tpl.id });
+    carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end, template: tpl.id, tally });
   const consumed = deck.consumed.map(Number);
   if (deck.skip) {
     say('SKIP —', w.key, `(${deck.skip})`);
@@ -237,6 +242,9 @@ async function runStories() {
 
   if (posted) {
     await keepTemplate(tplRecent, tpl.id);
+    // Only after something actually went up — a set that failed on its
+    // first board must not push the card an hour further away.
+    if (deck.tally != null) await setState(TALLY_KEY, deck.tally);
     await setWindow({ key: deck.key, status: 'posted', slides: posted,
       posted_at: Math.floor(Date.now() / 1000),
       error: failure ? `${posted}/${urls.length}: ${failure.message}` : null });
