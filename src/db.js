@@ -114,10 +114,25 @@ export const getWindow = key =>
 // does not open the minimum gap — otherwise one story at :16 would
 // silence the digest that follows it. The 'S:' prefix is what keeps
 // the two ledgers apart in one table.
+// ── the daily caps ───────────────────────────────────────────
+//
+// "Per day" means the calendar day in Israel, not a rolling 24 hours.
+//
+// The rolling version looks equivalent and is not. On 31 August the
+// story track ran hourly at three boards a set — thirty boards. The
+// next morning it ran at one board every ninety minutes under a cap
+// of fourteen, and every single tick skipped: yesterday's thirty were
+// still inside the trailing window and would stay there until
+// midnight. A whole day of stories was lost to a cadence change that
+// had already been made. A cap that counts today can only ever be
+// spent by today.
+const DAY_START = `extract(epoch from date_trunc('day', now() at time zone $tz) at time zone $tz)::bigint`
+  .replace(/\$tz/g, `'${(process.env.TZ || 'Asia/Jerusalem').replace(/'/g, "''")}'`);
+
 export const postsToday = () =>
   q(`select count(*)::int n from agent.windows
      where status='posted' and key not like 'S:%'
-       and posted_at > extract(epoch from now())::bigint - 86400`)
+       and posted_at >= ${DAY_START}`)
     .then(r => r.rows[0].n);
 
 export const lastPostAt = () =>
@@ -133,7 +148,7 @@ export const lastStoryAt = () =>
 export const storiesToday = () =>
   q(`select coalesce(sum(slides),0)::int n from agent.windows
      where status='posted' and key like 'S:%'
-       and posted_at > extract(epoch from now())::bigint - 86400`)
+       and posted_at >= ${DAY_START}`)
     .then(r => r.rows[0].n);
 
 // Only outcomes from the last `sinceMin` minutes count toward the
