@@ -25,6 +25,28 @@ const fmt = (ts, o) => new Intl.DateTimeFormat('en-GB',
   { timeZone: TZ, hour12: false, ...o }).format(new Date(ts * 1000));
 const hhmm = ts => fmt(ts, { hour: '2-digit', minute: '2-digit' });
 const ddmmyy = ts => fmt(ts, { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '.');
+const dmy = ts => fmt(ts, { day: '2-digit', month: '2-digit' }).replace(/\//g, '.');
+const localDay = ts => fmt(ts, { year: 'numeric', month: '2-digit', day: '2-digit' })
+  .split('/').reverse().join('-');
+
+/**
+ * What the masthead claims the deck covers.
+ *
+ * A digest is stamped from its window's START, which is right while a
+ * deck is one hour long and wrong the moment windows merge. The
+ * morning deck picks up where the evening one stopped — 21:15 the
+ * night before — so it went out on 1 September announcing itself as
+ * 31.08, and read as yesterday's paper. A post is dated the day it is
+ * PUBLISHED; the span says how far back it reaches.
+ */
+const daysBack = w => Math.round(
+  (Date.parse(localDay(w.end)) - Date.parse(localDay(w.start))) / 86400000);
+const span = w => {
+  const d = daysBack(w);
+  if (d <= 0) return `${hhmm(w.start)}\u2013${hhmm(w.end)}`;
+  if (d === 1) return `\u05de\u05d0\u05de\u05e9 ${hhmm(w.start)}\u2013${hhmm(w.end)}`;
+  return `${dmy(w.start)} ${hhmm(w.start)}\u2013${hhmm(w.end)}`;
+};
 
 /** Window key + bounds for any instant, snapped to the WIN grid. */
 export function windowOf(ts) {
@@ -157,7 +179,16 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
 
   // §04: "a story cannot appear on both the cover and a card" —
   // each message is consumed exactly once across the deck.
-  const pool = [...parsed].sort((a, b) => b.score - a.score || a.ts - b.ts);
+  // A merged window can span half a day, and raw score then hands the
+  // cover to whatever scored highest anywhere in it — which on the
+  // morning deck is last night. Age is worth a point: a story sheds
+  // one point for every SCORE_DECAY_HOURS between it and the close of
+  // the window, so this morning takes a tie and last night has to be
+  // genuinely bigger to lead. Ties break newest-first for the same
+  // reason.
+  const decay = Number(process.env.SCORE_DECAY_HOURS || 4);
+  const fresh = p => p.score - (w.end - p.ts) / 3600 / decay;
+  const pool = [...parsed].sort((a, b) => fresh(b) - fresh(a) || b.ts - a.ts);
   const used = new Set();
   const take = pred => {
     const hit = pool.find(p => !used.has(p.tg_id) && pred(p));
@@ -175,7 +206,19 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   // the card silently stopped appearing. The window's END is the
   // stable thing: the evening digest always closes on the 21:15
   // boundary.
-  const isCta = hhmm(w.end).startsWith('21');
+  // Which of the three daily decks this is.
+  //
+  // This used to be read off the window's END. That was right only
+  // while a digest covered exactly one hour: the morning deck merges
+  // forward until it has a full deck — through to 11:15 on 1 September
+  // — so the 08:xx test never fired, the morning post lost its
+  // question cover, and the evening test would go the same way on a
+  // quiet night. The slot is a property of WHEN THE DECK GOES OUT, not
+  // of wherever the merge happened to stop.
+  const at = now ?? Math.floor(Date.now() / 1000);
+  const hour = Number(fmt(at, { hour: '2-digit' }));
+  const slot = hour < 12 ? 'morning' : hour < 19 ? 'afternoon' : 'evening';
+  const isCta = slot === 'evening';
   const cap = isCta ? MAX_CTA : MAX;
 
   // 01 · cover — highest score, not most recent.
@@ -199,7 +242,7 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   // deck carries the Telegram card instead; the afternoon one is
   // straight news, half an hour before the US bell, when a reader
   // wants the fact and not a riddle.
-  const asks = hhmm(w.end).startsWith('08');
+  const asks = slot === 'morning';
   const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
   slides.push({ type: coverType,
     // When the lead carries a number, the eyebrow IS the number — so
@@ -296,8 +339,8 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   return {
     key: w.key,
     template,
-    window: `${hhmm(w.start)}–${hhmm(w.end - 1 + 1)}`,
-    date: ddmmyy(w.start),
+    window: span(w),
+    date: ddmmyy(w.end),
     stamp, quotes,
     slides: slides.slice(0, cap),
     caption: caption(parsed, w),
@@ -411,8 +454,8 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
     key: `S:${w.key}`,
     template,
     tally: t,
-    window: `${hhmm(w.start)}–${hhmm(w.end)}`,
-    date: ddmmyy(w.start),
+    window: span(w),
+    date: ddmmyy(w.end),
     stamp, quotes, slides: told,
     // Every message in the window is marked, not just the three that
     // were told — otherwise the two that lost would resurface as the
@@ -489,7 +532,7 @@ export function caption(parsed, w) {
     .filter((t, i, a) => a.indexOf(t) === i).slice(0, 5)
     .map(t => '#' + t).join(' ');
 
-  const foot = `\nעדכון ${hhmm(w.start)}–${hhmm(w.end)} · @marketalert.il\n${tags}`;
+  const foot = `\nעדכון ${span(w)} · @marketalert.il\n${tags}`;
   const head = opener + parsed[0].headline + '\n';
 
   // Whole stories, never a half one. Slicing at 2200 cut mid-word on
