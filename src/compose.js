@@ -400,8 +400,14 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
   // two hours of headlines, then one that reads the number or the
   // meaning behind it. The turn comes from the hour itself, so it
   // advances without anything having to be remembered between runs.
-  const turn = Math.floor(w.start / 3600) % 3;
-  const seasoned = turn === 2;
+  const hourNo = Math.floor(w.start / 3600);
+  const seasoned = hourNo % 3 === 2;
+  // Among the seasoned hours, alternate which one it is. Preferring
+  // the figure every time would bury the meaning board again — most
+  // updates carry a number, so it would always win and the
+  // interpretation would show up about as often as it did before,
+  // which is to say never.
+  const prefersFigure = Math.floor(hourNo / 3) % 2 === 0;
 
   const options = p => {
     const out = [];
@@ -414,15 +420,35 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
     const news = { type: 'cover', eyebrow: catchup ? hhmm(p.ts) : 'עכשיו',
       headline: p.headline, stand: p.stand, source: p.source, photo: p.photo };
     if (!seasoned) out.push(news);
-    if (fig && p.figureCount < 4)
-      out.push({ type: 'hero', figure: fig.text.replace(/[−־]/g, '-'),
-        dir: direction(fig.text, `${p.headline} ${p.stand ?? ''}`),
-        quote: p.stand || p.headline, source: p.source });
+    const hero = fig && p.figureCount < 4
+      ? { type: 'hero', figure: fig.text.replace(/[−־]/g, '-'),
+          dir: direction(fig.text, `${p.headline} ${p.stand ?? ''}`),
+          quote: p.stand || p.headline, source: p.source }
+      : null;
+    if (hero && prefersFigure) out.push(hero);
     // Even the meaning board names the story it is about. It has always
     // had the slot for it and was never given one, so a reader who met
     // the account on an interpretation board got a verdict about news
     // they had never been told.
-    if (p.note) out.push({ type: 'note', about: p.headline, text: p.note, source: p.source });
+    // The board shows its working. A verdict with nothing under it is
+    // an opinion; the same verdict with the reported facts above it is
+    // an argument the reader can check and disagree with. Everything
+    // here comes from the message itself — the headline it is about,
+    // the reporting lines beneath it, and the figure if the update
+    // carried a clean one. Nothing is inferred.
+    if (p.note) {
+      const basis = p.reporting.slice(0, 2);
+      const fg = p.figures.length && p.figureCount < 4
+        ? p.figures[0].text.replace(/[−־]/g, '-') : null;
+      // Pulled out only when it is not already sitting in the line
+      // underneath it — otherwise the board says 41% twice, once big
+      // and once mid-sentence, and reads as a stutter rather than a
+      // headline number.
+      const stat = fg && !basis.some(b => b.includes(fg)) ? fg : null;
+      out.push({ type: 'note', about: p.headline, text: p.note,
+        basis, stat, source: p.source });
+    }
+    if (hero && !prefersFigure) out.push(hero);
     // Always last as well, so a seasoned hour with neither a figure
     // nor a note still has news to fall back on.
     if (seasoned) out.push(news);

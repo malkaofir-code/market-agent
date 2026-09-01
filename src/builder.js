@@ -148,6 +148,11 @@ const ARCHETYPES = {
   // 04 · interpretation — the one heavy frame in the system.
   note: s => `<div class="a-nt"><p class="eyeb">MEANING · משמעות</p>
     ${s.about ? `<p class="abt">${bidi(s.about)}</p>` : ''}
+    ${(s.basis?.length || s.stat) ? `<div class="why">
+      <p class="why-k">מה דווח</p>
+      ${s.stat ? `<p class="why-n">${bidi(s.stat)}</p>` : ''}
+      ${(s.basis ?? []).map(b => `<p class="why-l">${bidi(b)}</p>`).join('')}
+    </div>` : ''}
     <p class="txt">${bidi(s.text)}</p>
     <p class="dis">${bidi(s.disclaimer || 'פרשנות, לא המלצה.')}</p></div>`,
 

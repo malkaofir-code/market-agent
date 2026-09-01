@@ -146,6 +146,16 @@ html,body{margin:0;padding:0;background:var(--bg)}
   border-bottom:1.5px solid var(--rule);line-height:1.34}
 .a-nt .txt{font-size:60px;font-weight:800;line-height:1.32;margin:0;letter-spacing:-.015em;max-width:21ch;
   border-inline-start:9px solid var(--acc);padding-inline-start:34px}
+/* The working, between the story and the verdict: what was reported,
+   set quieter and smaller than the meaning it leads into, so the eye
+   still lands on the conclusion but can walk back up to the evidence. */
+.a-nt .why{margin:0;display:flex;flex-direction:column;gap:12px}
+.a-nt .why-k{font-family:var(--f-mono);font-size:22px;letter-spacing:.09em;
+  color:var(--dim);margin:0;text-transform:uppercase}
+.a-nt .why-n{font-family:var(--f-mono);font-size:52px;font-weight:700;color:var(--acc);
+  margin:0;line-height:1;direction:ltr;unicode-bidi:isolate;align-self:flex-start}
+.a-nt .why-l{font-size:30px;line-height:1.4;color:var(--dim2);margin:0;max-width:34ch;
+  padding-inline-start:22px;border-inline-start:2px solid var(--rule)}
 .a-nt .dis{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:0}
 
 /* ── 05 · tape chart ── */
