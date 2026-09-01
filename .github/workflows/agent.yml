@@ -111,7 +111,16 @@ jobs:
           # buys nothing until there is an audience to retain; the
           # spacing is set by the cron, this is the belt.
           MAX_STORIES: '1'
-          MIN_MINUTES_BETWEEN_STORIES: '80'
+          # The rail against a DOUBLE DISPATCH, not a second opinion on
+          # the cadence — the cron already sets the ninety minutes.
+          #
+          # It was 80, which left ten minutes of slack against a
+          # ninety-minute rhythm, and any story told off-cycle spends
+          # that slack: the catch-up posted at 13:28, so the 14:46 tick
+          # landed 78 minutes later and skipped by two. Sixty keeps a
+          # doubled dispatch out while leaving half an hour of margin
+          # for the clock to drift into.
+          MIN_MINUTES_BETWEEN_STORIES: '60'
           MAX_STORIES_PER_DAY: '14'
           # A story is about the hour it belongs to. More than two
           # windows behind and it is news, not "now".
