@@ -129,10 +129,34 @@ export async function publish(urls, caption, { dryRun = false } = {}) {
     return { id: one, permalink: link ?? null };
   }
 
+  // Meta fetches each URL itself, and that fetch fails from time to
+  // time on a URL it accepted a moment earlier — 2207052 is what it
+  // says when it could not read one, whatever the reason. preflight()
+  // has already proved every URL serves an image, so a refusal here is
+  // Meta's side of the wire, not ours: retry the child before losing
+  // the window, and if it still refuses, say WHICH slide it was
+  // instead of making the next person guess from ten identical URLs.
   const children = [];
-  for (const image_url of urls) {
-    const { id } = await call(`/${ig}/media`, { image_url, is_carousel_item: 'true' });
-    children.push(id);
+  for (const [i, image_url] of urls.entries()) {
+    let made = null, last = null;
+    for (let attempt = 0; attempt < 3 && !made; attempt++) {
+      if (attempt) await sleep(4000 * attempt);
+      try {
+        made = await call(`/${ig}/media`, { image_url, is_carousel_item: 'true' });
+      } catch (e) {
+        last = e;
+        if (!/2207052|9004/.test(e.message)) throw e;
+        console.warn(`  slide ${i + 1}/${urls.length} refused (${e.message}) — retry ${attempt + 1}/2`);
+      }
+    }
+    if (!made) {
+      const seen = await fetch(image_url, { headers: { range: 'bytes=0-0' } })
+        .then(r => `${r.status} ${r.headers.get('content-type')} len=${r.headers.get('content-range') ?? '?'}`)
+        .catch(e => `unreachable: ${e.message}`);
+      throw new Error(`slide ${i + 1}/${urls.length} refused by Meta after 3 tries `
+        + `— ${last.message} · url now serves: ${seen} · ${image_url}`);
+    }
+    children.push(made.id);
   }
   await Promise.all(children.map(id => ready(id)));
 
