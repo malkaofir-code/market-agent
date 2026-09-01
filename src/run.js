@@ -33,6 +33,30 @@ const DRY = process.argv.includes('--dry') || process.env.DRY_RUN === '1';
 const STORIES = process.argv.includes('--stories') || process.env.MODE === 'stories';
 // Scheduled ticks render for review only; publishing needs a person.
 const REVIEW = process.env.REVIEW === '1';
+// Telling an hour late, on purpose.
+//
+// The story track drops any hour it did not tell at the time — that
+// is the design, and it is right: a story is about the hour it
+// belongs to. But when the track itself was the thing that broke, the
+// day's news was never told at all, and dropping it a second time
+// just to honour a rule about timeliness serves nobody. Catch-up is
+// therefore explicit and never scheduled: it reaches back to this
+// morning, not into last week, and every board it makes is stamped
+// with the hour it is ABOUT rather than announcing itself as "now".
+const CATCHUP = process.env.CATCHUP === '1';
+
+/** Local midnight, in unix seconds — the floor a catch-up reaches to. */
+function dayStart() {
+  const tz = process.env.TZ || 'Asia/Jerusalem';
+  const [d, m, y] = new Intl.DateTimeFormat('en-GB', { timeZone: tz,
+    day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date()).split('/');
+  // Midnight local, found by asking what UTC instant wears that wall clock.
+  const guess = Date.parse(`${y}-${m}-${d}T00:00:00Z`) / 1000;
+  const offMin = (guess - Math.floor(Date.parse(
+    new Intl.DateTimeFormat('sv-SE', { timeZone: tz, dateStyle: 'short', timeStyle: 'medium' })
+      .format(new Date(guess * 1000)).replace(' ', 'T') + 'Z') / 1000));
+  return guess + offMin;
+}
 const CARRY_KEY = 'tape-carry';
 // One shared memory across BOTH tracks. Separate lists would let an
 // hour's stories and the digest that follows them land on the same
@@ -155,43 +179,50 @@ async function runStories() {
   // a backlog of weeks and advanced one hour per hour — it would have
   // spent a fortnight walking through August and never once reached
   // today. That is why the first day of stories posted nothing at all.
-  const cutoff = nowWindow - maxBehind * WIN * 60;
+  // Catch-up still retires — just at a different line. Yesterday and
+  // everything before it is gone either way; what it spares is the
+  // hours of TODAY that the track owed and never delivered.
+  const cutoff = CATCHUP ? dayStart() : nowWindow - maxBehind * WIN * 60;
   const retired = await retireStories(cutoff);
   if (retired) say(`retired ${retired} message(s) older than the story window`);
 
   const oldest = await oldestUnstoriedBefore(nowWindow);
-  if (oldest == null) { say('SKIP — nothing unstoried'); return; }
+  if (oldest == null) { say('SKIP — nothing unstoried'); return 'none'; }
 
   const w = windowOf(Number(oldest));
 
   const rows = await storyMessagesIn(w.start, w.end);
-  if (!rows.length) { say(`SKIP — ${w.key} has nothing unstoried`); return; }
+  if (!rows.length) { say(`SKIP — ${w.key} has nothing unstoried`); return 'none'; }
 
   const cap = Number(process.env.MAX_STORIES_PER_DAY || 40);
   const told = await storiesToday();
-  if (!DRY && told >= cap) { say(`SKIP — story cap reached (${told}/${cap})`); return; }
+  if (!DRY && told >= cap) { say(`SKIP — story cap reached (${told}/${cap})`); return 'none'; }
 
   // The cron sets the ninety-minute rhythm; this is the belt that
   // holds it if a dispatch fires twice or a catch-up run lands early.
-  const gap = Number(process.env.MIN_MINUTES_BETWEEN_STORIES || 0);
+  // The gap is the cron's ninety minutes held in code. A catch-up is
+  // deliberately telling several hours in one sitting, so the rail
+  // that exists to stop that is the one thing it must not obey.
+  const gap = CATCHUP ? 0 : Number(process.env.MIN_MINUTES_BETWEEN_STORIES || 0);
   if (!DRY && gap) {
     const last = await lastStoryAt();
     const since = last ? Math.round((Date.now() / 1000 - last) / 60) : null;
     if (since != null && since < gap) {
       say(`SKIP — only ${since}min since the last story (min ${gap})`);
-      return;
+      return 'none';
     }
   }
 
   const { t: tpl, recent: tplRecent } = await nextTemplate(`S:${w.key}`);
   const tally = Number((await getState(TALLY_KEY)) ?? 0);
   const deck = composeStories(rows, {
-    carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end, template: tpl.id, tally });
+    carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end, template: tpl.id, tally,
+    catchup: CATCHUP });
   const consumed = deck.consumed.map(Number);
   if (deck.skip) {
     say('SKIP —', w.key, `(${deck.skip})`);
     await markStoried(deck.key ?? `S:${w.key}`, consumed);
-    return;
+    return 'done';
   }
   // The carry is the tape's running level and belongs to whichever
   // track saw the snapshot last — both write it, and both are right.
@@ -209,7 +240,7 @@ async function runStories() {
     await markStoried(deck.key, consumed);
     await upsertWindow(deck.key, w.start, w.end);
     await setWindow({ key: deck.key, status: 'review', slides: files.length });
-    return;
+    return 'done';
   }
 
   const { upload, remove, publishStory } = await import('./publish/api.js');
@@ -251,7 +282,7 @@ async function runStories() {
     await remove(files, prefix);
   }
 
-  if (DRY) { say(`DRY RUN OK — ${files.length} stories built`); return; }
+  if (DRY) { say(`DRY RUN OK — ${files.length} stories built`); return 'done'; }
 
   if (posted) {
     await keepTemplate(tplRecent, tpl.id);
@@ -272,7 +303,9 @@ async function runStories() {
     await logRun(deck.key, 'stories', false, failure?.message ?? 'nothing posted');
     await notify(`❌ stories ${deck.key}\n${failure?.message ?? 'nothing posted'}`);
     process.exitCode = 1;
+    return 'failed';
   }
+  return 'done';
 }
 
 async function main() {
@@ -302,7 +335,20 @@ async function main() {
 
   // The story track shares the kill switch, the active hours and the
   // failure latch above, and nothing else: its own cap lives inside.
-  if (STORIES) return runStories();
+  if (STORIES && !CATCHUP) return runStories();
+  if (STORIES) {
+    // One window per run is the normal rhythm; a catch-up walks the
+    // day until it runs out of untold hours or hits the daily cap,
+    // whichever comes first. The guard is the number of windows in a
+    // day, so a bug here costs one wasted run and not an afternoon of
+    // stories.
+    say('CATCH-UP — telling every hour of today the track still owes');
+    for (let i = 0; i < 24; i++) {
+      const r = await runStories();
+      if (r !== 'done') { say(`catch-up stopped after ${i} set(s) — ${r}`); return; }
+    }
+    say('catch-up hit its 24-window guard'); return;
+  }
 
   // Three digests a day, not one an hour — stories carry the hour now,
   // and a digest that repeats them an hour later is the same news

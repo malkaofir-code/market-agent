@@ -59,6 +59,10 @@ on:
         description: 'Ignore the digest schedule and post this one now'
         type: boolean
         default: false
+      catchup:
+        description: 'stories only: tell every hour of TODAY the track still owes, back to back'
+        type: boolean
+        default: false
 
 # Never let two ticks overlap - they would fight over the same window.
 concurrency:
@@ -118,6 +122,8 @@ jobs:
           # thinks in UTC and Israel changes its clocks twice a year.
           DIGEST_HOURS: '8,15,21'
           IGNORE_SCHEDULE: ${{ inputs.now && '1' || '0' }}
+          # Never set by the cron — a catch-up is always a decision.
+          CATCHUP: ${{ inputs.catchup && '1' || '0' }}
           # A digest now covers everything since the last one, so the
           # merge-forward should never stop early: it absorbs every
           # closed window up to the one still filling.

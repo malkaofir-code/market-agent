@@ -367,7 +367,7 @@ export const TG_LINK = 't.me/nq_es_hunters';
  * separate cursor, so telling an hour as stories never costs the
  * digest that will later summarise it.
  */
-export function composeStories(rows, { carry = {}, endTs = null, template = null, tally = 0 } = {}) {
+export function composeStories(rows, { carry = {}, endTs = null, template = null, tally = 0, catchup = false } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
   const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
@@ -396,7 +396,12 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
         dir: direction(fig.text, `${p.headline} ${p.stand ?? ''}`),
         quote: p.stand || p.headline, source: p.source });
     if (p.note) out.push({ type: 'note', text: p.note, source: p.source });
-    out.push({ type: 'cover', eyebrow: 'עכשיו', headline: p.headline,
+    // A board told at the time says "now"; a board told late says the
+    // hour it is about. The masthead carries the span either way, but
+    // the eyebrow is the word a reader takes on trust, and a catch-up
+    // that still says "now" is the one thing that would make the
+    // track dishonest rather than merely late.
+    out.push({ type: 'cover', eyebrow: catchup ? hhmm(p.ts) : 'עכשיו', headline: p.headline,
       stand: p.stand, source: p.source, photo: p.photo });
     return out;
   };
