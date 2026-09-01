@@ -384,25 +384,48 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
   const picks = [...parsed].sort((a, b) => b.score - a.score || b.ts - a.ts)
     .slice(0, MAX_STORIES);
 
-  // Each update is offered as whichever archetypes it can support, in
-  // order of preference — then the set is dealt so that two boards
-  // running never use the same one. Three heroes in a row is a viewer
-  // tapping through the same picture three times.
+  // Which board an update gets.
+  //
+  // THE HEADLINE LEADS. This list used to open with the figure and the
+  // interpretation and leave the news last, which was survivable while
+  // a set was three boards — you got a number, a meaning and a
+  // headline, and the mix read as an hour's work. At ONE board a set
+  // the order stopped being a preference and became a verdict, and it
+  // always fell the same way: a note is worth four of the seven points
+  // a message can score, so the top-scored update almost always
+  // carries one, and every story on the account came out
+  // MEANING · משמעות. Four in a row, and no news at all.
+  //
+  // So the news board is the default and the other two are seasoning:
+  // two hours of headlines, then one that reads the number or the
+  // meaning behind it. The turn comes from the hour itself, so it
+  // advances without anything having to be remembered between runs.
+  const turn = Math.floor(w.start / 3600) % 3;
+  const seasoned = turn === 2;
+
   const options = p => {
     const out = [];
     const fig = p.figures?.[0];
-    if (fig && p.figureCount < 4)
-      out.push({ type: 'hero', figure: fig.text.replace(/[−־]/g, '-'),
-        dir: direction(fig.text, `${p.headline} ${p.stand ?? ''}`),
-        quote: p.stand || p.headline, source: p.source });
-    if (p.note) out.push({ type: 'note', text: p.note, source: p.source });
     // A board told at the time says "now"; a board told late says the
     // hour it is about. The masthead carries the span either way, but
     // the eyebrow is the word a reader takes on trust, and a catch-up
     // that still says "now" is the one thing that would make the
     // track dishonest rather than merely late.
-    out.push({ type: 'cover', eyebrow: catchup ? hhmm(p.ts) : 'עכשיו', headline: p.headline,
-      stand: p.stand, source: p.source, photo: p.photo });
+    const news = { type: 'cover', eyebrow: catchup ? hhmm(p.ts) : 'עכשיו',
+      headline: p.headline, stand: p.stand, source: p.source, photo: p.photo };
+    if (!seasoned) out.push(news);
+    if (fig && p.figureCount < 4)
+      out.push({ type: 'hero', figure: fig.text.replace(/[−־]/g, '-'),
+        dir: direction(fig.text, `${p.headline} ${p.stand ?? ''}`),
+        quote: p.stand || p.headline, source: p.source });
+    // Even the meaning board names the story it is about. It has always
+    // had the slot for it and was never given one, so a reader who met
+    // the account on an interpretation board got a verdict about news
+    // they had never been told.
+    if (p.note) out.push({ type: 'note', about: p.headline, text: p.note, source: p.source });
+    // Always last as well, so a seasoned hour with neither a figure
+    // nor a note still has news to fall back on.
+    if (seasoned) out.push(news);
     return out;
   };
 
