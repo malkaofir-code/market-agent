@@ -15,7 +15,7 @@ import { join } from 'path';
 import 'dotenv/config';
 import {
   putMessages, messagesIn, messagesInAll, oldestUnconsumedBefore, markConsumed,
-  storyMessagesIn, oldestUnstoriedBefore, markStoried, storiesToday, retireStories,
+  storyMessagesIn, oldestUnstoriedBefore, markStoried, storiesToday, retireStories, unretireStoriesSince,
   lastStoryAt,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   logRun, getState, setState, getToken, setToken, close,
@@ -44,6 +44,7 @@ const REVIEW = process.env.REVIEW === '1';
 // morning, not into last week, and every board it makes is stamped
 // with the hour it is ABOUT rather than announcing itself as "now".
 const CATCHUP = process.env.CATCHUP === '1';
+let recovered = false;   // the catch-up recovers once, not once per window
 
 /** Local midnight, in unix seconds — the floor a catch-up reaches to. */
 function dayStart() {
@@ -182,6 +183,16 @@ async function runStories() {
   // Catch-up still retires — just at a different line. Yesterday and
   // everything before it is gone either way; what it spares is the
   // hours of TODAY that the track owed and never delivered.
+  // Today's hours were discarded by the very ticks that could not
+  // publish them, so they are sitting in the table marked retired.
+  // Hand them back before anything else looks for work — otherwise a
+  // catch-up would faithfully find nothing to catch up on.
+  if (CATCHUP && !recovered) {
+    recovered = true;
+    const back = await unretireStoriesSince(dayStart());
+    if (back) say(`recovered ${back} message(s) the failed ticks had retired`);
+  }
+
   const cutoff = CATCHUP ? dayStart() : nowWindow - maxBehind * WIN * 60;
   const retired = await retireStories(cutoff);
   if (retired) say(`retired ${retired} message(s) older than the story window`);

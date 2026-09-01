@@ -93,6 +93,18 @@ export const markStoried = (key, ids) =>
  * the middle of August. Stories are about now; the past is the
  * digest's job, and it has already told it.
  */
+/**
+ * Give a discarded hour back to the story track.
+ *
+ * Only ever touches rows the track itself threw away — a told hour
+ * carries its window key in story_of, never 'S:retired' — and only
+ * from `sinceTs` forward, so a catch-up can recover this morning
+ * without reopening August. Called from the catch-up path alone.
+ */
+export const unretireStoriesSince = sinceTs =>
+  q(`update agent.messages set story_of = null
+     where story_of = 'S:retired' and ts >= $1`, [sinceTs]).then(r => r.rowCount);
+
 export const retireStories = beforeTs =>
   q(`update agent.messages set story_of = 'S:retired'
      where story_of is null and ts < $1`, [beforeTs]).then(r => r.rowCount);
