@@ -158,6 +158,17 @@ html,body{margin:0;padding:0;background:var(--bg)}
   padding-inline-start:22px;border-inline-start:2px solid var(--rule)}
 .a-nt .dis{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:0}
 
+/* ── 08 · the ask ── */
+.a-ask .big{font-family:var(--f-disp);font-size:72px;font-weight:800;line-height:1.12;
+  letter-spacing:-.03em;margin:0;max-width:17ch}
+.a-ask .acts{display:flex;flex-direction:column;gap:26px;margin-top:6px}
+.a-ask .act{display:grid;grid-template-columns:66px 1fr;align-items:center;gap:24px;
+  padding-top:26px;border-top:1.5px solid var(--rule)}
+.a-ask .ai{font-family:var(--f-mono);font-size:40px;font-weight:700;color:var(--acc);
+  text-align:center;direction:ltr;unicode-bidi:isolate}
+.a-ask .al{font-size:34px;font-weight:600;line-height:1.3;margin:0}
+.a-ask .afoot{font-family:var(--f-mono);font-size:24px;color:var(--dim);margin:0}
+
 /* ── 05 · tape chart ── */
 .a-ch h2{font-family:var(--f-disp);font-weight:800;font-size:58px;letter-spacing:-.028em;margin:0}
 .a-ch .bars{display:flex;flex-direction:column;gap:30px;margin-top:10px}
@@ -260,6 +271,7 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide[data-type="chart"] {--ron-w:340px; --ron-h:480px; --lane:325px}
 .slide[data-type="watch"] {--ron-w:390px; --ron-h:600px; --lane:365px}
 .slide[data-type="telegram"]{--ron-w:430px; --ron-h:700px; --lane:395px}
+.slide[data-type="ask"]   {--ron-w:360px; --ron-h:560px; --lane:340px}
 
 .slide[data-type="coverFramed"] .ron,
 .slide[data-type="cover"] .ron{right:-44px}
@@ -268,6 +280,7 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide[data-type="chart"] .ron{left:-26px}
 .slide[data-type="watch"] .ron{left:-40px}
 .slide[data-type="telegram"] .ron{left:-46px}
+.slide[data-type="ask"]   .ron{left:-38px}
 
 
 /* ── making room for him ─────────────────────────────────────────

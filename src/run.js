@@ -16,6 +16,7 @@ import 'dotenv/config';
 import {
   putMessages, messagesIn, messagesInAll, oldestUnconsumedBefore, markConsumed,
   storyMessagesIn, oldestUnstoriedBefore, markStoried, storiesToday, retireStories, unretireStoriesSince,
+  setPublished, publishedSince, putInsight, performanceBy,
   lastStoryAt,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   logRun, getState, setState, getToken, setToken, close,
@@ -31,6 +32,7 @@ const DRY = process.argv.includes('--dry') || process.env.DRY_RUN === '1';
 // read the same messages through separate cursors, so neither one
 // starves the other.
 const STORIES = process.argv.includes('--stories') || process.env.MODE === 'stories';
+const INSIGHTS = process.argv.includes('--insights') || process.env.MODE === 'insights';
 // Scheduled ticks render for review only; publishing needs a person.
 const REVIEW = process.env.REVIEW === '1';
 // Telling an hour late, on purpose.
@@ -279,12 +281,13 @@ async function runStories() {
   // One at a time, and a failure on the third does not undo the first
   // two. Instagram counts each story against the same 100-per-24h
   // ceiling as a post, which is why they are capped separately above.
-  let posted = 0, failure = null;
+  let posted = 0, failure = null, firstId = null;
   try {
     for (const [i, url] of urls.entries()) {
       try {
         const r = await publishStory(url, { dryRun: DRY });
         posted++;
+        firstId ??= r.id ?? null;
         say(DRY ? `  DRY story ${i + 1}/${urls.length} built, NOT published`
                 : `  STORY ${i + 1}/${urls.length} posted ${r.id}`);
       } catch (e) { failure = e; say(`  story ${i + 1} FAILED — ${e.message}`); break; }
@@ -303,6 +306,12 @@ async function runStories() {
     await setWindow({ key: deck.key, status: 'posted', slides: posted,
       posted_at: Math.floor(Date.now() / 1000),
       error: failure ? `${posted}/${urls.length}: ${failure.message}` : null });
+    // A set is one board now, so the first id IS the set. If it grows
+    // back to three this still measures the opener, which is the board
+    // that decides whether the other two are ever seen.
+    if (firstId) await setPublished(deck.key, { media_id: firstId,
+      choices: { template: String(tpl.id), name: tpl.name, cover: deck.slides[0]?.type,
+        types: deck.slides.map(x => x.type) } });
     await logRun(deck.key, 'stories', true, `${posted}/${urls.length}`);
     say(`POSTED ${posted} story(ies)`);
     // Stories used to report only their failures, which made "three
@@ -319,8 +328,85 @@ async function runStories() {
   return 'done';
 }
 
+/**
+ * Reading the account back.
+ *
+ * Runs once a day and pulls the numbers for everything published in
+ * the last fortnight, then says which choices paid. Ranked on saves
+ * and shares against reach, never on likes: a like is the cheapest
+ * thing a viewer can do and predicts least about whether the next
+ * post reaches anyone at all.
+ *
+ * Two pulls matter and this makes both: a post an hour old and the
+ * same post three days later are different questions, and the rows
+ * are a series rather than an overwrite so the difference survives.
+ *
+ * Nothing here writes to the publishing tables and nothing it
+ * discovers changes a decision on its own. The agent does not get to
+ * tune itself on three data points; the numbers are for a person to
+ * read and decide with.
+ */
+async function runInsights() {
+  const { mediaInsights, accountInsights } = await import('./publish/insights.js');
+  const days = Number(process.env.INSIGHT_DAYS || 14);
+  const rows = await publishedSince(days);
+  if (!rows.length) {
+    say('SKIP — nothing published with a media id yet.');
+    say('       Media ids are recorded from this build forward; the');
+    say('       first numbers arrive after the next post goes out.');
+    return;
+  }
+
+  let got = 0, gone = 0;
+  for (const r of rows) {
+    let data = null;
+    try { data = await mediaInsights(r.media_id, r.kind); }
+    catch (e) { say(`  ${r.key} — ${e.message}`); continue; }
+    // A story past its 24 hours reports nothing. That is not a
+    // failure, it is the medium.
+    if (!data) { gone++; continue; }
+    await putInsight({
+      media_id: r.media_id, wkey: r.key, kind: r.kind,
+      age_min: Math.round((Date.now() / 1000 - Number(r.posted_at)) / 60),
+      reach: data.reach ?? null, views: data.views ?? null,
+      likes: data.likes ?? null, comments: data.comments ?? null,
+      saved: data.saved ?? null, shares: data.shares ?? null,
+      replies: data.replies ?? null,
+      profile_visits: data.profile_visits ?? null, follows: data.follows ?? null,
+      raw: data,
+    });
+    got++;
+  }
+  say(`pulled ${got} of ${rows.length}${gone ? ` (${gone} expired)` : ''}`);
+
+  try {
+    const acc = await accountInsights(7);
+    if (acc) say('account, 7d:', Object.entries(acc).map(([k, v]) => `${k} ${v}`).join(' · '));
+  } catch (e) { say('account insights unavailable:', e.message); }
+
+  // ── what paid ────────────────────────────────────────────
+  // Two of anything is not a finding, so the grouping drops any
+  // bucket with fewer than two posts in it rather than announcing
+  // that template 17 is the best on the strength of one lucky
+  // afternoon.
+  const lines = [];
+  for (const [label, field] of [['opening', 'cover'], ['template', 'template']]) {
+    const by = await performanceBy(field, 30, 'post').catch(() => []);
+    if (!by.length) continue;
+    lines.push(`${label}:`);
+    for (const b of by.slice(0, 6))
+      lines.push(`  ${String(b.k).padEnd(12)} n=${b.n}  reach ${b.reach}  saves+shares ${b.spread} (${b.spread_pct}%)`);
+  }
+  if (lines.length) { say('— what paid, 30d —'); lines.forEach(l => say(l)); }
+  else say('not enough posts measured yet to rank anything — needs two per bucket.');
+}
+
 async function main() {
-  if (process.argv.includes('--ingest')) {
+  // Reading the account back is not publishing: it ingests nothing,
+  // and the kill switch, the active hours and the failure latch have
+  // no opinion about a run that only asks questions. It does still
+  // need the live token, so it sits after that and before every rail.
+  if (process.argv.includes('--ingest') && !INSIGHTS) {
     try {
       const { fetchRecent } = await import('./ingest.js');
       const { withMedia } = await import('./db.js');
@@ -338,6 +424,8 @@ async function main() {
     await setToken(process.env.IG_ACCESS_TOKEN, null);
     say('seeded Instagram token into the database');
   }
+
+  if (INSIGHTS) return runInsights();
 
   // A review run publishes nothing, so the post-rate guards have no
   // opinion about it — let it render even at the daily cap.
@@ -513,6 +601,10 @@ async function main() {
   await keepTemplate(tplRecent, tpl.id);
   await setWindow({ key: w.key, status: 'posted', slides: deck.slides.length, shed,
     posted_at: Math.floor(Date.now() / 1000) });
+  // The result is worthless without the decision that produced it.
+  await setPublished(w.key, { media_id: result.id, permalink: result.permalink,
+    choices: { template: String(tpl.id), name: tpl.name, cover: deck.slides[0]?.type,
+      types: deck.slides.map(x => x.type), slot: deck.slot ?? null } });
   await logRun(w.key, 'publish', true, result.permalink ?? result.id);
   await notify(`✅ ${w.key} — ${deck.slides.length} slides\n${result.permalink ?? ''}`);
 }

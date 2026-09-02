@@ -147,6 +147,55 @@ export const postsToday = () =>
        and posted_at >= ${DAY_START}`)
     .then(r => r.rows[0].n);
 
+/**
+ * What a window published, and what its deck chose.
+ *
+ * Without the media id nothing can be measured; without the choices
+ * beside it the measurement cannot be attributed. Both are written in
+ * the same statement as the post going live, so a result can never
+ * exist without the decision that produced it.
+ */
+export const setPublished = (key, { media_id = null, permalink = null, choices = null }) =>
+  q(`update agent.windows set media_id = $2, permalink = $3, choices = $4 where key = $1`,
+    [key, media_id, permalink, choices ? JSON.stringify(choices) : null]);
+
+/** Everything published in the last `days` that still has a media id. */
+export const publishedSince = (days = 14) =>
+  q(`select key, media_id, posted_at, choices,
+            case when key like 'S:%' then 'story' else 'post' end as kind
+     from agent.windows
+     where status = 'posted' and media_id is not null
+       and posted_at > extract(epoch from now())::bigint - $1 * 86400
+     order by posted_at desc`, [days]).then(r => r.rows);
+
+export const putInsight = (row) =>
+  q(`insert into agent.insights
+       (media_id, wkey, kind, age_min, reach, views, likes, comments,
+        saved, shares, replies, profile_visits, follows, raw)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     on conflict (media_id, at) do nothing`,
+    [row.media_id, row.wkey, row.kind, row.age_min, row.reach, row.views,
+     row.likes, row.comments, row.saved, row.shares, row.replies,
+     row.profile_visits, row.follows, JSON.stringify(row.raw ?? {})]);
+
+/**
+ * What actually worked, grouped however you ask.
+ *
+ * Ranked on saves + shares against reach, not on likes: a like is the
+ * cheapest thing a person can do and predicts the least about whether
+ * the next post reaches anybody.
+ */
+export const performanceBy = (field, days = 30, kind = 'post') =>
+  q(`select coalesce(p.${field}, '(none)') as k, count(*)::int n,
+            round(avg(p.reach))::int reach,
+            round(avg(coalesce(p.saved,0) + coalesce(p.shares,0)), 1) spread,
+            round(avg(p.spread_pct), 2) spread_pct
+     from agent.performance p
+     join agent.windows w on w.key = p.wkey
+     where p.kind = $2 and w.posted_at > extract(epoch from now())::bigint - $1 * 86400
+     group by 1 having count(*) >= 2 order by spread_pct desc nulls last`,
+    [days, kind]).then(r => r.rows);
+
 export const lastPostAt = () =>
   q(`select max(posted_at) t from agent.windows
      where status='posted' and key not like 'S:%'`).then(r => r.rows[0].t);

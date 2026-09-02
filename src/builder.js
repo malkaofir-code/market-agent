@@ -203,6 +203,24 @@ const ARCHETYPES = {
       `<div class="sr"><span class="st">${esc(r.time)}</span><span class="se">${bidi(r.label)}</span></div>`
     ).join('')}</div>
     <div class="link">${esc(s.link)}</div></div>`,
+
+  // 08 · the ask.
+  //
+  // The deck has never asked for anything. Saves and shares are what
+  // the ranking actually rewards — a save says "I will need this
+  // again", a share puts the account in front of someone who has
+  // never seen it — and a reader who was not asked does neither.
+  //
+  // One board, at the end, where the reader has already got the news
+  // and owes nothing. Never on the cover, which is a headline's job,
+  // and never on a news board, which would make the reporting look
+  // like bait.
+  ask: s => `<div class="a-ask"><p class="eyeb">${bidi(s.eyebrow || 'לפני שאתם ממשיכים')}</p>
+    <p class="big">${bidi(s.big)}</p>
+    <div class="acts" data-protect="the three asks">${(s.acts || []).map(a =>
+      `<div class="act"><span class="ai">${esc(a.mark)}</span><span class="al">${bidi(a.label)}</span></div>`
+    ).join('')}</div>
+    ${s.foot ? `<p class="afoot" data-protect="the sign-off">${bidi(s.foot)}</p>` : ''}</div>`,
 };
 
 // ── chart geometry, reproduced from the specimen ─────────────
@@ -242,6 +260,7 @@ const GROUND = {
   chart:       'doc',     // levels on paper
   watch:       'flare',   // the one that shouts
   telegram:    'deep',    // the sign-off
+  ask:         'deep',    // the one board that asks for something
 };
 
 // Which pose suits which board. The wardrobe rotates on top of this —
@@ -252,7 +271,7 @@ const POSE = {
   coverRule: 'explain', coverEdge: 'point', coverPoster: 'upward',
   coverBand: 'welcome', coverStack: 'yes', voice: 'explain',
   hero: 'point', note: 'explain', chart: 'upward',
-  watch: 'pause', telegram: 'yes',
+  watch: 'pause', telegram: 'yes', ask: 'welcome',
 };
 // Boards carrying evidence, plus the edged opening — there the accent
 // bar already owns the reading edge, and a mascot lane on the other

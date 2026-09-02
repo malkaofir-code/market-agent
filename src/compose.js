@@ -299,7 +299,12 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   // photos collapsed to 5 slides. Wrong: dedupe decides what counts as
   // a story, and after that nothing gets merged.
   const rest = pool.filter(p => !used.has(p.tg_id));
-  const room = cap - slides.length - (isCta ? 1 : 0);
+  // Every deck now closes on a board that asks for something — the
+  // Telegram card in the evening, the ask on the other two — so the
+  // slot is reserved unconditionally. It used to be reserved only for
+  // the evening, which would have let a busy window fill to the cap
+  // and drop the ask silently on exactly the days most people saw it.
+  const room = cap - slides.length - 1;
 
   // Reserve one slot for a list only if there is genuine overflow.
   const overflow = rest.length > room;
@@ -320,6 +325,38 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
     slides.push({ type: 'list', title: 'עוד מהחלון הזה',
       rows: tail.slice(0, 4).map((p, j) => ({ n: solo + j + 1,
         headline: p.headline, source: p.source })) });
+  }
+
+  // 07 · the ask — every deck except the evening one, which already
+  // closes on the Telegram card and must not close on two asks.
+  //
+  // The deck has never asked for anything at all. Saves and shares
+  // are what the ranking rewards and what puts the account in front
+  // of someone who has not seen it, and a reader who is not asked
+  // does neither. The wording is specific about WHY — "save it, the
+  // numbers are here" beats "save this post", which reads as begging
+  // and is ignored.
+  //
+  // One board, last, after the news is delivered and the reader owes
+  // nothing. Rotates so the same three lines are not repeated twice a
+  // day for a month.
+  const ASKS = [
+    { big: 'שומרים את זה למחר', foot: 'הסקירה הבאה ב־15:00',
+      acts: [{ mark: '↓', label: 'שמרו — המספרים כאן כשתצטרכו אותם' },
+             { mark: '↗', label: 'שלחו למי שמחזיק את המניות האלה' },
+             { mark: '@', label: 'עוקבים — שלוש סקירות ביום, בעברית' }] },
+    { big: 'מה פספסנו היום?', foot: 'עונים לכל תגובה',
+      acts: [{ mark: '✎', label: 'כתבו בתגובות מה הכי הפתיע אתכם' },
+             { mark: '↓', label: 'שמרו — לחזור לזה לפני הפתיחה' },
+             { mark: '↗', label: 'שלחו לחבר שמסתכל על השוק האמריקאי' }] },
+    { big: 'הסקירה הזאת שווה שיתוף אחד', foot: 'תודה שאתם כאן',
+      acts: [{ mark: '↗', label: 'שלחו את זה הלאה — ככה החשבון גדל' },
+             { mark: '↓', label: 'שמרו לפני שזה נעלם בפיד' },
+             { mark: '@', label: 'עוקבים ל־@marketalert.il' }] },
+  ];
+  if (!isCta && slides.length < cap) {
+    const a = ASKS[Math.abs(seed) % ASKS.length];
+    slides.push({ type: 'ask', ...a });
   }
 
   // 06 · telegram CTA — 23:00 deck only

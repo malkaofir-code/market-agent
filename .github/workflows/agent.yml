@@ -51,9 +51,9 @@ on:
         type: boolean
         default: false
       mode:
-        description: 'digest = the carousel; stories = up to 3 story boards for the last hour'
+        description: 'digest = the carousel; stories = the hour as story boards; insights = read the account back, publish nothing'
         type: choice
-        options: [digest, stories]
+        options: [digest, stories, insights]
         default: digest
       now:
         description: 'Ignore the digest schedule and post this one now'
