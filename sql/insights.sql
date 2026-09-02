@@ -49,23 +49,23 @@ create index if not exists ix_ins_wkey on agent.insights (wkey);
 alter table agent.insights enable row level security;
 
 -- The latest pull for each media, joined to what the deck chose.
+-- DISTINCT ON is Postgres's "one row per group, the one I ordered
+-- first" - here the newest pull per media.
 create or replace view agent.performance as
-select
+select distinct on (i.media_id)
   i.media_id, i.wkey, i.kind, i.age_min,
   i.reach, i.views, i.likes, i.comments, i.saved, i.shares, i.replies,
-  w.choices ->> 'template'          as template,
-  w.choices ->> 'cover'             as cover,
-  w.choices ->> 'slot'              as slot,
-  w.choices -> 'types'              as types,
-  to_char(to_timestamp(w.posted_at) at time zone 'Asia/Jerusalem', 'DD.MM HH24:MI') as posted,
+  w.choices ->> 'template' as template,
+  w.choices ->> 'cover'    as cover,
+  w.choices ->> 'slot'     as slot,
+  w.choices -> 'types'     as types,
+  to_char(to_timestamp(w.posted_at) at time zone 'Asia/Jerusalem',
+          'DD.MM HH24:MI') as posted,
   -- Saves and shares are what the ranking actually rewards; a like is
   -- the cheapest thing a person can do and predicts the least.
   case when i.reach > 0
        then round(100.0 * (coalesce(i.saved,0) + coalesce(i.shares,0)) / i.reach, 2)
   end as spread_pct
 from agent.insights i
-join lateral (
-  select * from agent.insights x
-  where x.media_id = i.media_id order by x.at desc limit 1
-) latest on latest.at = i.at
-left join agent.windows w on w.key = i.wkey;
+left join agent.windows w on w.key = i.wkey
+order by i.media_id, i.at desc;
