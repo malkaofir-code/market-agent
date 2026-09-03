@@ -71,6 +71,41 @@ export const PALETTES = {
   violet:   { bg:'#6B3BE8', fg:'#F5F1FF', dim:'rgba(245,241,255,.66)', dim2:'rgba(245,241,255,.88)',
               rule:'rgba(245,241,255,.3)', acc:'#E8FF4F', pos:'#9BF5CE', neg:'#FFB0C4',
               grid:'rgba(245,241,255,.06)' },
+
+  // ── added with the second thirty ──────────────────────────
+
+  // ── dark worlds ────────────────────────────────────────────
+  graphite: { bg:'#17181A', fg:'#F4F3F1', dim:'#9B9994', dim2:'#CFCDC8', rule:'#2C2E31',
+              acc:'#FFA62B', pos:'#4BD98C', neg:'#FF6259', grid:'rgba(244,243,241,.035)' },
+  abyss:    { bg:'#03181C', fg:'#E8F6F7', dim:'#7BA5AB', dim2:'#BEDDE1', rule:'#0E3238',
+              acc:'#2FD4E8', pos:'#4FE0A8', neg:'#FF7A85', grid:'rgba(232,246,247,.04)' },
+  wine:     { bg:'#2B0B1E', fg:'#FBEDF4', dim:'#B98CA4', dim2:'#E3C9D8', rule:'#4B1837',
+              acc:'#FFC24D', pos:'#5FD79B', neg:'#FF8FA8', grid:'rgba(251,237,244,.04)' },
+  moss:     { bg:'#1A1E0C', fg:'#F2F5E4', dim:'#9BA57C', dim2:'#D2DBB8', rule:'#333A18',
+              acc:'#CDFF4F', pos:'#8DE86B', neg:'#FF8A6E', grid:'rgba(242,245,228,.04)' },
+  navy:     { bg:'#0A1A33', fg:'#EEF3FB', dim:'#8199B8', dim2:'#C2D2E7', rule:'#182F52',
+              acc:'#F5C451', pos:'#4FD9A4', neg:'#FF7A88', grid:'rgba(238,243,251,.04)' },
+  basalt:   { bg:'#101418', fg:'#E9EDF0', dim:'#7E8A94', dim2:'#B8C2CA', rule:'#1F262D',
+              acc:'#7AE8C0', pos:'#7AE8C0', neg:'#FF6F7D', grid:'rgba(233,237,240,.035)' },
+
+  // ── paper worlds ───────────────────────────────────────────
+  linen:    { bg:'#F5F1E8', fg:'#191713', dim:'#736C5E', dim2:'#403B31', rule:'#D2C9B6',
+              acc:'#A8321E', pos:'#12833F', neg:'#A8321E', grid:'rgba(25,23,19,.05)' },
+  newsprint:{ bg:'#DEDCD6', fg:'#101010', dim:'#63615B', dim2:'#33322E', rule:'#B4B1A8',
+              acc:'#101010', pos:'#0E6B36', neg:'#A3201A', grid:'rgba(16,16,16,.06)' },
+  blush:    { bg:'#F6E7E7', fg:'#1E1112', dim:'#7E6062', dim2:'#452A2C', rule:'#DCC0C1',
+              acc:'#B0273A', pos:'#12833F', neg:'#B0273A', grid:'rgba(30,17,18,.05)' },
+
+  // ── fields: the accent IS the ground ───────────────────────
+  oxide:    { bg:'#C2410C', fg:'#FFF4EC', dim:'rgba(255,244,236,.7)', dim2:'rgba(255,244,236,.9)',
+              rule:'rgba(255,244,236,.32)', acc:'#FFE0B2', pos:'#B8F5D4', neg:'#FFD5CE',
+              grid:'rgba(255,244,236,.06)' },
+  sky:      { bg:'#8ECDF0', fg:'#04202E', dim:'rgba(4,32,46,.62)', dim2:'rgba(4,32,46,.85)',
+              rule:'rgba(4,32,46,.28)', acc:'#04202E', pos:'#04202E', neg:'#04202E',
+              grid:'rgba(4,32,46,.05)' },
+  ochre:    { bg:'#D9A521', fg:'#1C1403', dim:'rgba(28,20,3,.62)', dim2:'rgba(28,20,3,.86)',
+              rule:'rgba(28,20,3,.3)', acc:'#1C1403', pos:'#1C1403', neg:'#1C1403',
+              grid:'rgba(28,20,3,.05)' }
 };
 
 /**
@@ -115,7 +150,94 @@ export const TEMPLATES = [
   T(28, 'Ember',         'coverStack',  'espresso', 'oxblood'),
   T(29, 'Harbour',       'coverEdge',   'deep',     'ice'),
   T(30, 'Blacktop',      'coverPoster', 'carbon',   'citrus'),
+
+  // ── the second thirty ────────────────────────────────────
+  // Four openings became eleven and twenty palettes became
+  // thirty-two, so none of these repeats a pair already above. Two of
+  // the new openings are formats the set simply did not have: a
+  // full-bleed photograph, and a figure at the size of the board.
+  T(31, 'Seam',          'coverSplit',   'graphite', 'basalt'),
+  T(32, 'Chapter',       'coverIndex',   'linen',    'newsprint'),
+  T(33, 'Quotation',     'coverBracket', 'navy',     'steel'),
+  T(34, 'Wide Margin',   'coverMargin',  'newsprint','linen'),
+  T(35, 'Nightfall',     'coverBleed',   'ink',      'graphite'),
+  T(36, 'Big Number',    'coverFigure',  'carbon',   'graphite'),
+  T(37, 'Rustbelt',      'coverSplit',   'oxide',    'espresso'),
+  T(38, 'Ledgerline',    'coverIndex',   'doc',      'linen'),
+  T(39, 'Deep Field',    'coverBracket', 'abyss',    'basalt'),
+  T(40, 'Salt Flat',     'coverMargin',  'sky',      'ice'),
+  T(41, 'Long Exposure', 'coverBleed',   'abyss',    'navy'),
+  T(42, 'Tally',         'coverFigure',  'moss',     'forest'),
+  T(43, 'Vintner',       'coverSplit',   'wine',     'plum'),
+  T(44, 'Index Card',    'coverIndex',   'newsprint','graphite'),
+  T(45, 'Basalt',        'coverBracket', 'basalt',   'graphite'),
+  T(46, 'Long Shore',    'coverMargin',  'linen',    'doc'),
+  T(47, 'Undertow II',   'coverBleed',   'navy',     'abyss'),
+  T(48, 'Counter',       'coverFigure',  'ochre',    'sand'),
+  T(49, 'Kilnworks',     'coverSplit',   'oxide',    'oxblood'),
+  T(50, 'Powder',        'coverMargin',  'blush',    'rose'),
 ];
+
+/**
+ * Story templates are a different thing, and it took a contact sheet
+ * to see why.
+ *
+ * A story is ONE board, so the second ground a post uses for its
+ * evidence slides has nothing to dress — which meant a story template
+ * was only ever a colour, and thirty of them dressed one vertical
+ * arrangement thirty times. Twenty palettes, one composition, sixty
+ * per cent of a 1920px canvas empty.
+ *
+ * So the varying dimension here is the LAYOUT: where the block sits
+ * in the height, what marks the page, and — the part that actually
+ * broke the sameness — whether the mascot is on the board at all.
+ * Three of the seven drop him, and the type doubles into the room he
+ * was taking.
+ */
+const S = (id, name, layout, pal) => ({ id, name, layout, pal });
+
+/** Layouts that carry the mascot. The rest are type alone. */
+export const STORY_RON = new Set(['top', 'base', 'bar', 'rules']);
+
+export const STORY_TEMPLATES = [
+  S(101, 'Highwater',     'top',    'abyss'),
+  S(102, 'Say It',        'quote',  'graphite'),
+  S(103, 'Low Tide',      'base',   'navy'),
+  S(104, 'Banner',        'bar',    'oxide'),
+  S(105, 'Passepartout',  'frame',  'linen'),
+  S(106, 'Broadsheet II', 'rules',  'newsprint'),
+  S(107, 'Wash',          'flood',  'basalt'),
+  S(108, 'Signalman',     'bar',    'ochre'),
+  S(109, 'Vitrine',       'frame',  'wine'),
+  S(110, 'Column',        'rules',  'moss'),
+  S(111, 'Shoreline',     'base',   'sky'),
+  S(112, 'Crest',         'top',    'wine'),
+  S(113, 'Quiet Room',    'quote',  'blush'),
+  S(114, 'Flagship',      'bar',    'navy'),
+  S(115, 'Cabinet',       'frame',  'graphite'),
+  S(116, 'Masthead',      'rules',  'linen'),
+  S(117, 'Undercurrent',  'base',   'moss'),
+  S(118, 'Lantern',       'top',    'ochre'),
+  S(119, 'Placard',       'quote',  'newsprint'),
+  S(120, 'Spill',         'flood',  'navy'),
+];
+
+export const byStoryId = id =>
+  STORY_TEMPLATES.find(t => t.id === id) ?? STORY_TEMPLATES[0];
+
+/**
+ * Same anti-repeat contract as the posts, on the axis that matters
+ * here: never the same LAYOUT twice running, then never a template
+ * from the last `memory` hours.
+ */
+export function pickStoryTemplate(recent = [], seed = 0) {
+  const last = recent[0] ? byStoryId(recent[0]).layout : null;
+  const fresh = STORY_TEMPLATES.filter(t => !recent.includes(t.id));
+  const pool = fresh.length ? fresh : STORY_TEMPLATES;
+  const better = pool.filter(t => t.layout !== last);
+  const from = better.length ? better : pool;
+  return from[Math.abs(seed) % from.length];
+}
 
 export const byId = id => TEMPLATES.find(t => t.id === id) ?? TEMPLATES[0];
 

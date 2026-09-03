@@ -480,3 +480,164 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide[data-type="voice"]{--ron-w:430px; --ron-h:700px; --lane:400px}
 .slide[data-type="voice"] .ron{left:-46px}
 .slide--story[data-type="voice"]{--ron-w:430px; --ron-h:600px}
+
+/* ═══ THE SECOND THIRTY ══════════════════════════════════════════
+   Four openings became eleven; three of the new ones needed a lane
+   declared like every opening before them, and two are built to be
+   left alone. */
+/* ── 01h · split ── */
+.a-sp{display:flex;flex-direction:column;gap:0}
+.a-sp .sp-field{background:var(--acc);margin:-8px -64px 0;padding:44px 64px 96px}
+.a-sp .sp-field .eyeb{color:var(--bg);opacity:.88}
+.a-sp h1{font-family:var(--f-disp);font-size:112px;font-weight:800;line-height:.96;
+  letter-spacing:-.038em;margin:-60px 0 0;max-width:14ch;
+  background:var(--bg);padding:28px 30px 0;align-self:flex-start}
+.a-sp .stand{font-size:36px;line-height:1.36;color:var(--dim2);margin:32px 0 0;max-width:26ch}
+
+/* ── 01i · index ── */
+.a-ix{display:flex;flex-direction:column;gap:0}
+.a-ix .ix-n{font-family:var(--f-mono);font-size:290px;font-weight:700;line-height:.76;
+  letter-spacing:-.055em;color:var(--acc);margin:0;direction:ltr;unicode-bidi:isolate;
+  align-self:flex-start}
+.a-ix .ix-hr{height:3px;background:var(--fg);margin:38px 0 26px}
+.a-ix h1{font-family:var(--f-disp);font-size:76px;font-weight:800;line-height:1.08;
+  letter-spacing:-.028em;margin:14px 0 0;max-width:20ch}
+.a-ix .stand{font-size:32px;line-height:1.4;color:var(--dim2);margin:22px 0 0;max-width:30ch}
+
+/* ── 01j · bracket ── */
+.a-bk{display:flex;flex-direction:column;gap:28px}
+.a-bk .bk-hold{border-top:12px solid var(--acc);border-bottom:12px solid var(--acc);
+  border-inline-start:12px solid var(--acc);padding:44px 48px 50px;align-self:flex-start;
+  max-width:96%}
+.a-bk h1{font-family:var(--f-disp);font-size:100px;font-weight:800;line-height:.99;
+  letter-spacing:-.038em;margin:0;max-width:13ch}
+.a-bk .stand{font-size:36px;line-height:1.36;color:var(--dim2);margin:0;max-width:26ch}
+
+/* ── 01k · margin ── */
+.a-mg{display:flex;justify-content:flex-start;align-items:flex-end;height:100%}
+.a-mg .mg-col{max-width:72%}
+.a-mg h1{font-family:var(--f-disp);font-size:104px;font-weight:800;line-height:1;
+  letter-spacing:-.038em;margin:20px 0 0}
+.a-mg .mg-hr{height:2px;background:var(--rule);margin:34px 0 24px}
+.a-mg .stand{font-size:33px;line-height:1.4;color:var(--dim2);margin:0;max-width:30ch}
+
+/* ── 01l · bleed ── */
+.a-bl{position:absolute;inset:0;overflow:hidden}
+.a-bl .bl-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.a-bl .bl-scrim{position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(8,9,11,.72) 0%,rgba(8,9,11,.18) 26%,
+    rgba(8,9,11,.55) 58%,rgba(8,9,11,.95) 100%)}
+.a-bl .bl-txt{position:absolute;inset:auto 64px 96px;color:#fff}
+.a-bl .bl-txt .eyeb{color:var(--acc)}
+.a-bl h1{font-family:var(--f-disp);font-size:112px;font-weight:800;line-height:.97;
+  letter-spacing:-.038em;margin:16px 0 0;max-width:14ch;color:#fff;
+  text-shadow:0 2px 40px rgba(0,0,0,.5)}
+
+/* ── 01m · figure ── */
+.a-fg{display:flex;flex-direction:column;justify-content:center;height:100%;gap:0}
+.a-fg .fg-n{font-family:var(--f-disp);font-size:300px;font-weight:800;line-height:.84;
+  letter-spacing:-.06em;color:var(--acc);margin:18px 0 0;
+  direction:ltr;unicode-bidi:isolate;align-self:flex-start}
+.a-fg h1{font-family:var(--f-disp);font-size:60px;font-weight:800;line-height:1.14;
+  letter-spacing:-.024em;margin:40px 0 0;max-width:22ch;color:var(--dim2)}
+
+/* ── the mascot's lane on the new openings ──────────────────────
+   The lane is declared on the SLIDE so the text can read it; without
+   these four the Index and Figure boards ran their caption straight
+   under him, which is the exact fault the lane system was built to
+   stop and which I reintroduced by adding openings without it. */
+.slide[data-type="coverSplit"]  {--ron-w:360px; --ron-h:560px; --lane:340px}
+.slide[data-type="coverIndex"]  {--ron-w:330px; --ron-h:500px; --lane:315px}
+.slide[data-type="coverBracket"]{--ron-w:350px; --ron-h:540px; --lane:330px}
+.slide[data-type="coverFigure"] {--ron-w:320px; --ron-h:480px; --lane:305px}
+.slide[data-type="coverSplit"]  .ron{left:-36px}
+.slide[data-type="coverIndex"]  .ron{left:-30px}
+.slide[data-type="coverBracket"].ron,
+.slide[data-type="coverBracket"] .ron{left:-34px}
+.slide[data-type="coverFigure"] .ron{left:-28px}
+
+/* And the measures come in, so a headline stops before his lane
+   rather than relying on the lane padding alone. */
+.a-ix h1{max-width:16ch}
+.a-fg h1{max-width:17ch}
+.a-sp h1{max-width:13ch}
+
+/* ═══ STORY LAYOUTS ══════════════════════════════════════════════
+   The dimension the story track never had. */
+/* A story is not a post at a different aspect. Held at arm's length
+   for three seconds, at 1080 wide and 570px taller, it carries half
+   again the type — and the layouts that drop the mascot carry more
+   again, because the room is there and nothing else is using it. */
+.slide--story .a-cv h1{font-size:96px;line-height:1.02;letter-spacing:-.035em;max-width:15ch}
+.slide--story .a-cv .stand{font-size:38px;line-height:1.38;max-width:24ch}
+
+/* The board fills. v1 and v2's first pass both left the bottom third
+   empty with him floating in the middle of it — the type at the top,
+   the mascot adrift, and 500px of nothing under him. Pushing the two
+   apart is what makes a 1920px canvas look designed rather than
+   unfinished. */
+.slide--story[data-story="top"] .sl-bd,
+.slide--story[data-story="rules"] .sl-bd{justify-content:space-between}
+
+.slide--story[data-story="quote"] .sl-bd{justify-content:center}
+.slide--story[data-story="quote"] .a-cv h1{font-size:126px;line-height:.97;
+  letter-spacing:-.042em;max-width:11ch}
+.slide--story[data-story="quote"] .a-cv .stand{font-size:42px;margin-top:40px;max-width:21ch}
+
+/* He goes UP, the type goes to the floor.
+   Two earlier attempts failed for the same reason, which is worth
+   recording: the mascot is position:absolute and pinned to bottom:0,
+   so neither column-reverse nor 'order' could move him — flex has no
+   opinion about an element out of flow. Worse, the text band already
+   reserves his height as padding-BOTTOM, so justify-content:flex-end
+   pushed the type to the top of that reserve, which is the middle of
+   the board and looks exactly like 'top'.
+   Both have to move: pin him to the top, and move the reserve to the
+   other side so the floor is genuinely free. */
+.slide--story[data-story="base"] .ron{top:190px;bottom:auto}
+.slide--story[data-story="base"][data-ron] .sl-bd{
+  padding-bottom:0;
+  padding-top:calc(var(--ron-fit, calc(var(--ron-h) * var(--ron-k))) - 90px);
+  justify-content:flex-end}
+.slide--story[data-story="base"] .a-cv h1{font-size:104px;max-width:13ch}
+
+.slide--story[data-story="bar"]::before{content:'';position:absolute;
+  left:0;right:0;top:0;height:340px;background:var(--acc);z-index:0}
+.slide--story[data-story="bar"] .sl-hd{position:relative;z-index:2}
+.slide--story[data-story="bar"] .sl-hd .hd-name,
+.slide--story[data-story="bar"] .sl-hd .hd-meta{color:var(--bg);opacity:.9}
+.slide--story[data-story="bar"] .sl-bd{position:relative;z-index:1;padding-top:118px;
+  justify-content:space-between}
+
+/* 2px of --rule on a dark ground is invisible at thumbnail size, and
+   a frame nobody can see is not a layout. Four of the accent, inset
+   further, so it reads as a deliberate edge. */
+.slide--story[data-story="frame"]::before{content:'';position:absolute;
+  inset:196px 30px;border:4px solid var(--acc);opacity:.55;pointer-events:none}
+.slide--story[data-story="frame"] .sl-bd{justify-content:center;padding:0 34px}
+.slide--story[data-story="frame"] .a-cv h1{font-size:104px;max-width:13ch}
+
+.slide--story[data-story="rules"] .a-cv h1{border-top:12px solid var(--acc);
+  border-bottom:2px solid var(--rule);padding:40px 0 44px;margin-top:10px}
+
+/* The headline sits ON the seam, half on each ground, and the
+   standfirst goes into the flood in the flood's own ink. The first
+   pass left the two as disconnected slabs with the standfirst set in
+   a colour it was already standing on — invisible. */
+.slide--story[data-story="flood"]::before{content:'';position:absolute;
+  left:0;right:0;bottom:0;height:46%;background:var(--acc);z-index:0}
+.slide--story[data-story="flood"] .sl-bd{position:relative;z-index:1;
+  justify-content:center;padding-bottom:120px}
+.slide--story[data-story="flood"] .a-cv h1{font-size:112px;line-height:.99;max-width:12ch}
+.slide--story[data-story="flood"] .a-cv .stand{color:var(--bg);opacity:.85;font-size:40px;
+  margin-top:56px;max-width:21ch}
+
+/* The three mascot-free layouts enlarge the MEANING board too, not
+   just the cover. Without this a quote/frame/flood board that happens
+   to draw an interpretation renders at the post's 60px in a space
+   sized for 126 — the exact under-filled look the layouts exist to
+   fix, showing up on a third of them. */
+.slide--story[data-story="quote"] .a-nt .txt{font-size:88px;max-width:14ch}
+.slide--story[data-story="flood"] .a-nt .txt{font-size:80px;max-width:14ch}
+.slide--story[data-story="frame"] .a-nt .txt{font-size:78px;max-width:15ch}
+.slide--story[data-story="flood"] .a-nt .dis{color:var(--bg);opacity:.75}

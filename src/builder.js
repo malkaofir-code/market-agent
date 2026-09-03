@@ -125,6 +125,67 @@ const ARCHETYPES = {
     <div class="ck-box"><h1>${bidi(s.headline)}</h1></div>
     <p class="stand">${bidi(s.stand)}</p></div>`,
 
+  // 01h · cover, split — the board cut in two. An accent field holds
+  // the eyebrow, the headline crosses the seam so it belongs to
+  // neither half. The seam is the composition; nothing else on the
+  // board is decorated.
+  coverSplit: s => `<div class="a-sp">
+    <div class="sp-field"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p></div>
+    <h1>${bidi(s.headline)}</h1>
+    <p class="stand">${bidi(s.stand)}</p></div>`,
+
+  // 01i · cover, index — a chapter opener. The hour enormous as a
+  // numeral, the headline small beneath it. Inverts the usual
+  // hierarchy: the biggest thing carries the least information, which
+  // is what makes it read as a record rather than a bulletin.
+  coverIndex: s => `<div class="a-ix">
+    <p class="ix-n">${esc(s.index ?? '01')}</p>
+    <div class="ix-hr"></div>
+    <p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
+    <h1>${bidi(s.headline)}</h1>
+    <p class="stand">${bidi(s.stand)}</p></div>`,
+
+  // 01j · cover, bracket — the headline held in a drawn bracket.
+  // Drawn with borders, not a glyph: a quotation mark inside an RTL
+  // line is a bidi argument nobody wins, and a border has no
+  // direction.
+  coverBracket: s => `<div class="a-bk">
+    <p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
+    <div class="bk-hold"><h1>${bidi(s.headline)}</h1></div>
+    <p class="stand">${bidi(s.stand)}</p></div>`,
+
+  // 01k · cover, margin — a narrow column against a wide empty field.
+  // The quietest opening in the set and the only one that GAINS from
+  // emptiness, which is why it takes no mascot: he would fill exactly
+  // the space that is the design.
+  coverMargin: s => `<div class="a-mg">
+    <div class="mg-col"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
+      <h1>${bidi(s.headline)}</h1>
+      <div class="mg-hr"></div>
+      <p class="stand">${bidi(s.stand)}</p></div></div>`,
+
+  // 01l · cover, bleed — the photograph as the whole board, headline
+  // burned into the bottom over a scrim. Forty-four per cent of the
+  // source messages carry a picture and not one opening used it
+  // full-bleed; they framed it, banded it or ignored it. Without a
+  // photo it falls back to the ruled opening rather than rendering an
+  // empty scrim.
+  coverBleed: s => s.photo ? `<div class="a-bl">
+    <img class="bl-img" src="${esc(s.photo.src)}" alt="">
+    <div class="bl-scrim"></div>
+    <div class="bl-txt"><p class="eyeb">${bidi(s.eyebrow || 'עכשיו')}</p>
+      <h1>${bidi(s.headline)}</h1></div></div>` : ARCHETYPES.coverRule(s),
+
+  // 01m · cover, figure — the number at the size of the board, the
+  // headline reduced to a caption. For a market account this is the
+  // most legible thing that can go in a feed: a reader moving fast
+  // reads one number and either stops or does not. Falls back when
+  // the window's lead carries no clean figure.
+  coverFigure: s => s.figure ? `<div class="a-fg">
+    <p class="eyeb">${bidi(s.eyebrow || 'עכשיו')}</p>
+    <p class="fg-n">${esc(s.figure)}</p>
+    <h1>${bidi(s.headline)}</h1></div>` : ARCHETYPES.coverPoster(s),
+
   // 02 · hero figure — sized to its measure, not to a constant.
   hero: s => {
     // The measure is the COLUMN, not the canvas. With Ron on the board
@@ -261,6 +322,7 @@ const GROUND = {
   watch:       'flare',   // the one that shouts
   telegram:    'deep',    // the sign-off
   ask:         'deep',    // the one board that asks for something
+  coverBleed:  'ink',     // a scrim is mixed for a dark ground
 };
 
 // Which pose suits which board. The wardrobe rotates on top of this —
@@ -272,12 +334,19 @@ const POSE = {
   coverBand: 'welcome', coverStack: 'yes', voice: 'explain',
   hero: 'point', note: 'explain', chart: 'upward',
   watch: 'pause', telegram: 'yes', ask: 'welcome',
+  coverSplit: 'presenting', coverIndex: 'thinking', coverBracket: 'explain',
+  coverFigure: 'point',
 };
 // Boards carrying evidence, plus the edged opening — there the accent
 // bar already owns the reading edge, and a mascot lane on the other
 // side left the headline a column six characters wide. One opening in
 // seven without him is variety, not a loss.
-const NO_RON = new Set(['item', 'list', 'coverEdge']);
+// Boards he is kept off. The two new ones are not an oversight: the
+// margin opening is BUILT from emptiness and he would fill exactly
+// the space that is the design, and the bleed opening is a photograph
+// edge to edge with nowhere for him to stand that is not on top of
+// it.
+const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed']);
 
 /**
  * The mascot layer. `ctx.poses` is filled by render.js, which owns the
@@ -296,8 +365,15 @@ function ronSide(slide, ctx, i = 0) {
   return ronLayer(slide, ctx, i) ? (SIDE[slide.type] ?? 'left') : null;
 }
 
+// Story layouts that carry him. The other three are type alone —
+// that is the whole reason the layouts exist, so it has to be checked
+// here and not only in the CSS, or he renders under a headline sized
+// for a board he is not on.
+const STORY_RON = new Set(['top', 'base', 'bar', 'rules']);
+
 function ronLayer(slide, ctx, i = 0) {
   if (slide.ron === null || NO_RON.has(slide.type)) return '';
+  if (slide.story && !STORY_RON.has(slide.story)) return '';
   // A slide already carrying a photo has its image. Ron standing in
   // front of a screenshot is two subjects fighting, and on the framed
   // cover the frame landed across his face. One picture per board.
@@ -376,7 +452,7 @@ export function buildSlide(slide, ctx, i, n, { story = false } = {}) {
   // Three stories in a row should not be the same photograph three
   // times: he changes sides down the set.
   const alt = story && i % 2 === 1 ? ' of-alt' : '';
-  return `<div class="slide${story ? ' slide--story' + alt : ''}${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${oa}><div class="bgm"></div>${coverLayer(slide)}
+  return `<div class="slide${story ? ' slide--story' + alt : ''}${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
 ${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }

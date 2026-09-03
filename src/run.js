@@ -22,7 +22,7 @@ import {
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
 import { compose, composeStories, windowOf, WIN } from './compose.js';
-import { pickTemplate, remember, byId } from './templates.js';
+import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
 import { connect, alert } from './tg.js';
 
@@ -84,6 +84,19 @@ async function nextTemplate(key) {
   return { t, recent };
 }
 const keepTemplate = (recent, id) => setState(TPL_KEY, remember(recent, id));
+
+// Stories rotate on their own memory. Sharing the posts' list would
+// have been quietly wrong once the two stopped drawing from the same
+// pool: a story template is a LAYOUT, a post template is an opening
+// plus two grounds, and the ids do not overlap — one shared "recent"
+// would have let a post exclude a story it has nothing to do with.
+const STORY_TPL_KEY = 'story-template-recent';
+async function nextStoryTemplate(key) {
+  const recent = (await getState(STORY_TPL_KEY)) ?? [];
+  const seed = [...key].reduce((a, c) => a + c.charCodeAt(0), 0);
+  return { t: pickStoryTemplate(recent, seed), recent };
+}
+const keepStoryTemplate = (recent, id) => setState(STORY_TPL_KEY, remember(recent, id));
 const say = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 // A stray rejection must never take the run down mid-publish.
@@ -226,11 +239,11 @@ async function runStories() {
     }
   }
 
-  const { t: tpl, recent: tplRecent } = await nextTemplate(`S:${w.key}`);
+  const { t: tpl, recent: tplRecent } = await nextStoryTemplate(`S:${w.key}`);
   const tally = Number((await getState(TALLY_KEY)) ?? 0);
   const deck = composeStories(rows, {
-    carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end, template: tpl.id, tally,
-    catchup: CATCHUP });
+    carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end, template: null, tally,
+    catchup: CATCHUP, story: tpl.layout, palette: tpl.pal });
   const consumed = deck.consumed.map(Number);
   if (deck.skip) {
     say('SKIP —', w.key, `(${deck.skip})`);
@@ -299,7 +312,7 @@ async function runStories() {
   if (DRY) { say(`DRY RUN OK — ${files.length} stories built`); return 'done'; }
 
   if (posted) {
-    await keepTemplate(tplRecent, tpl.id);
+    await keepStoryTemplate(tplRecent, tpl.id);
     // Only after something actually went up — a set that failed on its
     // first board must not push the card an hour further away.
     if (deck.tally != null) await setState(TALLY_KEY, deck.tally);

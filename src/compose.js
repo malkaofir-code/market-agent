@@ -279,7 +279,14 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   // wants the fact and not a riddle.
   const asks = slot === 'morning';
   const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
+  // The index opening prints the hour, and the figure opening prints
+  // the lead's number. Both fall back inside the archetype when the
+  // window cannot supply one, so the rotation never has to know.
+  const leadFig = lead.figures?.length && lead.figureCount < 4
+    ? lead.figures[0].text.replace(/[−־]/g, '-') : null;
   slides.push({ type: coverType,
+    index: hhmm(w.end).slice(0, 2),
+    figure: leadFig,
     // When the lead carries a number, the eyebrow IS the number — so
     // the question has something concrete sitting above it instead of
     // asking about a figure the reader cannot see.
@@ -439,7 +446,7 @@ export const TG_LINK = 't.me/nq_es_hunters';
  * separate cursor, so telling an hour as stories never costs the
  * digest that will later summarise it.
  */
-export function composeStories(rows, { carry = {}, endTs = null, template = null, tally = 0, catchup = false } = {}) {
+export function composeStories(rows, { carry = {}, endTs = null, template = null, tally = 0, catchup = false, story = null, palette = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
   const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
@@ -544,10 +551,14 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
     // The cover's photo bleeds behind a scrim mixed for a dark ground.
     // On paper or on a colour field that scrim is a smear, so a board
     // carrying a picture keeps a dark one.
+    // A story is one board, so it has one ground — the template's —
+    // rather than a post's alternating pair. A board carrying a
+    // picture still overrides to a dark world, because the scrim is
+    // mixed for one.
     const pal = pick.photo
       ? DARK[(seed + i) % DARK.length]
-      : (tpl ? (i % 2 ? tpl.b : tpl.a) : DARK[(seed + i) % DARK.length]);
-    slides.push({ ...pick, palette: pal });
+      : (palette ?? (tpl ? (i % 2 ? tpl.b : tpl.a) : DARK[(seed + i) % DARK.length]));
+    slides.push({ ...pick, palette: pal, story });
     prev = pick.type;
   }
 
