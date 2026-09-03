@@ -67,19 +67,54 @@ export function windowOf(ts) {
  * timestamp cell shows when that was, so staleness is visible on
  * the slide rather than hidden.
  */
-export function tape(parsed, carry = {}) {
+/**
+ * A daily move an index future can actually make.
+ *
+ * SPX went out on the 3 September deck reading "+46.06%". It is not a
+ * percentage — it is the S&P's POINT change, about +0.7%, and it had
+ * been sitting in the carry since 30 August being reprinted every day.
+ * Cash-index circuit breakers halt trading at 7, 13 and 20 per cent,
+ * so nothing above 25 is a real daily percentage; a number that large
+ * is a misparse of points, and a misparse must never enter the tape.
+ */
+const PLAUSIBLE_PCT = Number(process.env.TAPE_MAX_PCT || 25);
+const plausible = v => Number.isFinite(v) && Math.abs(v) <= PLAUSIBLE_PCT;
+
+export function tape(parsed, carry = {}, now = null) {
+  const at = now ?? Math.floor(Date.now() / 1000);
   const seen = { ...carry };
   for (const p of parsed) for (const l of p.levels) {
+    if (!plausible(l.chg)) continue;
     seen[l.sym] = { ...l, at: p.ts, last: l.last ?? seen[l.sym]?.last ?? '—' };
   }
+
+  // A quote is dropped once it is too old to be "the tape".
+  //
+  // The carry existed so a symbol quoted at 09:00 still showed at
+  // 09:40, and it had no expiry at all — so YM was printing a figure
+  // from two days earlier and SPX one from four days earlier, on a
+  // board stamped with tonight's time. That is not a stale number, it
+  // is a false one: the strip asserts these are the levels now.
+  // Better to show two rows than four wrong ones.
+  const maxAge = Number(process.env.TAPE_MAX_AGE_MIN || 360) * 60;
+  const fresh = sym => seen[sym] && at - Number(seen[sym].at ?? 0) <= maxAge;
+
+  // And the carry itself is pruned, or the table accumulates dead
+  // symbols for ever and every read has to re-filter them.
+  const keep = Number(process.env.TAPE_CARRY_HOURS || 48) * 3600;
+  for (const k of Object.keys(seen))
+    if (at - Number(seen[k].at ?? 0) > keep) delete seen[k];
   // design.html's specimen used NQ/ES/YM, but the channel actually
   // quotes NQ, ES and SPX - YM never appeared once in 7 days. Keeping
   // YM in and SPX out silently threw away a third of the tape, and
   // left the chart slide (which needs 3 points) unbuildable.
   const order = ['NQ', 'ES', 'SPX', 'YM', 'NDX', 'RTY'];
-  const quotes = order.filter(s => seen[s]).map(s => seen[s]);
-  const freshest = Math.max(0, ...quotes.map(q => q.at || 0));
-  return { quotes, carry: seen, stamp: freshest ? hhmm(freshest) : '' };
+  const quotes = order.filter(fresh).map(s => seen[s]);
+  // Stamped from the OLDEST row on the strip, not the newest. The
+  // stamp is a promise about everything printed under it, and taking
+  // the newest let one live quote certify three dead ones.
+  const oldest = quotes.length ? Math.min(...quotes.map(q => Number(q.at) || 0)) : 0;
+  return { quotes, carry: seen, stamp: oldest ? hhmm(oldest) : '' };
 }
 
 /**

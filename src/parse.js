@@ -82,9 +82,21 @@ export function parse(row) {
 const SYM = /\b(NQ|ES|YM|RTY|NDX|SPX)\b/;
 const PRICE = /מחיר\s*([\d][\d,]*(?:\.\d+)?)/;
 const PAREN_PCT = /\(\s*([+\-−־]?\d+(?:[.,]\d+)?)\s*%\s*\)/;
-const INLINE = /\b(NQ|ES|YM|RTY|NDX|SPX)\b[^\n]{0,60}?((?<![\w.,])(?:(?<![֐-׿])[+\-−־])?\d+(?:[.,]\d+)?%)/g;
+// Tempered, so the gap between a symbol and "its" percentage cannot
+// contain ANOTHER symbol. Untempered it crossed them freely:
+// "NQ נסחר סביב 29,310 · ES עלה 1.03%" reported NQ at 1.03 — NQ had
+// no percentage of its own, so it reached over and took ES's. Every
+// row on the tape is an assertion about one instrument; a pattern
+// that can wander to the next one has no business feeding it.
+const INLINE = /\b(NQ|ES|YM|RTY|NDX|SPX)\b(?:(?!\b(?:NQ|ES|YM|RTY|NDX|SPX)\b)[^\n]){0,60}?((?<![\w.,])(?:(?<![֐-׿])[+\-−־])?\d+(?:[.,]\d+)?%)/g;
 
-const num = t => parseFloat(String(t).replace(/[−־]/g, '-').replace(',', '.'));
+// A comma is a THOUSANDS separator in this channel — every price it
+// quotes looks like 29,575.50 — and blindly reading it as a decimal
+// point turned 46,061 into 46.061, which is very close to the wrong
+// number that went out. Strip it where three digits follow; only then
+// treat a remaining comma as the decimal mark some sources use.
+const num = t => parseFloat(
+  String(t).replace(/[−־]/g, '-').replace(/,(\d{3})(?!\d)/g, '$1').replace(',', '.'));
 
 export function levels(text) {
   const raw = String(text ?? '');
