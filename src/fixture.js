@@ -25,7 +25,7 @@ export const deck = {
       { n: 2, headline: 'טייוואן: כתב אישום בגין הברחת שרתי NVDA' },
       { n: 3, headline: 'התשואה ל־10 שנים נגעה ב־4.31%' },
     ]},
-    { type: 'telegram', big: 'הבית של סוחרי NQ & ES', link: 't.me/nq_es_hunters',
+    { type: 'telegram', big: 'חמ״ל שוק ההון', link: 't.me/hamal_shukhahon',
       schedule: [
         { time: '08:00', label: 'סקירת בוקר' },
         { time: '15:00', label: 'טרום־פתיחה' },

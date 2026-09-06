@@ -402,11 +402,17 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   }
 
   // 06 · telegram CTA — 23:00 deck only
-  if (isCta) slides.push({ type: 'telegram', big: 'הבית של סוחרי NQ & ES',
+  if (isCta) slides.push({ type: 'telegram', big: 'חמ״ל שוק ההון',
     link: TG_LINK,
+    // The times the account actually keeps. This card was still
+    // advertising four digests at 08/15/18/23 — the rhythm from before
+    // the story track existed — so the one board whose entire job is
+    // to make a promise was making one the agent stopped keeping
+    // weeks ago.
     schedule: [
-      { time: '08:00', label: 'סקירת בוקר' }, { time: '15:00', label: 'טרום־פתיחה' },
-      { time: '18:00', label: 'סקירת פתיחה' }, { time: '23:00', label: 'סיכום יום' }] });
+      { time: '08:00', label: 'סקירת בוקר' },
+      { time: '15:00', label: 'טרום־פתיחה' },
+      { time: '21:00', label: 'סיכום יום' }] });
 
   // Instagram needs >=2 images for a carousel, and a one-slide deck
   // is a window that had nothing to say. 7% of windows land here.
@@ -431,7 +437,11 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
 const MAX_STORIES = Number(process.env.MAX_STORIES || 3);
 
 /** The channel the account points at, in one place. */
-export const TG_LINK = 't.me/nq_es_hunters';
+// One home for the address, because it moves. It moved on 6 September
+// — the channel renamed from nq_es_hunters to hamal_shukhahon — and
+// every board that prints it, the story strip and the evening card
+// alike, reads this constant.
+export const TG_LINK = 't.me/hamal_shukhahon';
 
 /**
  * The same hour, told as stories instead of summarised as a post.

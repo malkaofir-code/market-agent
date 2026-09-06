@@ -70,6 +70,9 @@ const TPL_KEY = 'template-recent';
 // boards, so "every sixth" only means anything if the count survives
 // between runs.
 const TALLY_KEY = 'story-tally';
+// The source channel's numeric identity, kept so a rename of its
+// @username cannot cut the agent off from it again.
+const PEER_KEY = 'tg-peer';
 
 /**
  * The next look, and the promise not to reuse it.
@@ -423,10 +426,24 @@ async function main() {
     try {
       const { fetchRecent } = await import('./ingest.js');
       const { withMedia } = await import('./db.js');
-      const rows = await fetchRecent(80, await withMedia());
+      const pinned = (await getState(PEER_KEY)) ?? null;
+      const { rows, peer } = await fetchRecent(80, await withMedia(), pinned);
       await putMessages(rows);
+      if (peer) await setState(PEER_KEY, peer);
       say('ingested', rows.length, 'message(s)');
-    } catch (e) { say('ingest failed (continuing):', e.message); }
+    } catch (e) {
+      // This used to be swallowed with a log line and nothing else.
+      //
+      // On 6 September the source channel renamed itself and this threw
+      // on every tick for seven hours. Every run stayed green, the
+      // dashboards looked healthy, and the account simply stopped —
+      // the failure mode that takes longest to notice is the one that
+      // does not announce itself. A dead source is worth waking
+      // somebody for.
+      say('INGEST FAILED —', e.message);
+      await notify(`❌ ingest failed\n${e.message}\n\nThe source channel may have been renamed or the session may be dead. Nothing new will be posted until this is fixed.`);
+      process.exitCode = 1;
+    }
   }
 
   // .env seeds the token once; after that Postgres holds the live one
