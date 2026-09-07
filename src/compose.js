@@ -473,6 +473,123 @@ function markWord(headline, figures) {
   return esc(headline);
 }
 
+// ─────────────────────────────────────────────────────────────
+// The narration.
+//
+// English, over Hebrew boards. The audience for the cards is Israeli;
+// the audience for a reel is whoever Instagram decides to show it to,
+// and that is the only reason this account has any reach beyond the
+// people already following it.
+//
+// It does NOT translate. Nothing here reads a Hebrew sentence and
+// says an English one — that would need a model, and a model that
+// paraphrases a financial headline is a machine for inventing numbers
+// that were never quoted. This account already published SPX +46.06%
+// once, from four stale carry rows and a comma read as a decimal
+// point, and the fix was to make every number traceable to something
+// the parser actually matched.
+//
+// So the voice says only what is already structured: the instrument
+// the topic table matched, the figure the parser extracted, and the
+// direction the board is ALREADY drawing behind him. A scene the
+// parser could not describe is narrated by nobody — silence over a
+// card is honest, and a bed is still playing under it.
+// ─────────────────────────────────────────────────────────────
+
+/** Futures symbols, said out loud rather than spelled.
+ *
+ * Short forms, because these are spoken on card one and card one is
+ * where a viewer decides. "Nasdaq futures down one point three three
+ * percent" is four seconds; "Nasdaq down one point three three" is
+ * two, and the strip on screen already says they are futures. */
+const SAY_SYM = {
+  NQ: 'Nasdaq', ES: 'S and P', YM: 'the Dow',
+  SPX: 'the S and P', NDX: 'the Nasdaq 100', RTY: 'the Russell',
+};
+
+const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
+  'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen',
+  'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy',
+  'eighty', 'ninety'];
+
+/** 0-999 in words. Beyond that is a level, not a percentage, and
+ *  nothing narrated here is ever a level. */
+function intWords(n) {
+  if (n < 20) return ONES[n];
+  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? `-${ONES[n % 10]}` : '');
+  return `${ONES[Math.floor(n / 100)]} hundred`
+    + (n % 100 ? ` ${intWords(n % 100)}` : '');
+}
+
+/**
+ * "1.33" -> "one point three three".
+ *
+ * Digit by digit after the point, the way a person reads a percentage
+ * aloud — "one point thirty-three" is a different number to some ears
+ * and this is not the place to be ambiguous. Returns null for
+ * anything that is not a plain number, so a malformed figure is
+ * silent rather than mispronounced.
+ */
+export function sayNum(text) {
+  const t = String(text ?? '').replace(/[−־]/g, '-').replace('%', '').trim();
+  // A leading + is normal on a figure and must not make the line
+  // silent. The decimal part is capped at two digits on purpose: with
+  // three, "46,061" — a LEVEL with a thousands separator, which is
+  // exactly how SPX came to be published as +46.06% — parses happily
+  // as a decimal and gets read aloud as a percentage. Two digits is
+  // how a percentage is quoted; anything else is not one, and is
+  // better said by nobody.
+  const m = /^[+-]?(\d{1,3})(?:[.,](\d{1,2}))?$/.exec(t);
+  if (!m) return null;
+  const whole = intWords(Number(m[1]));
+  if (!m[2]) return whole;
+  return `${whole} point ${[...m[2]].map(d => ONES[Number(d)]).join(' ')}`;
+}
+
+/**
+ * The tape, read short. Exact, or absent.
+ *
+ * ONE quote by default, not two. Two ran the opening line to eight
+ * seconds of speech — past the hold cap, so the last word would have
+ * been cut, on the one card where a viewer is deciding whether to
+ * stay. The second index is on the strip for anyone who wants it.
+ */
+function sayTape(quotes) {
+  const n = Number(process.env.REEL_SAY_QUOTES || 1);
+  const said = [];
+  for (const q of (quotes ?? []).slice(0, n)) {
+    const name = SAY_SYM[q.sym]; if (!name) continue;
+    const num = sayNum(q.chg); if (num == null) continue;
+    const way = Number(String(q.chg).replace(/[−־]/g, '-').replace(',', '.')) < 0
+      ? 'down' : 'up';
+    said.push(`${name} ${way} ${num} percent.`);
+  }
+  return said.join(' ');
+}
+
+/**
+ * One scene, one line — or nothing.
+ *
+ * The direction word is the same one the background already draws: if
+ * the candles behind him fall, the voice says down. They cannot
+ * disagree, because they read the same field.
+ */
+function sayScene(p, dir) {
+  const hay = `${p.headline} ${p.stand ?? ''}`;
+  const topic = TOPICS.find(t => t.re.test(hay))?.en ?? null;
+  const fig = p.figures?.length && p.figureCount < 4 ? p.figures[0].text : null;
+  const n = fig ? sayNum(fig) : null;
+  const way = dir === 'up' ? 'up' : dir === 'dn' ? 'down' : null;
+  if (topic && n && way) return `${cap(topic)}, ${way} ${n} percent.`;
+  if (topic && n) return `${cap(topic)}. ${cap(sayNum(fig))} percent.`;
+  if (n && way) return `${cap(way)} ${n} percent.`;
+  if (topic) return `${cap(topic)}.`;
+  return null;
+}
+
+const cap = t => String(t ?? '').charAt(0).toUpperCase() + String(t ?? '').slice(1);
+
 /** Which way the story points — the scene and his hands both follow it. */
 const GEST = { up: 'yes', dn: 'pause', '': 'explain' };
 
@@ -520,7 +637,7 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
       ? p.figures[0].text.replace(/[−־]/g, '-') : null;
     const dir = fig ? direction(p.figures[0].text, `${p.headline} ${p.stand ?? ''}`) : '';
     const marked = markWord(p.headline, p.figures);
-    return { type: 'scene', headline: p.headline, marked,
+    return { type: 'scene', headline: p.headline, marked, say: sayScene(p, dir),
       // The figure goes UNDER the line only when the line does not
       // already contain it. Printing 1.33% in the headline and again
       // beneath it is the board stuttering.
@@ -533,7 +650,10 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
   // they are looking at before the news starts.
   const slides = [{ type: 'scene', headline: 'היום בשוק',
     marked: 'היום ב<em>שוק</em>', sub: hhmm(w.end), dir: '',
-    gesture: 'welcome', seed, palette: ground(0) }];
+    gesture: 'welcome', seed, palette: ground(0),
+    // The opener is the most exact thing in the whole reel: the tape,
+    // read off the same quotes printed on the strip.
+    say: `Today in the U S market. ${sayTape(quotes)}`.trim() }];
 
   // 02-05 · the news, one story a scene.
   beats.forEach((p, i) => slides.push(scene(p, i + 1)));
@@ -542,7 +662,8 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
   // person on this platform worth asking for anything.
   slides.push({ type: 'scene', headline: 'עוקבים לעוד', marked: '<em>עוקבים</em> לעוד',
     sub: TG_LINK, dir: '', gesture: 'point', seed: seed + 99,
-    palette: ground(beats.length + 1) });
+    palette: ground(beats.length + 1),
+    say: process.env.REEL_SAY_CLOSE || 'Follow for the market, every day.' });
 
   return {
     key: `R:${w.key}`, template, window: span(w), date: ddmmyy(w.end),
@@ -748,19 +869,19 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
  * the caption because the window actually mentioned it.
  */
 const TOPICS = [
-  { re: /נאסד|nasdaq|NQ\b/i,                    word: 'נאסד״ק',        tag: 'נאסדק' },
-  { re: /S&P|אס אנד פי|ES\b/i,                  word: 'S&P 500',       tag: 'SP500' },
-  { re: /דאו|YM\b/i,                            word: 'דאו ג׳ונס',     tag: 'דאוגונס' },
-  { re: /ריבית|הפד\b|פדרל|פאוול|FOMC/i,         word: 'ריבית הפד',     tag: 'ריביתהפד' },
-  { re: /אינפלצי|מדד המחירים|CPI|PCE/i,          word: 'אינפלציה',      tag: 'אינפלציה' },
-  { re: /נפט|ברנט|אופ"?ק|OPEC/i,                 word: 'נפט',           tag: 'נפט' },
-  { re: /זהב|gold/i,                             word: 'זהב',           tag: 'זהב' },
-  { re: /ביטקוין|קריפטו|bitcoin|BTC/i,           word: 'קריפטו',        tag: 'קריפטו' },
-  { re: /תשואו?ת|אג"?ח|אגרות חוב|treasury/i,     word: 'תשואות אג״ח',   tag: 'אגח' },
-  { re: /דולר|שקל|מטבע|forex/i,                  word: 'מט״ח',          tag: 'מטח' },
-  { re: /אנבידיה|NVDA|שבבים|semiconduct/i,       word: 'שבבים',         tag: 'שבבים' },
-  { re: /טראמפ|trump|מכס|tariff/i,               word: 'מכסים',         tag: 'מכסים' },
-  { re: /דוחות|earnings|רווחי/i,                 word: 'עונת הדוחות',   tag: 'דוחות' },
+  { re: /נאסד|nasdaq|NQ\b/i,                    word: 'נאסד״ק',        tag: 'נאסדק',    en: 'the Nasdaq' },
+  { re: /S&P|אס אנד פי|ES\b/i,                  word: 'S&P 500',       tag: 'SP500',    en: 'the S and P 500' },
+  { re: /דאו|YM\b/i,                            word: 'דאו ג׳ונס',     tag: 'דאוגונס',  en: 'the Dow' },
+  { re: /ריבית|הפד\b|פדרל|פאוול|FOMC/i,         word: 'ריבית הפד',     tag: 'ריביתהפד', en: 'the Fed' },
+  { re: /אינפלצי|מדד המחירים|CPI|PCE/i,          word: 'אינפלציה',      tag: 'אינפלציה', en: 'inflation' },
+  { re: /נפט|ברנט|אופ"?ק|OPEC/i,                 word: 'נפט',           tag: 'נפט',      en: 'oil' },
+  { re: /זהב|gold/i,                             word: 'זהב',           tag: 'זהב',      en: 'gold' },
+  { re: /ביטקוין|קריפטו|bitcoin|BTC/i,           word: 'קריפטו',        tag: 'קריפטו',   en: 'crypto' },
+  { re: /תשואו?ת|אג"?ח|אגרות חוב|treasury/i,     word: 'תשואות אג״ח',   tag: 'אגח',      en: 'bond yields' },
+  { re: /דולר|שקל|מטבע|forex/i,                  word: 'מט״ח',          tag: 'מטח',      en: 'currencies' },
+  { re: /אנבידיה|NVDA|שבבים|semiconduct/i,       word: 'שבבים',         tag: 'שבבים',    en: 'chip stocks' },
+  { re: /טראמפ|trump|מכס|tariff/i,               word: 'מכסים',         tag: 'מכסים',    en: 'tariffs' },
+  { re: /דוחות|earnings|רווחי/i,                 word: 'עונת הדוחות',   tag: 'דוחות',    en: 'earnings' },
 ];
 
 /** The topics this window genuinely touches, most-mentioned first. */

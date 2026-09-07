@@ -101,6 +101,33 @@ jobs:
         if: inputs.mode == 'reel'
         run: command -v ffmpeg >/dev/null || (apt-get update -qq && apt-get install -y -qq ffmpeg)
 
+      # The voice model, restored BEFORE the download that would
+      # otherwise fetch it. Ordered the other way round it caches a
+      # file it just paid to download and never saves anyone the
+      # sixty megabytes.
+      - name: cache the voice
+        if: inputs.mode == 'reel'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/*.onnx*
+          key: piper-en_US-ryan-high-v1
+
+      # The narrator. Piper is a pip package plus a ~60MB voice model
+      # from HuggingFace — no key, no cost, no rate limit at 22:06.
+      # Every line here ends in `|| true`: a reel with the bed and no
+      # voice is still a reel, and the day's only surface a stranger
+      # sees is not worth losing to a slow CDN.
+      - name: piper
+        if: inputs.mode == 'reel'
+        run: |
+          python3 -m pip install --quiet --break-system-packages piper-tts || true
+          [ -f "${VOICE}.onnx" ] || python3 -m piper.download_voices "${VOICE}" --download-dir . || true
+          ls -la *.onnx* 2>/dev/null || echo "no voice model — the reel will be silent"
+        env:
+          VOICE: en_US-ryan-high
+        working-directory: ${{ runner.temp }}
+        continue-on-error: true
+
       - name: run
         env:
           TZ: Asia/Jerusalem
@@ -171,6 +198,20 @@ jobs:
           # surface that collects every reel using it; an unnamed one
           # is dead space.
           REEL_AUDIO_NAME: 'מרקט אלרט'
+          # ── the voice ────────────────────────────────────
+          # English narration over the Hebrew boards. Set to '0' to
+          # publish silent reels with the bed alone.
+          REEL_VOICE: '1'
+          REEL_VOICE_MODEL: en_US-ryan-high
+          PIPER_HOME: ${{ runner.temp }}
+          # length-scale is phoneme duration, so below 1 is FASTER.
+          # Reels are watched fast and a measured newsreader pace reads
+          # as slow on a surface people are scrolling past.
+          REEL_VOICE_RATE: '0.95'
+          # A narrated scene lasts as long as its sentence; this is the
+          # floor for one nobody speaks over.
+          REEL_HOLD_SEC: '2.0'
+          REEL_SAY_CLOSE: 'Follow for the U S market, every day.'
           IGNORE_SCHEDULE: ${{ inputs.now && '1' || '0' }}
           # Never set by the cron — a catch-up is always a decision.
           CATCHUP: ${{ inputs.catchup && '1' || '0' }}

@@ -516,8 +516,47 @@ async function runReel() {
   const { files: fgs } = await renderDeck(deck, dir, { format: 'png', layer: 'fg' });
   say('rendered', bgs.length, 'scene(s) in two planes');
 
+  // ── the narration ────────────────────────────────────────
+  // English over Hebrew boards, from lines compose built out of
+  // figures the parser matched — never a translation, because a
+  // paraphrased financial headline is a machine for inventing
+  // numbers, and this account has already published one.
+  //
+  // Every failure here is soft on purpose. A missing Piper, a slow
+  // model download, a line that will not synthesise: each costs the
+  // narration and nothing else. A silent reel is a reel; no reel is
+  // the day's only chance at a stranger, gone.
+  const { holdsFor, MAX_HOLD } = await import('./reel.js');
+  let voices = null, holds = null;
+  if (process.env.REEL_VOICE !== '0') {
+    const { ensureVoice, say: speak, seconds } = await import('./voice.js');
+    if (await ensureVoice()) {
+      voices = []; const secs = [];
+      for (const [i, sl] of deck.slides.entries()) {
+        let wav = null;
+        try { wav = sl.say ? await speak(sl.say, join(dir, `say-${i}.wav`)) : null; }
+        catch (e) { say(`  voice ${i + 1} failed — ${e.message}`); }
+        const len = wav ? await seconds(wav).catch(() => 0) : 0;
+        // Silence beats a cut word. A line longer than a scene can
+        // hold is dropped whole rather than played and chopped —
+        // half a sentence over a card is the one thing that reads as
+        // broken rather than as a choice.
+        if (len > MAX_HOLD) {
+          say(`  voice ${i + 1} dropped — ${len.toFixed(1)}s exceeds the ${MAX_HOLD}s scene cap`);
+          voices.push(null); secs.push(0);
+        } else {
+          voices.push(wav); secs.push(len);
+        }
+      }
+      holds = holdsFor(secs, deck.slides.length);
+      say(`narrated ${voices.filter(Boolean).length}/${deck.slides.length} scene(s)`);
+    } else {
+      say('no voice on this runner — the reel goes out with the bed alone');
+    }
+  }
+
   const mp4 = join(dir, 'reel.mp4');
-  const built = await buildReel(bgs, fgs, mp4, { audio: audioBed() });
+  const built = await buildReel(bgs, fgs, mp4, { audio: audioBed(), voices, holds });
   say(`encoded ${built.seconds}s · ${built.scenes} scenes · ${built.audio}`);
 
   if (DRY) { say('DRY RUN OK —', mp4); return; }
@@ -541,7 +580,11 @@ async function runReel() {
       posted_at: Math.floor(Date.now() / 1000) });
     await setPublished(deck.key, { media_id: r.id, permalink: r.permalink,
       choices: { template: String(tpl.id), name: tpl.name, kind: 'reel',
-        seconds: built.seconds, audio: built.audio } });
+        seconds: built.seconds, audio: built.audio,
+        // Whether a reel was narrated is the whole question this
+        // format is asking, so it is recorded beside the result
+        // rather than inferred from the log later.
+        voice: voices ? voices.filter(Boolean).length : 0 } });
     await logRun(deck.key, 'reel', true, r.permalink ?? r.id);
     await notify(`🎬 ${deck.key} — reel live (${built.seconds}s)\n${r.permalink ?? ''}`);
   } catch (e) {
