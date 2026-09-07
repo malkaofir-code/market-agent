@@ -491,11 +491,23 @@ async function runReel() {
   // floor at midnight would have handed the evening reel the same four
   // beats the afternoon one already used — the same film twice, which
   // is worse than one film.
-  const floor = last && last > day ? Number(last) : day;
+  // A forced dispatch reads the whole day, not just since the last
+  // reel.
+  //
+  // The floor is right for the schedule — the evening reel should
+  // cover what happened since the afternoon one, not repeat it — and
+  // exactly wrong for a person testing a change they just pushed. At
+  // 22:43 tonight it said "only 0 message(s) since the last reel",
+  // which was true and completely useless: the reel had gone out
+  // half an hour earlier and no news arrives in half an hour at that
+  // time of night. A forced reel re-telling the day is a duplicate
+  // nobody scheduled; a forced reel that cannot run at all is a
+  // feature nobody can test.
+  const floor = (!forced && last && last > day) ? Number(last) : day;
   const rows = await messagesInAll(floor, now);
   const need = Number(process.env.REEL_MIN_MESSAGES || 5);
   if (rows.length < need) {
-    say(`SKIP — only ${rows.length} message(s) since ${last && last > day ? 'the last reel' : 'midnight'} (need ${need})`);
+    say(`SKIP — only ${rows.length} message(s) since ${floor === day ? 'midnight' : 'the last reel'} (need ${need})`);
     return;
   }
 

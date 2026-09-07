@@ -97,35 +97,49 @@ jobs:
       # and reels must be H.264/AAC or Meta refuses the container.
       # Conditional because ~40 ticks a day never touch video and none
       # of them should pay thirty seconds of apt for it.
-      - name: ffmpeg
+      # ffmpeg for the encode, python3 for the narrator. The Playwright
+      # image ships neither: its ffmpeg is a webm capture build with no
+      # H.264 encoder, and it carries node rather than python, which is
+      # why the piper step below finished in zero seconds doing nothing
+      # at all on its first run.
+      - name: ffmpeg and python
         if: inputs.mode == 'reel'
-        run: command -v ffmpeg >/dev/null || (apt-get update -qq && apt-get install -y -qq ffmpeg)
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq ffmpeg python3 python3-pip
+          ffmpeg -version | head -1; python3 --version
 
-      # The voice model, restored BEFORE the download that would
-      # otherwise fetch it. Ordered the other way round it caches a
-      # file it just paid to download and never saves anyone the
-      # sixty megabytes.
+      # /tmp/piper, not ${{ runner.temp }}.
+      #
+      # This job runs in a container, and runner.temp is evaluated on
+      # the HOST — it expanded to /home/runner/work/_temp, a path that
+      # does not exist inside the image, where the mount is /__w/_temp.
+      # The piper step below had it as its working-directory, so the
+      # step died before its first line and reported success in zero
+      # seconds. An absolute path that exists in every image needs no
+      # expression to be translated correctly and cannot drift.
       - name: cache the voice
         if: inputs.mode == 'reel'
         uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/*.onnx*
+          path: /tmp/piper
           key: piper-en_US-ryan-high-v1
 
       # The narrator. Piper is a pip package plus a ~60MB voice model
       # from HuggingFace — no key, no cost, no rate limit at 22:06.
-      # Every line here ends in `|| true`: a reel with the bed and no
-      # voice is still a reel, and the day's only surface a stranger
-      # sees is not worth losing to a slow CDN.
+      # Every line ends in `|| true`: a reel with the bed and no voice
+      # is still a reel, and the day's only surface a stranger sees is
+      # not worth losing to a slow CDN.
       - name: piper
         if: inputs.mode == 'reel'
         run: |
+          mkdir -p /tmp/piper
           python3 -m pip install --quiet --break-system-packages piper-tts || true
-          [ -f "${VOICE}.onnx" ] || python3 -m piper.download_voices "${VOICE}" --download-dir . || true
-          ls -la *.onnx* 2>/dev/null || echo "no voice model — the reel will be silent"
+          [ -f "/tmp/piper/${VOICE}.onnx" ] \
+            || python3 -m piper.download_voices "${VOICE}" --download-dir /tmp/piper || true
+          ls -la /tmp/piper || echo "no voice model — the reel goes out with the bed alone"
         env:
           VOICE: en_US-ryan-high
-        working-directory: ${{ runner.temp }}
         continue-on-error: true
 
       - name: run
@@ -203,7 +217,7 @@ jobs:
           # publish silent reels with the bed alone.
           REEL_VOICE: '1'
           REEL_VOICE_MODEL: en_US-ryan-high
-          PIPER_HOME: ${{ runner.temp }}
+          PIPER_HOME: /tmp/piper
           # length-scale is phoneme duration, so below 1 is FASTER.
           # Reels are watched fast and a measured newsreader pace reads
           # as slow on a surface people are scrolling past.
