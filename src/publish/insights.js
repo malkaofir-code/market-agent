@@ -52,6 +52,16 @@ const LADDER = {
     'reach,views',
     'reach',
   ],
+  // A reel is measured on whether it HELD anyone, not on whether it
+  // was served. Watch time first, then the spread metrics, then the
+  // same floor as everything else.
+  reel: [
+    'reach,views,likes,comments,saved,shares,total_interactions,ig_reels_avg_watch_time,ig_reels_video_view_total_time',
+    'reach,views,likes,comments,saved,shares,total_interactions',
+    'reach,views,likes,comments,saved,shares',
+    'reach,views',
+    'reach',
+  ],
 };
 
 /**

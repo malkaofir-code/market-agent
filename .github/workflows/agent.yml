@@ -92,6 +92,15 @@ jobs:
 
       - run: npm ci --omit=dev
 
+      # The one mode that needs a real encoder. The Playwright image
+      # ships an ffmpeg built for webm capture, not an H.264 encoder,
+      # and reels must be H.264/AAC or Meta refuses the container.
+      # Conditional because ~40 ticks a day never touch video and none
+      # of them should pay thirty seconds of apt for it.
+      - name: ffmpeg
+        if: inputs.mode == 'reel'
+        run: command -v ffmpeg >/dev/null || (apt-get update -qq && apt-get install -y -qq ffmpeg)
+
       - name: run
         env:
           TZ: Asia/Jerusalem
@@ -133,6 +142,29 @@ jobs:
           # in run.js, not in the cron expression, because pg_cron
           # thinks in UTC and Israel changes its clocks twice a year.
           DIGEST_HOURS: '8,15,21'
+          # ── the reel track ───────────────────────────────
+          # Two a day, local. 17:00 is an hour into the US session —
+          # the open has produced a real move and the day's European
+          # news is already in the tape. 22:00 is the US session's last
+          # hour AND the peak of the Israeli evening scroll, which is
+          # the half that matters: a reel is shown to strangers, and it
+          # is shown to them when they are awake.
+          # These live here and not in the cron expression for the same
+          # reason the digest hours do — pg_cron is UTC and Israel
+          # changes its clocks twice a year.
+          REEL_HOURS: '17,22'
+          MAX_REELS_PER_DAY: '2'
+          # Hours, not minutes. A reel is the only surface a stranger
+          # sees; two of them an hour apart split the same audience
+          # across both and teach the ranker that neither held anyone.
+          MIN_MINUTES_BETWEEN_REELS: '180'
+          # The evening reel covers what happened since the afternoon
+          # one. Fewer than this many messages in that stretch and there
+          # is no second film to make — better one good reel than two
+          # thin ones.
+          REEL_MIN_MESSAGES: '5'
+          # Four beats plus a title and a close: six scenes, ~11s.
+          REEL_BEATS: '4'
           IGNORE_SCHEDULE: ${{ inputs.now && '1' || '0' }}
           # Never set by the cron — a catch-up is always a decision.
           CATCHUP: ${{ inputs.catchup && '1' || '0' }}
@@ -194,6 +226,7 @@ jobs:
           path: |
             out/**/*.png
             out/**/*.jpeg
+            out/**/*.mp4
             out/browser/**
           retention-days: 7
           if-no-files-found: ignore

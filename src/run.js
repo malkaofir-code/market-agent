@@ -17,7 +17,7 @@ import {
   putMessages, messagesIn, messagesInAll, oldestUnconsumedBefore, markConsumed,
   storyMessagesIn, oldestUnstoriedBefore, markStoried, storiesToday, retireStories, unretireStoriesSince,
   setPublished, publishedSince, putInsight, performanceBy,
-  lastStoryAt,
+  lastStoryAt, reelsToday, lastReelAt,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
@@ -61,6 +61,21 @@ function dayStart() {
       .format(new Date(guess * 1000)).replace(' ', 'T') + 'Z') / 1000));
   return guess + offMin;
 }
+/** The local wall clock as YYYY-MM-DDTHH — a key that is unique per hour. */
+function stampKey(at = Math.floor(Date.now() / 1000)) {
+  const tz = process.env.TZ || 'Asia/Jerusalem';
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric',
+    month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false })
+    .formatToParts(new Date(at * 1000))
+    .reduce((a, x) => (a[x.type] = x.value, a), {});
+  return `${p.year}-${p.month}-${p.day}T${p.hour}`;
+}
+
+/** The local hour, as a number. Every schedule gate reads this. */
+const localHour = () => Number(new Intl.DateTimeFormat('en-GB',
+  { timeZone: process.env.TZ || 'Asia/Jerusalem', hour: '2-digit', hour12: false })
+  .format(new Date()));
+
 const CARRY_KEY = 'tape-carry';
 // One shared memory across BOTH tracks. Separate lists would let an
 // hour's stories and the digest that follows them land on the same
@@ -118,7 +133,7 @@ process.on('unhandledRejection', e => {
 });
 
 // ── rails ────────────────────────────────────────────────────
-async function blocked({ stories = false } = {}) {
+async function blocked({ stories = false, reel = false } = {}) {
   const ks = process.env.KILL_SWITCH || './PAUSED';
   if (existsSync(ks)) return `kill switch present (${ks})`;
 
@@ -132,9 +147,11 @@ async function blocked({ stories = false } = {}) {
   // The post-rate rails are about POSTS. A story is a different thing
   // on a different clock — three of them at :16 must not be silenced
   // because a digest went out at 15:31, and they have their own cap
-  // inside runStories(). The kill switch, the active hours and the
-  // failure latch apply to both.
-  if (!stories) {
+  // inside runStories(). A reel is a third thing again, on a clock of
+  // hours rather than minutes, with its rails inside runReel(). The
+  // kill switch, the active hours and the failure latch apply to all
+  // three.
+  if (!stories && !reel) {
     const cap = Number(process.env.MAX_POSTS_PER_DAY || 12);
     const n = await postsToday();
     if (n >= cap) return `daily cap reached (${n}/${cap})`;
@@ -429,17 +446,65 @@ async function runInsights() {
  */
 async function runReel() {
   const { haveFfmpeg, buildReel, audioBed } = await import('./reel.js');
-  if (!await haveFfmpeg()) { say('SKIP — ffmpeg not on this runner'); return; }
+  // Loud, not quiet. A reel track that skips itself every day because
+  // the encoder is missing looks exactly like a reel track that has
+  // nothing to say — which is the failure mode that cost this account
+  // seven silent hours in September.
+  if (!await haveFfmpeg()) {
+    say('SKIP — ffmpeg not on this runner');
+    if (!DRY) {
+      await notify('❌ reel — ffmpeg is not installed on the runner, so no reel was built.');
+      process.exitCode = 1;
+    }
+    return;
+  }
 
+  const now = Math.floor(Date.now() / 1000);
   const day = dayStart();
-  const rows = await messagesInAll(day, Math.floor(Date.now() / 1000));
-  if (!rows.length) { say('SKIP — nothing today'); return; }
 
-  const { t: tpl, recent: tplRecent } = await nextTemplate(`R:${day}`);
+  // ── the reel's own two rails ─────────────────────────────
+  // One or two a day, hours apart. The cron owns the rhythm; these
+  // are the belt that holds it when a dispatch fires twice or a hand
+  // dispatches one on top of the schedule. Same shape as the story
+  // rails, and counted from local midnight for the same reason.
+  const cap = Number(process.env.MAX_REELS_PER_DAY || 2);
+  const made = await reelsToday();
+  if (!DRY && made >= cap) { say(`SKIP — reel cap reached (${made}/${cap})`); return; }
+
+  const gap = Number(process.env.MIN_MINUTES_BETWEEN_REELS || 180);
+  const last = await lastReelAt();
+  const since = last ? Math.round((now - last) / 60) : null;
+  if (!DRY && gap && since != null && since < gap) {
+    say(`SKIP — only ${since}min since the last reel (min ${gap})`);
+    return;
+  }
+
+  // A reel covers what has happened SINCE the last one, not the whole
+  // day over again. Both of the day's runs read the same table, so a
+  // floor at midnight would have handed the evening reel the same four
+  // beats the afternoon one already used — the same film twice, which
+  // is worse than one film.
+  const floor = last && last > day ? Number(last) : day;
+  const rows = await messagesInAll(floor, now);
+  const need = Number(process.env.REEL_MIN_MESSAGES || 5);
+  if (rows.length < need) {
+    say(`SKIP — only ${rows.length} message(s) since ${last && last > day ? 'the last reel' : 'midnight'} (need ${need})`);
+    return;
+  }
+
+  const { t: tpl, recent: tplRecent } = await nextTemplate(`R:${stampKey(now)}`);
   const deck = composeReel(rows, {
-    carry: (await getState(CARRY_KEY)) ?? {}, template: tpl.id,
-    endTs: Math.floor(Date.now() / 1000) });
+    carry: (await getState(CARRY_KEY)) ?? {}, template: tpl.id, endTs: now });
   if (deck.skip) { say('SKIP — reel', `(${deck.skip})`); return; }
+
+  // One row per reel, not one row per day.
+  //
+  // composeReel keys itself off the first message it was given, so two
+  // runs over an overlapping day could land on the same key — the
+  // second silently overwriting the first's row, taking its media id
+  // with it and leaving the cap above convinced only one had gone out.
+  // The key carries the hour it was published in instead.
+  deck.key = `R:${stampKey(now)}`;
 
   say(`${deck.key} — ${rows.length} msgs -> ${deck.slides.length} frames `
     + `[${deck.slides.map(x => x.type)}] · template ${tpl.id} ${tpl.name}`);
@@ -463,11 +528,15 @@ async function runReel() {
   // grid shows the hook rather than whatever frame Instagram picks.
   const urls = await upload([mp4, bgs[0]], prefix);
   say('uploaded');
+  // The row exists BEFORE the attempt, so a reel that Meta refuses
+  // leaves a record instead of vanishing. It counts toward nothing
+  // until it is 'posted', so a failure never eats the day's second
+  // slot — it just stops the failure from being invisible.
+  await upsertWindow(deck.key, floor, Math.floor(Date.now() / 1000));
   try {
     const r = await publishReel(urls[0], deck.caption, { coverUrl: urls[1] });
     say(`POSTED ${r.permalink ?? r.id}`);
     await keepTemplate(tplRecent, tpl.id);
-    await upsertWindow(deck.key, day, Math.floor(Date.now() / 1000));
     await setWindow({ key: deck.key, status: 'posted', slides: bgs.length,
       posted_at: Math.floor(Date.now() / 1000) });
     await setPublished(deck.key, { media_id: r.id, permalink: r.permalink,
@@ -477,6 +546,7 @@ async function runReel() {
     await notify(`🎬 ${deck.key} — reel live (${built.seconds}s)\n${r.permalink ?? ''}`);
   } catch (e) {
     say('REEL FAILED —', e.message);
+    await setWindow({ key: deck.key, status: 'failed', slides: bgs.length, error: e.message });
     await logRun(deck.key, 'reel', false, e.message);
     await notify(`❌ reel ${deck.key}\n${e.message}`);
     process.exitCode = 1;
@@ -527,13 +597,26 @@ async function main() {
 
   // A review run publishes nothing, so the post-rate guards have no
   // opinion about it — let it render even at the daily cap.
-  const stop = (DRY || REVIEW) ? null : await blocked({ stories: STORIES });
+  const stop = (DRY || REVIEW) ? null : await blocked({ stories: STORIES, reel: REEL });
   if (stop) { say('SKIP —', stop); return; }
 
   // A reel publishes, so unlike insights it sits BEHIND the kill
   // switch, the active hours and the failure latch — not in front of
   // them with the read-only mode.
-  if (REEL) return runReel();
+  if (REEL) {
+    // Two slots a day, gated on the LOCAL hour for the same reason the
+    // digest is: pg_cron thinks in UTC and Israel moves its clocks
+    // twice a year, so a cron expression pinned to the right minute in
+    // August is an hour wrong in November. The cron dispatches every
+    // hour; this is what makes only two of them do anything.
+    const hours = (process.env.REEL_HOURS || '').split(',').map(x => x.trim()).filter(Boolean);
+    if (hours.length && process.env.IGNORE_SCHEDULE !== '1' && !DRY
+        && !hours.includes(String(localHour()))) {
+      say(`SKIP — ${localHour()}:xx is not a reel hour (${hours.join(', ')})`);
+      return;
+    }
+    return runReel();
+  }
 
   // The story track shares the kill switch, the active hours and the
   // failure latch above, and nothing else: its own cap lives inside.

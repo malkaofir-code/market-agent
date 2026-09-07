@@ -141,9 +141,18 @@ export const getWindow = key =>
 const DAY_START = `extract(epoch from date_trunc('day', now() at time zone $tz) at time zone $tz)::bigint`
   .replace(/\$tz/g, `'${(process.env.TZ || 'Asia/Jerusalem').replace(/'/g, "''")}'`);
 
+// A reel is not a post and must not spend the post budget.
+//
+// The prefixes are the whole ledger: 'S:' a story set, 'R:' a reel,
+// bare a carousel. Every rail below filters on them explicitly rather
+// than on "not a story", because the moment a third kind existed
+// "not a story" quietly meant "post or reel" — one reel would have
+// eaten a digest slot and opened the minimum gap in front of it.
+const POSTS_ONLY = `key not like 'S:%' and key not like 'R:%'`;
+
 export const postsToday = () =>
   q(`select count(*)::int n from agent.windows
-     where status='posted' and key not like 'S:%'
+     where status='posted' and ${POSTS_ONLY}
        and posted_at >= ${DAY_START}`)
     .then(r => r.rows[0].n);
 
@@ -162,7 +171,9 @@ export const setPublished = (key, { media_id = null, permalink = null, choices =
 /** Everything published in the last `days` that still has a media id. */
 export const publishedSince = (days = 14) =>
   q(`select key, media_id, posted_at, choices,
-            case when key like 'S:%' then 'story' else 'post' end as kind
+            case when key like 'S:%' then 'story'
+                 when key like 'R:%' then 'reel'
+                 else 'post' end as kind
      from agent.windows
      where status = 'posted' and media_id is not null
        and posted_at > extract(epoch from now())::bigint - $1 * 86400
@@ -198,7 +209,7 @@ export const performanceBy = (field, days = 30, kind = 'post') =>
 
 export const lastPostAt = () =>
   q(`select max(posted_at) t from agent.windows
-     where status='posted' and key not like 'S:%'`).then(r => r.rows[0].t);
+     where status='posted' and ${POSTS_ONLY}`).then(r => r.rows[0].t);
 
 /** When the last story went up — the other half of the spacing rule. */
 export const lastStoryAt = () =>
@@ -212,12 +223,33 @@ export const storiesToday = () =>
        and posted_at >= ${DAY_START}`)
     .then(r => r.rows[0].n);
 
+// ── the reel track's own two rails ───────────────────────────
+//
+// One or two a day, hours apart. A reel is the only thing this
+// account publishes that a stranger can be shown, so it is worth
+// spending a run on — and worth NOT spending three, because two reels
+// twenty minutes apart split the same audience across both and teach
+// the ranker that neither held anyone.
+//
+// Counted from local midnight for the same reason the story cap is:
+// a rolling 24 hours means a cadence change silently blocks the whole
+// next day.
+export const reelsToday = () =>
+  q(`select count(*)::int n from agent.windows
+     where status='posted' and key like 'R:%'
+       and posted_at >= ${DAY_START}`)
+    .then(r => r.rows[0].n);
+
+export const lastReelAt = () =>
+  q(`select max(posted_at) t from agent.windows
+     where status='posted' and key like 'R:%'`).then(r => r.rows[0].t);
+
 // Only outcomes from the last `sinceMin` minutes count toward the
 // pause. A latch with no expiry is indistinguishable from a dead
 // agent: three plumbing failures at breakfast would silently kill
 // every window for the rest of the week.
 export const recentOutcomes = (n, sinceMin = 0) =>
-  q(`select status from agent.windows where status in ('posted','failed') and key not like 'S:%'
+  q(`select status from agent.windows where status in ('posted','failed') and ${POSTS_ONLY}
      ${sinceMin ? 'and coalesce(posted_at, end_ts) > extract(epoch from now()) - $2' : ''}
      order by coalesce(posted_at, end_ts) desc limit $1`,
     sinceMin ? [n, sinceMin * 60] : [n]).then(r => r.rows.map(x => x.status));
