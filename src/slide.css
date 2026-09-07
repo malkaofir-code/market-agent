@@ -682,3 +682,21 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .a-sn .sn-s{font-family:var(--f-mono);font-size:38px;font-weight:700;margin:24px 0 0;
   color:var(--fg);opacity:.92;direction:ltr;unicode-bidi:isolate;
   text-shadow:0 3px 18px rgba(0,0,0,.6)}
+
+/* ── the reel's two planes ───────────────────────────────────────
+   The same scene rendered twice: once as the market alone, once as
+   the man and the line alone on nothing. ffmpeg then moves them at
+   different rates and against each other, which is what gives a frame
+   depth. One flat image can only ever drift. */
+.slide.lay-bg .ron,
+.slide.lay-bg .sn-txt{display:none}
+
+.slide.lay-fg,
+.slide.lay-fg .bgm{background:transparent}
+.slide.lay-fg .sc-bg{display:none}
+.slide.lay-fg::before,
+.slide.lay-fg::after{display:none}
+/* The page itself has to be transparent for the foreground pass, or
+   the screenshot comes back fully opaque and there is nothing to
+   composite. :has() reaches the ancestor CSS otherwise cannot. */
+html:has(.lay-fg), body:has(.lay-fg){background:transparent}

@@ -82,7 +82,7 @@ const MASCOT_RETRIES = ['smaller', 'far-edge', 'smaller-far-edge'];
  * row and re-measure. Every other archetype still fails loudly - there
  * is nothing to shed on a cover.
  */
-export async function renderDeck(deck, outDir, { scale = 1, format = 'png', story = false } = {}) {
+export async function renderDeck(deck, outDir, { scale = 1, format = 'png', story = false, layer = null } = {}) {
   mkdirSync(outDir, { recursive: true });
   const size = story ? STORY : CANVAS;
   const browser = await chromium.launch();
@@ -147,7 +147,7 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
 
 
       for (let attempt = 0; attempt < 20; attempt++) {
-        await p.setContent(page(buildSlide(slide, meta, i, slides.length, { story }), CSS),
+        await p.setContent(page(buildSlide(slide, meta, i, slides.length, { story, layer }), CSS),
           { waitUntil: 'networkidle' });
         try { await p.evaluate(() => document.fonts.ready); } catch {}
         await p.waitForTimeout(120);
@@ -263,9 +263,19 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
       // The API path needs JPEG (Meta accepts nothing else). Quality 95
       // because the ground is a 5.5%-ink graph-paper grid and hairline
       // rules - exactly the content JPEG smears at the usual 80.
-      const file = join(outDir, `slide-${String(i + 1).padStart(2, '0')}.${format}`);
+      // A layered pass names its files by plane, and the foreground
+      // is always a PNG whatever the deck's format says — JPEG has no
+      // alpha and the whole point of that pass is the alpha.
+      const stem = layer ? layer : 'slide';
+      const ext = layer === 'fg' ? 'png' : format;
+      const file = join(outDir, `${stem}-${String(i + 1).padStart(2, '0')}.${ext}`);
+      // The foreground pass must keep its alpha: it is composited over
+      // a background that moves independently, and an opaque cut-out
+      // has nothing to composite against.
       await p.locator('.slide').screenshot(
-        format === 'jpeg' ? { path: file, type: 'jpeg', quality: 100 } : { path: file });
+        layer === 'fg' ? { path: file, omitBackground: true }
+        : format === 'jpeg' ? { path: file, type: 'jpeg', quality: 100 }
+        : { path: file });
       files.push(file);
     }
   } finally {

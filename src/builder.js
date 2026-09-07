@@ -492,7 +492,7 @@ const coverLayer = slide => {
   return `<div class="cv-bleed"><img src="${esc(slide.photo.src)}" alt=""></div>`;
 };
 
-export function buildSlide(slide, ctx, i, n, { story = false } = {}) {
+export function buildSlide(slide, ctx, i, n, { story = false, layer = null } = {}) {
   const body = ARCHETYPES[slide.type];
   if (!body) throw new Error(`unknown archetype: ${slide.type}`);
   const cover = COVERS.has(slide.type);
@@ -541,7 +541,13 @@ export function buildSlide(slide, ctx, i, n, { story = false } = {}) {
   // alternates sides down the set — which on a frame that centres him
   // meant half the scenes rendered with him sliced off at the margin.
   const reel = slide.type === 'scene';
-  return `<div class="slide${story && !reel ? ' slide--story' + alt : ''}${reel ? ' slide--reel' : ''}${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
+  // A reel scene can be rendered as one flat frame, or split into the
+  // layers that make it move: the market behind and the man in front.
+  // Rendered apart they can be given different motion, and different
+  // motion between planes is the whole difference between a picture
+  // that drifts and a shot with depth in it.
+  const lay = layer ? ` lay-${layer}` : '';
+  return `<div class="slide${lay}${story && !reel ? ' slide--story' + alt : ''}${reel ? ' slide--reel' : ''}${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
 ${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }

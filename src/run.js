@@ -445,12 +445,15 @@ async function runReel() {
     + `[${deck.slides.map(x => x.type)}] · template ${tpl.id} ${tpl.name}`);
 
   const dir = join('./out', deck.key.replace(/[:]/g, '').replace('R', 'R-'));
-  const { files } = await renderDeck(deck, dir, { format: 'jpeg', story: true });
-  say('rendered', files.length, 'frame(s)');
+  // Two passes over the same deck: the market, then him and the line
+  // on nothing. Rendered apart so they can be moved apart.
+  const { files: bgs } = await renderDeck(deck, dir, { format: 'jpeg', layer: 'bg' });
+  const { files: fgs } = await renderDeck(deck, dir, { format: 'png', layer: 'fg' });
+  say('rendered', bgs.length, 'scene(s) in two planes');
 
   const mp4 = join(dir, 'reel.mp4');
-  const built = await buildReel(files, mp4, { audio: audioBed() });
-  say(`encoded ${built.seconds}s (${built.audio})`);
+  const built = await buildReel(bgs, fgs, mp4, { audio: audioBed() });
+  say(`encoded ${built.seconds}s · ${built.scenes} scenes · ${built.audio}`);
 
   if (DRY) { say('DRY RUN OK —', mp4); return; }
 
@@ -458,14 +461,14 @@ async function runReel() {
   const prefix = deck.key.replace(/[:]/g, '');
   // The cover goes up as an image beside the video so the profile
   // grid shows the hook rather than whatever frame Instagram picks.
-  const urls = await upload([mp4, files[0]], prefix);
+  const urls = await upload([mp4, bgs[0]], prefix);
   say('uploaded');
   try {
     const r = await publishReel(urls[0], deck.caption, { coverUrl: urls[1] });
     say(`POSTED ${r.permalink ?? r.id}`);
     await keepTemplate(tplRecent, tpl.id);
     await upsertWindow(deck.key, day, Math.floor(Date.now() / 1000));
-    await setWindow({ key: deck.key, status: 'posted', slides: files.length,
+    await setWindow({ key: deck.key, status: 'posted', slides: bgs.length,
       posted_at: Math.floor(Date.now() / 1000) });
     await setPublished(deck.key, { media_id: r.id, permalink: r.permalink,
       choices: { template: String(tpl.id), name: tpl.name, kind: 'reel',
@@ -478,7 +481,7 @@ async function runReel() {
     await notify(`❌ reel ${deck.key}\n${e.message}`);
     process.exitCode = 1;
   } finally {
-    await remove([mp4, files[0]], prefix);
+    await remove([mp4, bgs[0]], prefix);
   }
 }
 
