@@ -22,7 +22,18 @@ from piper.config import SynthesisConfig
 
 
 def main() -> int:
-    req = json.load(sys.stdin)
+    # A path argument, not stdin.
+    #
+    # This read json.load(sys.stdin), and node's ASYNC execFile has no
+    # `input` option — that belongs to spawnSync. The payload was
+    # silently dropped, stdin never closed, and this sat blocked
+    # forever while the reel waiting on it ran out the job timeout.
+    # A path in argv cannot be silently dropped.
+    if len(sys.argv) > 1:
+        with open(sys.argv[1], "r", encoding="utf-8") as fh:
+            req = json.load(fh)
+    else:
+        req = json.load(sys.stdin)
     model = req["model"]
     lines = req["lines"]
     length = float(req.get("length_scale") or 1.0)

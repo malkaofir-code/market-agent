@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -130,9 +130,15 @@ export async function sayAll(lines, dir) {
       return line ? { text: line, out: join(dir, `say-${i}.wav`) } : {};
     }),
   };
-  const { stdout } = await run('python3', [join(HERE, 'py', 'speak.py')],
-    { input: JSON.stringify(req), maxBuffer: 1 << 26,
-      timeout: SAY_MS, killSignal: 'SIGKILL' });
+  // Through a file, not stdin. Node's async execFile silently ignores
+  // `input` — that is a spawnSync option — so the payload never
+  // arrived, speak.py blocked on a stdin that never closed, and the
+  // reel waiting on it burned the entire job timeout while looking
+  // like a slow model download. A path in argv cannot be dropped.
+  const reqPath = join(dir, 'say-request.json');
+  writeFileSync(reqPath, JSON.stringify(req));
+  const { stdout } = await run('python3', [join(HERE, 'py', 'speak.py'), reqPath],
+    { maxBuffer: 1 << 26, timeout: SAY_MS, killSignal: 'SIGKILL' });
   const out = JSON.parse(stdout);
   return lines.map((_, i) => (out[i] && existsSync(out[i]) ? out[i] : null));
 }
