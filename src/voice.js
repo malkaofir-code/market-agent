@@ -29,6 +29,22 @@ import { fileURLToPath } from 'url';
 
 const run = promisify(execFile);
 
+// ── every call here is on a clock ─────────────────────────────
+//
+// Run #370 rendered its six scenes in twelve seconds and then sat in
+// this module until the job timeout killed it. Nothing had failed —
+// a model download was simply taking longer than anyone was prepared
+// to wait, and there was no number anywhere that said how long that
+// was. An optional feature with no timeout is not optional: it is a
+// single point of failure for the thing it was supposed to decorate.
+//
+// So both slow paths carry a ceiling and blow past it into a
+// rejection, which runReel() already treats as "ship the reel with
+// the bed alone".
+const SETUP_MS = Number(process.env.REEL_VOICE_SETUP_SEC || 120) * 1000;
+const SAY_MS = Number(process.env.REEL_VOICE_SAY_SEC || 180) * 1000;
+const CHECK_MS = 15_000;
+
 /**
  * lessac-medium, not ryan-high.
  *
@@ -53,8 +69,9 @@ const HERE = fileURLToPath(new URL('.', import.meta.url));
 // module, and never let a PATH difference be the reason a reel is
 // silent.
 async function piper(args, opts = {}) {
-  try { return await run('piper', args, opts); }
-  catch { return await run('python3', ['-m', 'piper', ...args], opts); }
+  const o = { timeout: CHECK_MS, killSignal: 'SIGKILL', ...opts };
+  try { return await run('piper', args, o); }
+  catch { return await run('python3', ['-m', 'piper', ...args], o); }
 }
 
 /** A working Piper with its voice model already on this machine. */
@@ -79,8 +96,13 @@ export async function ensureVoice() {
     // --download-dir explicitly rather than relying on cwd: this runs
     // from the repo root under Actions, and a 60MB model landing in
     // the working tree is both wrong and invisible until it is not.
+    //
+    // The workflow already tries this before the run, so reaching
+    // here means that step did not deliver. Two minutes, then give up
+    // and let the reel go out with the bed.
     await run('python3', ['-m', 'piper.download_voices', VOICE,
-      '--download-dir', HOME], { cwd: HOME, maxBuffer: 1 << 26 });
+      '--download-dir', HOME],
+      { maxBuffer: 1 << 26, timeout: SETUP_MS, killSignal: 'SIGKILL' });
   } catch { return false; }
   return existsSync(model());
 }
@@ -109,7 +131,8 @@ export async function sayAll(lines, dir) {
     }),
   };
   const { stdout } = await run('python3', [join(HERE, 'py', 'speak.py')],
-    { input: JSON.stringify(req), maxBuffer: 1 << 26 });
+    { input: JSON.stringify(req), maxBuffer: 1 << 26,
+      timeout: SAY_MS, killSignal: 'SIGKILL' });
   const out = JSON.parse(stdout);
   return lines.map((_, i) => (out[i] && existsSync(out[i]) ? out[i] : null));
 }

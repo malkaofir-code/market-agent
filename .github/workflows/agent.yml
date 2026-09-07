@@ -133,20 +133,37 @@ jobs:
 
       # The narrator. Piper is a pip package plus a ~60MB voice model
       # from HuggingFace — no key, no cost, no rate limit at 22:06.
-      # Every line ends in `|| true`: a reel with the bed and no voice
-      # is still a reel, and the day's only surface a stranger sees is
-      # not worth losing to a slow CDN.
+      # The step cannot fail the run (a reel with the bed and no voice
+      # is still a reel), but it is no longer allowed to fail QUIETLY:
+      # `|| true` on every line meant two runs in a row reported
+      # success in seven seconds having installed nothing, and the
+      # only symptom was the reel hanging later somewhere else.
+      # Each stage now says what it did, and the last line is the
+      # answer to "is there a voice on this runner or not".
       - name: piper
         if: inputs.mode == 'reel'
+        timeout-minutes: 6
         run: |
+          set +e
           mkdir -p .piper
-          python3 -m pip install --quiet --break-system-packages piper-tts || true
+          echo "── pip install piper-tts"
+          python3 -m pip install --break-system-packages piper-tts 2>&1 | tail -5
+          python3 -c "import piper; print('piper importable')" \
+            || echo "PIPER NOT IMPORTABLE — the reel will go out with the bed alone"
+          if [ -f ".piper/${VOICE}.onnx" ]; then
+            echo "── voice model restored from cache"
+          else
+            echo "── downloading ${VOICE}"
+            python3 -m piper.download_voices "${VOICE}" --download-dir .piper 2>&1 | tail -5
+          fi
+          echo "── .piper now holds:"
+          ls -la .piper
           [ -f ".piper/${VOICE}.onnx" ] \
-            || python3 -m piper.download_voices "${VOICE}" --download-dir .piper || true
-          ls -la .piper || echo "no voice model — the reel goes out with the bed alone"
+            && echo "VOICE READY" \
+            || echo "NO VOICE MODEL — the reel will go out with the bed alone"
+          exit 0
         env:
           VOICE: en_US-lessac-medium
-        continue-on-error: true
 
       - name: run
         env:
@@ -235,6 +252,11 @@ jobs:
           # floor for one nobody speaks over.
           REEL_HOLD_SEC: '2.0'
           REEL_SAY_CLOSE: 'Follow for the U S market, every day.'
+          # Ceilings on the two slow paths in voice.js. Narration is
+          # optional; without these it is a way for an optional thing
+          # to hang the reel that does not need it.
+          REEL_VOICE_SETUP_SEC: '120'
+          REEL_VOICE_SAY_SEC: '180'
           IGNORE_SCHEDULE: ${{ inputs.now && '1' || '0' }}
           # Never set by the cron — a catch-up is always a decision.
           CATCHUP: ${{ inputs.catchup && '1' || '0' }}
