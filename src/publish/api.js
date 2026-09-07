@@ -270,6 +270,18 @@ export async function publishReel(videoUrl, caption, { dryRun = false, coverUrl 
   // place to go looking.
   if (coverUrl) await preflight([coverUrl], 'image');
   const body = { media_type: 'REELS', video_url: videoUrl, caption };
+  // Name the original audio.
+  //
+  // Instagram's own music library is app-only — the API has no track
+  // parameter, so a reel published this way carries whatever is baked
+  // into the file and there is no way around that from here. What the
+  // API DOES have is audio_name, and it is worth more than it looks:
+  // every reel with baked audio gets an "original audio" page, and an
+  // unnamed one reads as "Original audio · marketalert.il" while a
+  // named one is a tappable, followable surface that collects every
+  // reel using it. It can only be set once, at creation.
+  const audioName = process.env.REEL_AUDIO_NAME || '';
+  if (audioName) body.audio_name = audioName;
   // The cover is what the profile grid shows. Left to Instagram it
   // picks a frame at random, which on a deck of cards means the grid
   // fills with whatever half-transition it happened to land on.

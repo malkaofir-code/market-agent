@@ -165,6 +165,12 @@ jobs:
           REEL_MIN_MESSAGES: '5'
           # Four beats plus a title and a close: six scenes, ~11s.
           REEL_BEATS: '4'
+          # The name on the reel's original-audio page. Not a track —
+          # the API cannot attach Instagram's library music, only label
+          # the audio already inside the file. A named audio page is a
+          # surface that collects every reel using it; an unnamed one
+          # is dead space.
+          REEL_AUDIO_NAME: 'מרקט אלרט'
           IGNORE_SCHEDULE: ${{ inputs.now && '1' || '0' }}
           # Never set by the cron — a catch-up is always a decision.
           CATCHUP: ${{ inputs.catchup && '1' || '0' }}
