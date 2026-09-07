@@ -23,9 +23,11 @@ import { fileURLToPath } from 'url';
 const run = promisify(execFile);
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 
-/** Seconds each board holds. Short: a card that outstays its welcome
- *  is a scroll, and retention is the whole ranking signal on Reels. */
-export const HOLD = Number(process.env.REEL_HOLD_SEC || 2.6);
+/** Seconds each scene holds.
+ *  1.9 rather than 2.6 — the reference cut this account is chasing runs
+ *  six scenes in eleven and a half seconds, and a card that outstays
+ *  its welcome is a scroll. Retention is the whole ranking signal. */
+export const HOLD = Number(process.env.REEL_HOLD_SEC || 1.9);
 const FPS = 30;
 
 export async function haveFfmpeg() {

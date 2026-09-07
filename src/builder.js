@@ -265,6 +265,19 @@ const ARCHETYPES = {
     ).join('')}</div>
     <div class="link">${esc(s.link)}</div></div>`,
 
+  // 09 · the scene — the reel's board, and nothing like the others.
+  //
+  // Every other archetype here is a page: text laid on a field, read
+  // at the reader's pace. This is a FRAME. He stands in a market that
+  // is visibly doing something, one short line sits over it, and the
+  // viewer has under two seconds to take it in — so the headline is
+  // short, enormous, and carries a single accented word to land the
+  // eye somewhere specific.
+  scene: s => `<div class="a-sn">
+    ${sceneBg(s.dir, s.seed ?? 0)}
+    <div class="sn-txt"><p class="sn-h">${s.marked ?? bidi(s.headline)}</p>
+      ${s.sub ? `<p class="sn-s">${bidi(s.sub)}</p>` : ''}</div></div>`,
+
   // 08 · the ask.
   //
   // The deck has never asked for anything. Saves and shares are what
@@ -283,6 +296,70 @@ const ARCHETYPES = {
     ).join('')}</div>
     ${s.foot ? `<p class="afoot" data-protect="the sign-off">${bidi(s.foot)}</p>` : ''}</div>`,
 };
+
+/**
+ * The scene behind him.
+ *
+ * The reel format wants a WORLD, not a colour field: the mascot
+ * standing in a market that is visibly doing something, so the board
+ * reads before a word of it is read. Drawn rather than photographed —
+ * a wall of candles whose direction matches the story's direction,
+ * a trend line through them, and a glow behind his head so he
+ * separates from it.
+ *
+ * Deterministic from the seed, so the same story always renders the
+ * same scene and a replay reproduces what it replayed.
+ */
+export function sceneBg(dir = '', seed = 0) {
+  const W = 1080, H = 1920;
+  const rnd = (n) => { const x = Math.sin(seed * 9301 + n * 49297) * 233280; return x - Math.floor(x); };
+  const up = dir === 'up', dn = dir === 'dn';
+  const rise = up ? 1 : dn ? -1 : 0;
+
+  // A wall of candles across the lower two-thirds, drifting the way
+  // the story drifts.
+  const n = 26, cw = 26, gap = W / n;
+  let candles = '';
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const base = 1180 - rise * t * 300 + (rnd(i) - 0.5) * 190;
+    const h = 70 + rnd(i + 60) * 230;
+    const green = rise ? (rnd(i + 9) > (dn ? 0.72 : 0.28)) : rnd(i + 9) > 0.5;
+    const c = green ? 'var(--pos)' : 'var(--neg)';
+    const x = i * gap + (gap - cw) / 2;
+    candles += `<rect x="${x.toFixed(0)}" y="${(base - h).toFixed(0)}" width="${cw}" height="${h.toFixed(0)}" fill="${c}" opacity=".72"/>`
+             + `<rect x="${(x + cw / 2 - 2).toFixed(0)}" y="${(base - h - 34).toFixed(0)}" width="4" height="${(h + 68).toFixed(0)}" fill="${c}" opacity=".5"/>`;
+  }
+
+  // The line through them — the one element that states the direction
+  // outright rather than implying it.
+  const pts = Array.from({ length: 14 }, (_, i) => {
+    const t = i / 13;
+    return `${(t * W).toFixed(0)},${(1010 - rise * t * 330 + (rnd(i + 200) - 0.5) * 130).toFixed(0)}`;
+  }).join(' ');
+
+  return `<svg class="sc-bg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <radialGradient id="g${seed}" cx="50%" cy="34%" r="52%">
+        <stop offset="0%" stop-color="var(--acc)" stop-opacity=".30"/>
+        <stop offset="100%" stop-color="var(--acc)" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="f${seed}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--bg)" stop-opacity=".18"/>
+        <stop offset="62%" stop-color="var(--bg)" stop-opacity=".42"/>
+        <stop offset="100%" stop-color="var(--bg)" stop-opacity=".97"/>
+      </linearGradient>
+    </defs>
+    <rect width="${W}" height="${H}" fill="var(--bg)"/>
+    <rect width="${W}" height="${H}" fill="url(#g${seed})"/>
+    <g>${Array.from({ length: 11 }, (_, i) =>
+      `<line x1="0" y1="${300 + i * 130}" x2="${W}" y2="${300 + i * 130}" stroke="var(--fg)" stroke-opacity=".05"/>`).join('')}</g>
+    <g>${candles}</g>
+    <polyline points="${pts}" fill="none" stroke="${dn ? 'var(--neg)' : 'var(--pos)'}"
+      stroke-width="8" stroke-opacity=".95" stroke-linejoin="round"/>
+    <rect width="${W}" height="${H}" fill="url(#f${seed})"/>
+  </svg>`;
+}
 
 // ── chart geometry, reproduced from the specimen ─────────────
 // zero rail at 482.56, plot left edge at 120, row pitch 118.
@@ -335,7 +412,7 @@ const POSE = {
   hero: 'point', note: 'explain', chart: 'upward',
   watch: 'pause', telegram: 'yes', ask: 'welcome',
   coverSplit: 'presenting', coverIndex: 'thinking', coverBracket: 'explain',
-  coverFigure: 'point',
+  coverFigure: 'point', scene: 'explain',
 };
 // Boards carrying evidence, plus the edged opening — there the accent
 // bar already owns the reading edge, and a mascot lane on the other
@@ -372,13 +449,20 @@ function ronSide(slide, ctx, i = 0) {
 const STORY_RON = new Set(['top', 'base', 'bar', 'rules']);
 
 function ronLayer(slide, ctx, i = 0) {
-  if (slide.ron === null || NO_RON.has(slide.type)) return '';
-  if (slide.story && !STORY_RON.has(slide.story)) return '';
+  // A scene without him is a background. He is the subject of the
+  // reel, so no rule downstream gets to drop him from one.
+  if (slide.type !== 'scene') {
+    if (slide.ron === null || NO_RON.has(slide.type)) return '';
+    if (slide.story && !STORY_RON.has(slide.story)) return '';
+  }
   // A slide already carrying a photo has its image. Ron standing in
   // front of a screenshot is two subjects fighting, and on the framed
   // cover the frame landed across his face. One picture per board.
-  if (slide.photo) return '';
-  const gesture = POSE[slide.type];
+  if (slide.photo && slide.type !== 'scene') return '';
+  // A scene names its own gesture: the reel matches him to the story
+  // — a hand up for a fall, an open hand for a rally — rather than to
+  // the archetype, which is the same on every board.
+  const gesture = slide.gesture ?? POSE[slide.type];
   const wardrobe = ctx.poses?.[gesture];
   if (!wardrobe?.length) return '';
   // The slide index is in the seed as well as the window's, or every
@@ -452,7 +536,12 @@ export function buildSlide(slide, ctx, i, n, { story = false } = {}) {
   // Three stories in a row should not be the same photograph three
   // times: he changes sides down the set.
   const alt = story && i % 2 === 1 ? ' of-alt' : '';
-  return `<div class="slide${story ? ' slide--story' + alt : ''}${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
+  // A reel board is NOT a story board that happens to move. It was
+  // getting both classes, and slide--story pins him to an edge and
+  // alternates sides down the set — which on a frame that centres him
+  // meant half the scenes rendered with him sliced off at the margin.
+  const reel = slide.type === 'scene';
+  return `<div class="slide${story && !reel ? ' slide--story' + alt : ''}${reel ? ' slide--reel' : ''}${cover ? ' slide--cover' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
 ${masthead(ctx)}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${foot(i + 1, n, slide.source)}</div>`;
 }

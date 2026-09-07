@@ -448,6 +448,50 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
  * the reader's pace and can hold ten slides; a reel is watched at the
  * video's pace and every extra second is a chance to scroll away.
  */
+/**
+ * The accented word.
+ *
+ * At under two seconds a viewer does not read a headline, they land
+ * on it — so one word carries the colour and the eye goes there
+ * first. It is chosen, never invented: the figure if the line has
+ * one, otherwise the instrument or company the line is about, drawn
+ * from the same topic table the caption uses. If neither is present
+ * nothing is accented, because guessing which word matters is how a
+ * headline gets editorialised.
+ */
+function markWord(headline, figures) {
+  const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const fig = figures?.[0]?.text;
+  const cands = [];
+  if (fig) cands.push(fig);
+  for (const t of TOPICS) { const m = t.re.exec(headline); if (m) cands.push(m[0]); }
+  for (const c of cands) {
+    const at = headline.indexOf(c);
+    if (at < 0) continue;
+    return esc(headline.slice(0, at)) + '<em>' + esc(c) + '</em>' + esc(headline.slice(at + c.length));
+  }
+  return esc(headline);
+}
+
+/** Which way the story points — the scene and his hands both follow it. */
+const GEST = { up: 'yes', dn: 'pause', '': 'explain' };
+
+/**
+ * A reel: six scenes, twelve seconds, built to be watched by someone
+ * who has never heard of this account.
+ *
+ * It is not a deck of boards with motion added. Every other archetype
+ * here is a PAGE — text laid on a field, read at the reader's pace.
+ * A reel scene is a FRAME: he stands inside a market that is visibly
+ * doing something, one short line sits over it, and the viewer has
+ * under two seconds to take it in before deciding whether to keep
+ * watching. That is why the headline is short and enormous, why one
+ * word carries the accent, and why the masthead, the tape and the
+ * footer are all suppressed — at 1.9 seconds a masthead is noise.
+ *
+ * The scene, his gesture and his wardrobe all follow the story's
+ * direction rather than a rotation, so a fall looks like a fall.
+ */
 export function composeReel(rows, { carry = {}, endTs = null, template = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const nothing = reason => ({ skip: reason, slides: [], consumed: all.map(p => p.tg_id) });
@@ -461,44 +505,44 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
   const { quotes, carry: nextCarry, stamp } = tape(all, carry);
 
   const decay = Number(process.env.SCORE_DECAY_HOURS || 4);
-  const fresh = p => p.score - (w.end - p.ts) / 3600 / decay;
-  const pool = [...parsed].sort((a, b) => fresh(b) - fresh(a) || b.ts - a.ts);
-  const beats = pool.slice(0, 3);
+  const freshness = p => p.score - (w.end - p.ts) / 3600 / decay;
+  const pool = [...parsed].sort((a, b) => freshness(b) - freshness(a) || b.ts - a.ts);
+  const beats = pool.slice(0, Number(process.env.REEL_BEATS || 4));
   if (beats.length < 2) return nothing('thin');
 
   const tpl = template ? byId(template) : null;
-  const pal = tpl?.a ?? 'ink';
-  const lead = beats[0];
-  const fig = lead.figures?.length && lead.figureCount < 4
-    ? lead.figures[0].text.replace(/[−־]/g, '-') : null;
+  const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const DARK = ['ink', 'deep', 'midnight', 'abyss', 'basalt', 'navy'];
+  const ground = i => DARK[(seed + i) % DARK.length];
 
-  const slides = [];
-  // 01 · the hook. One number, screen-height, or the headline set as
-  // a poster when the window has no clean figure. Two seconds to earn
-  // the next ten.
-  slides.push(fig
-    ? { type: 'coverFigure', eyebrow: 'היום בשוק', figure: fig,
-        headline: lead.headline, palette: pal, story: 'quote' }
-    : { type: 'coverPoster', eyebrow: 'היום בשוק',
-        headline: lead.headline, stand: lead.stand, palette: pal, story: 'quote' });
-
-  // 02-04 · the beats. One story each, no standfirst — there is no
-  // time to read one and a viewer who wants detail goes to the post.
-  for (const [i, p] of beats.entries()) {
-    const f = p.figures?.length && p.figureCount < 4
+  const scene = (p, i) => {
+    const fig = p.figures?.length && p.figureCount < 4
       ? p.figures[0].text.replace(/[−־]/g, '-') : null;
-    slides.push({ type: 'cover', eyebrow: `0${i + 1}`, headline: p.headline,
-      stand: f ?? p.stand, palette: tpl ? (i % 2 ? tpl.b : tpl.a) : pal,
-      story: i % 2 ? 'rules' : 'top' });
-  }
+    const dir = fig ? direction(p.figures[0].text, `${p.headline} ${p.stand ?? ''}`) : '';
+    const marked = markWord(p.headline, p.figures);
+    return { type: 'scene', headline: p.headline, marked,
+      // The figure goes UNDER the line only when the line does not
+      // already contain it. Printing 1.33% in the headline and again
+      // beneath it is the board stuttering.
+      sub: fig && !marked.includes(`<em>${fig}`) ? fig : null,
+      dir, gesture: GEST[dir] ?? 'explain', seed: seed + i * 7,
+      palette: ground(i), source: p.source };
+  };
 
-  // 05 · the ask. A stranger who watched to the end is the only person
-  // on this platform worth asking for anything.
-  slides.push({ type: 'ask', eyebrow: 'לפני שאתם ממשיכים',
-    big: 'עוקבים — שוק ההון בעברית', foot: TG_LINK,
-    acts: [{ mark: '@', label: 'שלוש סקירות ביום' },
-           { mark: '↗', label: 'שלחו למי שמסתכל על השוק' }],
-    palette: tpl?.b ?? pal, story: 'quote' });
+  // 01 · the title. The account's own card, so a stranger knows what
+  // they are looking at before the news starts.
+  const slides = [{ type: 'scene', headline: 'היום בשוק',
+    marked: 'היום ב<em>שוק</em>', sub: hhmm(w.end), dir: '',
+    gesture: 'welcome', seed, palette: ground(0) }];
+
+  // 02-05 · the news, one story a scene.
+  beats.forEach((p, i) => slides.push(scene(p, i + 1)));
+
+  // 06 · the ask. A stranger who watched to the end is the only
+  // person on this platform worth asking for anything.
+  slides.push({ type: 'scene', headline: 'עוקבים לעוד', marked: '<em>עוקבים</em> לעוד',
+    sub: TG_LINK, dir: '', gesture: 'point', seed: seed + 99,
+    palette: ground(beats.length + 1) });
 
   return {
     key: `R:${w.key}`, template, window: span(w), date: ddmmyy(w.end),

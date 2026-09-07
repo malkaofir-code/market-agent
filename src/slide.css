@@ -641,3 +641,44 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide--story[data-story="flood"] .a-nt .txt{font-size:80px;max-width:14ch}
 .slide--story[data-story="frame"] .a-nt .txt{font-size:78px;max-width:15ch}
 .slide--story[data-story="flood"] .a-nt .dis{color:var(--bg);opacity:.75}
+
+/* ── 09 · the scene ── the reel's frame ──────────────────────────
+   Not a page with a picture on it. The scene is the whole board: it
+   bleeds past the safe area, past the masthead, past the tape, and
+   he stands IN it at the size of a person rather than beside the text
+   at the size of an ornament. Everything else on the reel board is
+   suppressed, because at 1.9 seconds a masthead is noise. */
+/* Its own dimensions, not the story board's.
+   Taking slide--story off the reel — which had to happen, because it
+   pins him to an edge — also took the 1920 height with it, and the
+   board silently reverted to the post's 1350: every frame rendered
+   with a black band across the bottom third. A reel board states its
+   own size. */
+.slide--reel{width:1080px;height:1920px;padding:0}
+.slide--reel .sl-hd,
+.slide--reel .tick,
+.slide--reel .sl-ft{display:none}
+.slide--reel::after{display:none}
+.slide--reel .sl-bd{padding:0;gap:0;position:absolute;inset:0;justify-content:flex-start}
+
+.a-sn{position:absolute;inset:0;overflow:hidden}
+.a-sn .sc-bg{position:absolute;inset:0;width:100%;height:100%}
+
+/* He is the subject. 66% of a 1920 frame, anchored to the floor and
+   centred — the reference reel's whole idea is that the mascot is the
+   film, not a garnish on it. */
+.slide--reel .ron{position:absolute;left:50%;right:auto;transform:translateX(-50%);
+  bottom:-14px;width:auto;height:72%;z-index:2;
+  filter:drop-shadow(0 24px 60px rgba(0,0,0,.55))}
+.slide--reel .ron img{height:100%;width:auto;object-fit:contain;object-position:bottom center}
+
+.a-sn .sn-txt{position:absolute;left:46px;right:46px;top:132px;z-index:3;text-align:center}
+.a-sn .sn-h{font-family:var(--f-disp);font-size:118px;font-weight:800;line-height:1.0;
+  letter-spacing:-.035em;margin:0;color:var(--fg);
+  text-shadow:0 4px 26px rgba(0,0,0,.55),0 1px 0 rgba(0,0,0,.35)}
+/* One word in the accent. The eye needs somewhere to land in the
+   half-second before it starts reading. */
+.a-sn .sn-h em{font-style:normal;color:var(--acc)}
+.a-sn .sn-s{font-family:var(--f-mono);font-size:38px;font-weight:700;margin:24px 0 0;
+  color:var(--fg);opacity:.92;direction:ltr;unicode-bidi:isolate;
+  text-shadow:0 3px 18px rgba(0,0,0,.6)}
