@@ -21,7 +21,7 @@ import {
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
-import { compose, composeStories, windowOf, WIN } from './compose.js';
+import { compose, composeStories, composeReel, windowOf, WIN } from './compose.js';
 import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
 import { connect, alert } from './tg.js';
@@ -33,6 +33,7 @@ const DRY = process.argv.includes('--dry') || process.env.DRY_RUN === '1';
 // starves the other.
 const STORIES = process.argv.includes('--stories') || process.env.MODE === 'stories';
 const INSIGHTS = process.argv.includes('--insights') || process.env.MODE === 'insights';
+const REEL = process.argv.includes('--reel') || process.env.MODE === 'reel';
 // Scheduled ticks render for review only; publishing needs a person.
 const REVIEW = process.env.REVIEW === '1';
 // Telling an hour late, on purpose.
@@ -417,6 +418,70 @@ async function runInsights() {
   else say('not enough posts measured yet to rank anything — needs two per bucket.');
 }
 
+/**
+ * The reel track: one a day, and the only thing this account
+ * publishes that a stranger can see.
+ *
+ * It reads the same window a digest would and consumes nothing —
+ * deliberately. A reel is a second telling of the day for a different
+ * audience, not a competitor for the carousel's material, so it never
+ * marks a message used and never blocks a digest.
+ */
+async function runReel() {
+  const { haveFfmpeg, buildReel, audioBed } = await import('./reel.js');
+  if (!await haveFfmpeg()) { say('SKIP — ffmpeg not on this runner'); return; }
+
+  const day = dayStart();
+  const rows = await messagesInAll(day, Math.floor(Date.now() / 1000));
+  if (!rows.length) { say('SKIP — nothing today'); return; }
+
+  const { t: tpl, recent: tplRecent } = await nextTemplate(`R:${day}`);
+  const deck = composeReel(rows, {
+    carry: (await getState(CARRY_KEY)) ?? {}, template: tpl.id,
+    endTs: Math.floor(Date.now() / 1000) });
+  if (deck.skip) { say('SKIP — reel', `(${deck.skip})`); return; }
+
+  say(`${deck.key} — ${rows.length} msgs -> ${deck.slides.length} frames `
+    + `[${deck.slides.map(x => x.type)}] · template ${tpl.id} ${tpl.name}`);
+
+  const dir = join('./out', deck.key.replace(/[:]/g, '').replace('R', 'R-'));
+  const { files } = await renderDeck(deck, dir, { format: 'jpeg', story: true });
+  say('rendered', files.length, 'frame(s)');
+
+  const mp4 = join(dir, 'reel.mp4');
+  const built = await buildReel(files, mp4, { audio: audioBed() });
+  say(`encoded ${built.seconds}s (${built.audio})`);
+
+  if (DRY) { say('DRY RUN OK —', mp4); return; }
+
+  const { upload, remove, publishReel } = await import('./publish/api.js');
+  const prefix = deck.key.replace(/[:]/g, '');
+  // The cover goes up as an image beside the video so the profile
+  // grid shows the hook rather than whatever frame Instagram picks.
+  const urls = await upload([mp4, files[0]], prefix);
+  say('uploaded');
+  try {
+    const r = await publishReel(urls[0], deck.caption, { coverUrl: urls[1] });
+    say(`POSTED ${r.permalink ?? r.id}`);
+    await keepTemplate(tplRecent, tpl.id);
+    await upsertWindow(deck.key, day, Math.floor(Date.now() / 1000));
+    await setWindow({ key: deck.key, status: 'posted', slides: files.length,
+      posted_at: Math.floor(Date.now() / 1000) });
+    await setPublished(deck.key, { media_id: r.id, permalink: r.permalink,
+      choices: { template: String(tpl.id), name: tpl.name, kind: 'reel',
+        seconds: built.seconds, audio: built.audio } });
+    await logRun(deck.key, 'reel', true, r.permalink ?? r.id);
+    await notify(`🎬 ${deck.key} — reel live (${built.seconds}s)\n${r.permalink ?? ''}`);
+  } catch (e) {
+    say('REEL FAILED —', e.message);
+    await logRun(deck.key, 'reel', false, e.message);
+    await notify(`❌ reel ${deck.key}\n${e.message}`);
+    process.exitCode = 1;
+  } finally {
+    await remove([mp4, files[0]], prefix);
+  }
+}
+
 async function main() {
   // Reading the account back is not publishing: it ingests nothing,
   // and the kill switch, the active hours and the failure latch have
@@ -461,6 +526,11 @@ async function main() {
   // opinion about it — let it render even at the daily cap.
   const stop = (DRY || REVIEW) ? null : await blocked({ stories: STORIES });
   if (stop) { say('SKIP —', stop); return; }
+
+  // A reel publishes, so unlike insights it sits BEHIND the kill
+  // switch, the active hours and the failure latch — not in front of
+  // them with the read-only mode.
+  if (REEL) return runReel();
 
   // The story track shares the kill switch, the active hours and the
   // failure latch above, and nothing else: its own cap lives inside.

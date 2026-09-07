@@ -41,9 +41,14 @@ export async function upload(files, prefix) {
   for (const f of files) {
     const path = `${prefix}/${basename(f)}`;
     const body = await readFile(f);
+    // A reel is an MP4 through the same door. Meta refuses a video
+    // container whose URL serves image/jpeg, and Supabase serves back
+    // exactly the content-type it was given.
+    const type = /\.mp4$/i.test(f) ? 'video/mp4'
+               : /\.png$/i.test(f) ? 'image/png' : 'image/jpeg';
     const res = await fetch(`${base()}/storage/v1/object/${bucket()}/${path}`, {
       method: 'POST',
-      headers: { ...auth(), 'content-type': 'image/jpeg', 'x-upsert': 'true' },
+      headers: { ...auth(), 'content-type': type, 'x-upsert': 'true' },
       body,
     });
     if (!res.ok) throw new Error(`storage upload ${path} -> ${res.status} ${await res.text()}`);

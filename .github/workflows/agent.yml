@@ -51,9 +51,9 @@ on:
         type: boolean
         default: false
       mode:
-        description: 'digest = the carousel; stories = the hour as story boards; insights = read the account back, publish nothing'
+        description: 'digest = the carousel; stories = the hour as story boards; insights = read the account back, publish nothing; reel = one MP4 to the only surface strangers see'
         type: choice
-        options: [digest, stories, insights]
+        options: [digest, stories, insights, reel]
         default: digest
       now:
         description: 'Ignore the digest schedule and post this one now'

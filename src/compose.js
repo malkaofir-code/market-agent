@@ -434,6 +434,80 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   };
 }
 
+/**
+ * A reel: five boards, twelve seconds, built to be watched by someone
+ * who has never heard of this account.
+ *
+ * The shape is fixed, unlike a digest, because retention is the whole
+ * ranking signal and retention is a property of PACING. A viewer
+ * decides in about two seconds, so board one is a single number at
+ * the size of the screen; then three beats of one story each, short
+ * enough that nothing is ever still; then the ask.
+ *
+ * It deliberately carries LESS than a digest. A carousel is read at
+ * the reader's pace and can hold ten slides; a reel is watched at the
+ * video's pace and every extra second is a chance to scroll away.
+ */
+export function composeReel(rows, { carry = {}, endTs = null, template = null } = {}) {
+  const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
+  const nothing = reason => ({ skip: reason, slides: [], consumed: all.map(p => p.tg_id) });
+  if (!all.length) return nothing('empty');
+
+  const parsed = dedupe(all.filter(p => !isSnapshot(p)));
+  if (!parsed.length) return nothing('snapshots-only');
+
+  const w0 = windowOf(parsed[0].ts);
+  const w = endTs && endTs > w0.end ? { ...w0, end: endTs } : w0;
+  const { quotes, carry: nextCarry, stamp } = tape(all, carry);
+
+  const decay = Number(process.env.SCORE_DECAY_HOURS || 4);
+  const fresh = p => p.score - (w.end - p.ts) / 3600 / decay;
+  const pool = [...parsed].sort((a, b) => fresh(b) - fresh(a) || b.ts - a.ts);
+  const beats = pool.slice(0, 3);
+  if (beats.length < 2) return nothing('thin');
+
+  const tpl = template ? byId(template) : null;
+  const pal = tpl?.a ?? 'ink';
+  const lead = beats[0];
+  const fig = lead.figures?.length && lead.figureCount < 4
+    ? lead.figures[0].text.replace(/[−־]/g, '-') : null;
+
+  const slides = [];
+  // 01 · the hook. One number, screen-height, or the headline set as
+  // a poster when the window has no clean figure. Two seconds to earn
+  // the next ten.
+  slides.push(fig
+    ? { type: 'coverFigure', eyebrow: 'היום בשוק', figure: fig,
+        headline: lead.headline, palette: pal, story: 'quote' }
+    : { type: 'coverPoster', eyebrow: 'היום בשוק',
+        headline: lead.headline, stand: lead.stand, palette: pal, story: 'quote' });
+
+  // 02-04 · the beats. One story each, no standfirst — there is no
+  // time to read one and a viewer who wants detail goes to the post.
+  for (const [i, p] of beats.entries()) {
+    const f = p.figures?.length && p.figureCount < 4
+      ? p.figures[0].text.replace(/[−־]/g, '-') : null;
+    slides.push({ type: 'cover', eyebrow: `0${i + 1}`, headline: p.headline,
+      stand: f ?? p.stand, palette: tpl ? (i % 2 ? tpl.b : tpl.a) : pal,
+      story: i % 2 ? 'rules' : 'top' });
+  }
+
+  // 05 · the ask. A stranger who watched to the end is the only person
+  // on this platform worth asking for anything.
+  slides.push({ type: 'ask', eyebrow: 'לפני שאתם ממשיכים',
+    big: 'עוקבים — שוק ההון בעברית', foot: TG_LINK,
+    acts: [{ mark: '@', label: 'שלוש סקירות ביום' },
+           { mark: '↗', label: 'שלחו למי שמסתכל על השוק' }],
+    palette: tpl?.b ?? pal, story: 'quote' });
+
+  return {
+    key: `R:${w.key}`, template, window: span(w), date: ddmmyy(w.end),
+    stamp, quotes, slides,
+    caption: caption(parsed, w),
+    consumed: all.map(p => p.tg_id), carry: nextCarry,
+  };
+}
+
 const MAX_STORIES = Number(process.env.MAX_STORIES || 3);
 
 /** The channel the account points at, in one place. */

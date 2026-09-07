@@ -93,7 +93,7 @@ async function preflight(urls) {
  * common case is 1.
  */
 async function ready(id, { tries = 5 } = {}) {
-  const waits = [1200, 2500, 5000, 9000, 15000];
+  const waits = [1200, 2500, 5000, 9000, 15000, 15000, 20000, 20000, 30000];
   for (let i = 0; i < tries; i++) {
     await sleep(waits[Math.min(i, waits.length - 1)]);
     const { status_code, status } = await call(`/${id}`, { fields: 'status_code' }, 'GET');
@@ -230,6 +230,36 @@ export async function publishStory(url, { dryRun = false } = {}) {
   if (dryRun) return { id: null, container, dryRun: true };
   const { id } = await call(`/${ig}/media_publish`, { creation_id: container });
   return { id, permalink: null };   // stories have no public permalink
+}
+
+/**
+ * A reel: one MP4, published to the surface that reaches strangers.
+ *
+ * Everything else this account publishes lands in a closed room —
+ * carousels reach followers plus a trickle of Explore, stories reach
+ * followers only. Reels are the one format Instagram shows to people
+ * who do not follow the account, which makes this the only publish
+ * path here with any discovery in it at all.
+ *
+ * Video containers are not images: Meta has to fetch, transcode and
+ * validate the file, which takes minutes rather than the second an
+ * image takes. The default poller gives up after about thirty
+ * seconds, so this one waits far longer before calling it a failure.
+ */
+export async function publishReel(videoUrl, caption, { dryRun = false, coverUrl = null } = {}) {
+  const { id: ig } = creds();
+  await preflight([videoUrl]);
+  const body = { media_type: 'REELS', video_url: videoUrl, caption };
+  // The cover is what the profile grid shows. Left to Instagram it
+  // picks a frame at random, which on a deck of cards means the grid
+  // fills with whatever half-transition it happened to land on.
+  if (coverUrl) body.cover_url = coverUrl;
+  const { id: container } = await call(`/${ig}/media`, body);
+  await ready(container, { tries: Number(process.env.REEL_POLL_TRIES || 20) });
+  if (dryRun) return { id: null, container, dryRun: true };
+  const { id } = await call(`/${ig}/media_publish`, { creation_id: container });
+  const { permalink } = await call(`/${id}`, { fields: 'permalink' }, 'GET').catch(() => ({}));
+  return { id, permalink: permalink ?? null };
 }
 
 /** Long-lived tokens last 60 days and are refreshable while still valid. */
