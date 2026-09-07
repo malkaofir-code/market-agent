@@ -62,7 +62,14 @@ export async function buildReel(files, out, { hold = HOLD, audio = audioBed() } 
   const total = (files.length * frames) / FPS;
 
   const args = ['-y'];
-  for (const f of files) args.push('-loop', '1', '-t', String(hold), '-i', f);
+  // A still image, NOT a looped one.
+  //
+  // zoompan emits `d` frames PER INPUT FRAME, so feeding it
+  // `-loop 1 -t 2.6` — which decodes as dozens of identical frames —
+  // multiplied the output instead of timing it: a five-board reel
+  // came out at forty seconds. One frame in, `d` frames out, exactly
+  // `hold` seconds of motion.
+  for (const f of files) args.push('-i', f);
   if (audio) args.push('-i', audio);
   // A silent track rather than no track: some Instagram surfaces
   // treat an audio-less reel as malformed, and a null source costs
