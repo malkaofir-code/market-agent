@@ -53,7 +53,8 @@ async function call(path, params, method = 'POST', attempt = 0) {
 }
 
 /**
- * Prove every URL serves an image before Meta is asked to fetch it.
+ * Prove every URL serves the media it claims to before Meta is asked
+ * to fetch it.
  *
  * Meta's rejection for a URL it cannot read is "Only photo or video
  * can be accepted as media type" — which names neither the slide nor
@@ -61,17 +62,32 @@ async function call(path, params, method = 'POST', attempt = 0) {
  * eventually consistent: an object uploaded a moment ago can 404 for
  * a beat, so a single retry absorbs the propagation lag that a fast
  * eight-slide deck can outrun.
+ *
+ * `kind` exists because this check was written when everything this
+ * account published was a JPEG, and the family grew. The first reel
+ * ever built — six scenes, 11.1 seconds, encoded and uploaded
+ * correctly — was refused HERE, by its own side, because the mp4
+ * served video/mp4 and the test said /^image\//. Nothing was wrong
+ * with the file; the gate had simply never been told a second kind
+ * existed. A check that only ever passes the thing it was written for
+ * is not a check, it is a wall.
  */
-async function preflight(urls) {
+async function preflight(urls, kind = 'image') {
+  const want = new RegExp(`^${kind}/`);
+  const noun = kind === 'video' ? 'the video' : null;
   for (const [i, url] of urls.entries()) {
     for (let attempt = 0; attempt < 2; attempt++) {
+      // 206 is the correct answer to a ranged GET and counts as ok —
+      // fetch treats the whole 2xx family as ok, which is why the mp4
+      // passed the status test and failed only on its content-type.
       const r = await fetch(url, { method: 'GET', headers: { range: 'bytes=0-1023' } })
         .catch(e => ({ ok: false, status: 0, statusText: e.message, headers: new Headers() }));
       const type = r.headers?.get?.('content-type') ?? '';
-      if (r.ok && /^image\//.test(type)) break;
+      if (r.ok && want.test(type)) break;
       if (attempt === 0) { await sleep(1500); continue; }
       throw new Error(
-        `slide ${i + 1} is not readable as an image — ${r.status} ${type || r.statusText || 'no content-type'}\n` +
+        `${noun ?? `slide ${i + 1}`} is not readable as ${kind === 'video' ? 'a video' : 'an image'}`
+        + ` — ${r.status} ${type || r.statusText || 'no content-type'}\n` +
         `  ${url}\n  Meta would reject this with 2207052.`);
     }
   }
@@ -248,7 +264,11 @@ export async function publishStory(url, { dryRun = false } = {}) {
  */
 export async function publishReel(videoUrl, caption, { dryRun = false, coverUrl = null } = {}) {
   const { id: ig } = creds();
-  await preflight([videoUrl]);
+  await preflight([videoUrl], 'video');
+  // The cover is fetched by Meta too, and a broken one fails the whole
+  // container — with an error about the video, which is the wrong
+  // place to go looking.
+  if (coverUrl) await preflight([coverUrl], 'image');
   const body = { media_type: 'REELS', video_url: videoUrl, caption };
   // The cover is what the profile grid shows. Left to Instagram it
   // picks a frame at random, which on a deck of cards means the grid
