@@ -471,7 +471,14 @@ async function runReel() {
   const made = await reelsToday();
   if (!DRY && made >= cap) { say(`SKIP — reel cap reached (${made}/${cap})`); return; }
 
-  const gap = Number(process.env.MIN_MINUTES_BETWEEN_REELS || 180);
+  // 'now' on the dispatch lifts the spacing rail as well as the hour
+  // gate — the same way 'catchup' lifts the story gap. Deliberately
+  // telling a hand-dispatched reel to wait three hours makes the one
+  // thing a person does at the console (test the change they just
+  // pushed) the one thing the rails forbid. The daily cap still holds:
+  // two is a real limit, three hours is a rhythm.
+  const forced = process.env.IGNORE_SCHEDULE === '1';
+  const gap = forced ? 0 : Number(process.env.MIN_MINUTES_BETWEEN_REELS || 180);
   const last = await lastReelAt();
   const since = last ? Math.round((now - last) / 60) : null;
   if (!DRY && gap && since != null && since < gap) {
