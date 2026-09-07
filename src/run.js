@@ -548,27 +548,32 @@ async function runReel() {
   const { holdsFor, MAX_HOLD } = await import('./reel.js');
   let voices = null, holds = null;
   if (process.env.REEL_VOICE !== '0') {
-    const { ensureVoice, say: speak, seconds } = await import('./voice.js');
+    const { ensureVoice, sayAll, seconds } = await import('./voice.js');
+    const t0 = Date.now();
     if (await ensureVoice()) {
-      voices = []; const secs = [];
-      for (const [i, sl] of deck.slides.entries()) {
-        let wav = null;
-        try { wav = sl.say ? await speak(sl.say, join(dir, `say-${i}.wav`)) : null; }
-        catch (e) { say(`  voice ${i + 1} failed — ${e.message}`); }
-        const len = wav ? await seconds(wav).catch(() => 0) : 0;
-        // Silence beats a cut word. A line longer than a scene can
-        // hold is dropped whole rather than played and chopped —
-        // half a sentence over a card is the one thing that reads as
-        // broken rather than as a choice.
-        if (len > MAX_HOLD) {
-          say(`  voice ${i + 1} dropped — ${len.toFixed(1)}s exceeds the ${MAX_HOLD}s scene cap`);
-          voices.push(null); secs.push(0);
-        } else {
-          voices.push(wav); secs.push(len);
+      try {
+        // All six lines in one process. One model load, not six.
+        voices = await sayAll(deck.slides.map(sl => sl.say), dir);
+        const secs = [];
+        for (const [i, wav] of voices.entries()) {
+          const len = wav ? await seconds(wav).catch(() => 0) : 0;
+          // Silence beats a cut word. A line longer than a scene can
+          // hold is dropped whole rather than played and chopped —
+          // half a sentence over a card reads as broken; silence
+          // reads as a choice.
+          if (len > MAX_HOLD) {
+            say(`  voice ${i + 1} dropped — ${len.toFixed(1)}s exceeds the ${MAX_HOLD}s scene cap`);
+            voices[i] = null; secs.push(0);
+          } else secs.push(len);
         }
+        holds = holdsFor(secs, deck.slides.length);
+        say(`narrated ${voices.filter(Boolean).length}/${deck.slides.length} scene(s)`
+          + ` in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+      } catch (e) {
+        // Narration is the one part of a reel that is optional.
+        say(`voice failed — ${e.message}; the reel goes out with the bed alone`);
+        voices = null; holds = null;
       }
-      holds = holdsFor(secs, deck.slides.length);
-      say(`narrated ${voices.filter(Boolean).length}/${deck.slides.length} scene(s)`);
     } else {
       say('no voice on this runner — the reel goes out with the bed alone');
     }

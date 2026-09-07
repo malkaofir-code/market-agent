@@ -20,3 +20,4 @@ src/assets/*.zip.bak
 
 # downloaded run artefacts — inspection only, never part of the build
 review/
+.piper/

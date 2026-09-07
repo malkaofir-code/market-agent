@@ -72,7 +72,13 @@ concurrency:
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    # 12 was right when a tick was a carousel. A reel installs ffmpeg
+    # and python, pulls a voice model on a cold cache, renders twelve
+    # boards in two passes and encodes seven video segments — run #368
+    # was killed at 12m00s with the mp4 nearly built. The concurrency
+    # group already stops two ticks overlapping, so a longer ceiling
+    # costs nothing on the runs that finish in a minute.
+    timeout-minutes: 25
     # Chromium and its system libraries are already in this image.
     # Installing them per run would double the billed minutes.
     #
@@ -122,8 +128,8 @@ jobs:
         if: inputs.mode == 'reel'
         uses: actions/cache@v4
         with:
-          path: /tmp/piper
-          key: piper-en_US-ryan-high-v1
+          path: .piper
+          key: piper-en_US-lessac-medium-v1
 
       # The narrator. Piper is a pip package plus a ~60MB voice model
       # from HuggingFace — no key, no cost, no rate limit at 22:06.
@@ -133,13 +139,13 @@ jobs:
       - name: piper
         if: inputs.mode == 'reel'
         run: |
-          mkdir -p /tmp/piper
+          mkdir -p .piper
           python3 -m pip install --quiet --break-system-packages piper-tts || true
-          [ -f "/tmp/piper/${VOICE}.onnx" ] \
-            || python3 -m piper.download_voices "${VOICE}" --download-dir /tmp/piper || true
-          ls -la /tmp/piper || echo "no voice model — the reel goes out with the bed alone"
+          [ -f ".piper/${VOICE}.onnx" ] \
+            || python3 -m piper.download_voices "${VOICE}" --download-dir .piper || true
+          ls -la .piper || echo "no voice model — the reel goes out with the bed alone"
         env:
-          VOICE: en_US-ryan-high
+          VOICE: en_US-lessac-medium
         continue-on-error: true
 
       - name: run
@@ -216,8 +222,11 @@ jobs:
           # English narration over the Hebrew boards. Set to '0' to
           # publish silent reels with the bed alone.
           REEL_VOICE: '1'
-          REEL_VOICE_MODEL: en_US-ryan-high
-          PIPER_HOME: /tmp/piper
+          REEL_VOICE_MODEL: en_US-lessac-medium
+          # Relative, resolved from the repo root the run starts in.
+          # No workflow expression to be evaluated on the host and
+          # then not exist inside the container.
+          PIPER_HOME: .piper
           # length-scale is phoneme duration, so below 1 is FASTER.
           # Reels are watched fast and a measured newsreader pace reads
           # as slow on a surface people are scrolling past.
