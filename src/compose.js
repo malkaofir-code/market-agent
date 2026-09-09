@@ -584,11 +584,34 @@ function sayScene(p, dir) {
   if (topic && n && way) return `${cap(topic)}, ${way} ${n} percent.`;
   if (topic && n) return `${cap(topic)}. ${cap(sayNum(fig))} percent.`;
   if (n && way) return `${cap(way)} ${n} percent.`;
-  if (topic) return `${cap(topic)}.`;
+  // A topic and nothing else used to return "Crypto." — one word,
+  // said out loud, in the middle of a summary. It was thin when the
+  // narration was a list of fragments and it is broken now that the
+  // narration is a telling: the listener hears a sentence, a sentence,
+  // then a noun. Silence over the card is better, and the bed is
+  // still playing under it.
   return null;
 }
 
 const cap = t => String(t ?? '').charAt(0).toUpperCase() + String(t ?? '').slice(1);
+
+/**
+ * The words that turn five sentences into one bulletin.
+ *
+ * Read aloud, isolated clauses land as a list — "Oil down two point
+ * one percent." "Nvidia jumps three point seven five percent." — and
+ * a list is not a summary of anything. One connective in front of
+ * each beat after the first is the whole difference between a feed
+ * and somebody telling you about the day.
+ *
+ * Fixed and rotating, never chosen by a model: a connective is a
+ * claim about how two stories relate, and "because" or "despite"
+ * would be inventing a link the source never drew. These only say
+ * "and there was also this", which is the only relationship the
+ * pipeline actually knows to be true.
+ */
+const JOIN = ['', 'Also, ', 'Meanwhile, ', 'And ', 'On top of that, '];
+export const connective = i => JOIN[Math.min(i, JOIN.length - 1)];
 
 /** Which way the story points — the scene and his hands both follow it. */
 const GEST = { up: 'yes', dn: 'pause', '': 'explain' };
@@ -643,6 +666,14 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
       // beneath it is the board stuttering.
       sub: fig && !marked.includes(`<em>${fig}`) ? fig : null,
       dir, gesture: GEST[dir] ?? 'explain', seed: seed + i * 7,
+      // The photo the message actually carried, when it carried one.
+      //
+      // A picture of the thing being reported beats a drawn candle
+      // wall, and it is the only kind of image this account can put on
+      // a board honestly: it came with the story. Nothing here
+      // generates or searches for an image — an illustration that
+      // merely looks like the news is a claim about the news.
+      photo: p.photo ?? null,
       palette: ground(i), source: p.source };
   };
 
@@ -657,7 +688,7 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
     // quotes printed on the strip — and there is nothing to gain and a
     // number to lose by paraphrasing it.
     own: true,
-    say: `Today in the U S market. ${sayTape(quotes)}`.trim() }];
+    say: `Here's the U S market today. ${sayTape(quotes)}`.trim() }];
 
   // 02-05 · the news, one story a scene.
   beats.forEach((p, i) => slides.push(scene(p, i + 1)));
@@ -667,7 +698,7 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
   slides.push({ type: 'scene', headline: 'עוקבים לעוד', marked: '<em>עוקבים</em> לעוד',
     sub: TG_LINK, dir: '', gesture: 'point', seed: seed + 99,
     palette: ground(beats.length + 1), own: true,
-    say: process.env.REEL_SAY_CLOSE || 'Follow for the market, every day.' });
+    say: process.env.REEL_SAY_CLOSE || "That's the day. Follow for the market." });
 
   return {
     key: `R:${w.key}`, template, window: span(w), date: ddmmyy(w.end),

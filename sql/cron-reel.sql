@@ -4,8 +4,8 @@
 -- Run cron.sql FIRST (it creates the extensions and agent.secrets and
 -- stores the GitHub token); this file only adds one job.
 --
---   reel   every hour at :06 — but run.js only acts on the hours in
---                              REEL_HOURS (17 and 22 local).
+--   reel   every hour at :06 — but run.js only acts on the hour in
+--                              REEL_HOURS (17 local).
 --
 -- Hourly on purpose, exactly like the digest. pg_cron thinks in UTC
 -- and Israel moves its clocks twice a year, so a job pinned to 14:06

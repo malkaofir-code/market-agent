@@ -503,11 +503,20 @@ async function runReel() {
   // time of night. A forced reel re-telling the day is a duplicate
   // nobody scheduled; a forced reel that cannot run at all is a
   // feature nobody can test.
-  const floor = (!forced && last && last > day) ? Number(last) : day;
+  // "The day" at five in the afternoon is not midnight to now.
+  //
+  // The US session runs 16:30 to 23:00 local, so a reel at 17:00 that
+  // reads from midnight has the day's build-up and almost none of its
+  // trading. A rolling window catches last night's close as well as
+  // this morning, which is what somebody means when they ask what the
+  // market did.
+  const back = Number(process.env.REEL_LOOKBACK_HOURS || 24) * 3600;
+  const floor = (!forced && last && last > day) ? Number(last)
+    : Math.min(day, now - back);
   const rows = await messagesInAll(floor, now);
   const need = Number(process.env.REEL_MIN_MESSAGES || 5);
   if (rows.length < need) {
-    say(`SKIP — only ${rows.length} message(s) since ${floor === day ? 'midnight' : 'the last reel'} (need ${need})`);
+    say(`SKIP — only ${rows.length} message(s) in the window (need ${need})`);
     return;
   }
 
@@ -548,11 +557,23 @@ async function runReel() {
       const src = deck.slides.map(sl => (sl.own ? null : sl.headline ?? null));
       const r = await translate(src);
       if (r) {
+        const { connective } = await import('./compose.js');
         let used = 0;
         r.lines.forEach((en, i) => {
           if (!en) return;
           deck.slides[i].say = speakable(en);
           used++;
+        });
+        // The connectives go on LAST, over whatever each card ended up
+        // saying — a translated headline or the structured line it
+        // fell back to. Numbering only the translated ones produced
+        // "Also," on the second story and nothing on the third when
+        // the middle one had been rejected, which is the join sounding
+        // like a fault rather than a sentence.
+        let beat = 0;
+        deck.slides.forEach(sl => {
+          if (sl.own || !sl.say) return;
+          sl.say = connective(beat++) + sl.say;
         });
         say(`translated ${used}/${src.filter(Boolean).length} headline(s) · ${r.backend}`);
         // A rejection is the guard doing its job, and it is the single
