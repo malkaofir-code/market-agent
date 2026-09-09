@@ -528,6 +528,39 @@ async function runReel() {
   say(`${deck.key} — ${rows.length} msgs -> ${deck.slides.length} frames `
     + `[${deck.slides.map(x => x.type)}] · template ${tpl.id} ${tpl.name}`);
 
+  // ── the headlines, in English ─────────────────────────────
+  // The structured line — "Chip stocks, up three point seven five
+  // percent" — is true and safe and is not news. A stranger scrolling
+  // past learns that a number moved, never what happened. So the
+  // headline itself gets translated, and the translation is checked
+  // rather than trusted: any English line carrying a digit the Hebrew
+  // does not have is thrown away and that card keeps the structured
+  // line it already had. The account's own cards, the tape read and
+  // the closing ask, are never sent at all.
+  if (process.env.ANTHROPIC_API_KEY && process.env.REEL_TRANSLATE !== '0') {
+    try {
+      const { translate, speakable } = await import('./translate.js');
+      const src = deck.slides.map(sl => (sl.own ? null : sl.headline ?? null));
+      const r = await translate(src);
+      if (r) {
+        let used = 0;
+        r.lines.forEach((en, i) => {
+          if (!en) return;
+          deck.slides[i].say = speakable(en);
+          used++;
+        });
+        say(`translated ${used}/${src.filter(Boolean).length} headline(s)`);
+        // A rejection is the guard doing its job, and it is the single
+        // most interesting line this run can print — it means a model
+        // tried to state a number the source never gave.
+        for (const bad of r.rejected)
+          say(`  REJECTED (invented a number) — ${bad.en}\n     source: ${bad.he}`);
+      }
+    } catch (e) {
+      say(`translation unavailable — ${e.message}; keeping the structured lines`);
+    }
+  }
+
   const dir = join('./out', deck.key.replace(/[:]/g, '').replace('R', 'R-'));
   // Two passes over the same deck: the market, then him and the line
   // on nothing. Rendered apart so they can be moved apart.

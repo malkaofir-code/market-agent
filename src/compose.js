@@ -651,8 +651,12 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
   const slides = [{ type: 'scene', headline: 'היום בשוק',
     marked: 'היום ב<em>שוק</em>', sub: hhmm(w.end), dir: '',
     gesture: 'welcome', seed, palette: ground(0),
-    // The opener is the most exact thing in the whole reel: the tape,
-    // read off the same quotes printed on the strip.
+    // `own` marks a card the account wrote rather than one the source
+    // did. Nothing here is ever sent to the translator: the opener is
+    // the most exact line in the reel — the tape, read off the same
+    // quotes printed on the strip — and there is nothing to gain and a
+    // number to lose by paraphrasing it.
+    own: true,
     say: `Today in the U S market. ${sayTape(quotes)}`.trim() }];
 
   // 02-05 · the news, one story a scene.
@@ -662,7 +666,7 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
   // person on this platform worth asking for anything.
   slides.push({ type: 'scene', headline: 'עוקבים לעוד', marked: '<em>עוקבים</em> לעוד',
     sub: TG_LINK, dir: '', gesture: 'point', seed: seed + 99,
-    palette: ground(beats.length + 1),
+    palette: ground(beats.length + 1), own: true,
     say: process.env.REEL_SAY_CLOSE || 'Follow for the market, every day.' });
 
   return {

@@ -257,6 +257,16 @@ jobs:
           # to hang the reel that does not need it.
           REEL_VOICE_SETUP_SEC: '120'
           REEL_VOICE_SAY_SEC: '180'
+          # ── the translation ──────────────────────────────
+          # The one place in this pipeline where a model writes a
+          # sentence. It is checked rather than trusted: any English
+          # line carrying a digit the Hebrew never had is discarded and
+          # the card keeps its structured line. Set to '0' to go back
+          # to structured narration everywhere.
+          REEL_TRANSLATE: '1'
+          TRANSLATE_MODEL: claude-haiku-4-5-20251001
+          TRANSLATE_TIMEOUT_SEC: '45'
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           IGNORE_SCHEDULE: ${{ inputs.now && '1' || '0' }}
           # Never set by the cron — a catch-up is always a decision.
           CATCHUP: ${{ inputs.catchup && '1' || '0' }}
