@@ -27,6 +27,18 @@ const API = 'https://api.anthropic.com/v1/messages';
 const MODEL = process.env.TRANSLATE_MODEL || 'claude-haiku-4-5-20251001';
 const MS = Number(process.env.TRANSLATE_TIMEOUT_SEC || 45) * 1000;
 
+// The free one. Runs on the runner like the voice does — no key, no
+// bill, no third party that can rate-limit a reel at 17:06. It is a
+// small many-to-one model rather than a dedicated Hebrew pair, which
+// is the price of it being 45MB of npm instead of a gigabyte of
+// torch, and it reads rougher than a large model would.
+//
+// That is survivable ONLY because of the guard below. A rough
+// sentence is a rough sentence; a wrong number would be a lie, and
+// the guard is what makes the difference between the two.
+const MT_MODEL = process.env.MT_MODEL || 'Xenova/opus-mt-mul-en';
+const MT_CACHE = process.env.MT_CACHE || '.mt';
+
 /**
  * Every number in a string, in a form two languages can be compared in.
  *
@@ -79,26 +91,56 @@ Rules, in order of importance:
 Reply with a JSON array of strings, one per input headline, in the same order. Nothing else.`;
 
 /**
- * Hebrew headlines -> English lines, or null.
+ * Is this sentence shaped like a translation, or like a model falling over?
  *
- * Null on any failure at all — no key, a refused model, a timeout, a
- * malformed reply, the wrong number of lines back. The caller keeps
- * the structured narration it already has, which is worse English and
- * has never once been wrong.
+ * The number guard catches the dangerous failure. This catches the
+ * embarrassing one: a small MT model handed an unfamiliar headline
+ * emits Hebrew it never translated, or the same word eight times, or
+ * three words where the source had fifteen. None of those is unsafe.
+ * All of them sound broken read aloud over a card, and the structured
+ * line they would replace does not.
  */
-export async function translate(lines) {
+export function looksTranslated(en, he) {
+  const t = String(en ?? '').trim();
+  if (!t) return false;
+  if (/[\u0590-\u05FF]/.test(t)) return false;              // Hebrew left in
+  const words = t.split(/\s+/);
+  if (words.length > 18) return false;
+  // Degenerate repetition: the same word three times running, or one
+  // word making up more than half a long sentence.
+  for (let i = 2; i < words.length; i++)
+    if (words[i].toLowerCase() === words[i - 1].toLowerCase()
+      && words[i] === words[i - 2]) return false;
+  const counts = new Map();
+  for (const w of words) counts.set(w.toLowerCase(), (counts.get(w.toLowerCase()) ?? 0) + 1);
+  if (words.length >= 6 && Math.max(...counts.values()) > words.length / 2) return false;
+  // A fifteen-word headline rendered as two words dropped the story.
+  const src = String(he ?? '').trim().split(/\s+/).length;
+  if (src >= 6 && words.length < 3) return false;
+  return true;
+}
+
+/** The free backend: a small translation model, on this machine. */
+async function localLines(texts) {
+  const { pipeline, env } = await import('@xenova/transformers');
+  env.cacheDir = MT_CACHE;
+  env.allowLocalModels = true;
+  const pipe = await pipeline('translation', MT_MODEL, { quantized: true });
+  const out = [];
+  for (const t of texts) {
+    const r = await pipe(t, { max_new_tokens: 60 });
+    out.push(String(r?.[0]?.translation_text ?? '').replace(/\s+/g, ' ').trim());
+  }
+  return out;
+}
+
+/** The paid backend, used only when a key is present. */
+async function claudeLines(texts) {
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return null;
-  const wanted = lines.map((t, i) => ({ i, t: String(t ?? '').trim() })).filter(x => x.t);
-  if (!wanted.length) return null;
-
   const body = {
-    model: MODEL,
-    max_tokens: 1000,
-    system: PROMPT,
-    messages: [{ role: 'user', content: JSON.stringify(wanted.map(x => x.t)) }],
+    model: MODEL, max_tokens: 1000, system: PROMPT,
+    messages: [{ role: 'user', content: JSON.stringify(texts) }],
   };
-
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), MS);
   let json;
@@ -110,30 +152,52 @@ export async function translate(lines) {
       body: JSON.stringify(body),
     });
     json = await res.json().catch(() => null);
-    if (!res.ok || json?.error) {
-      throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
-    }
+    if (!res.ok || json?.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
   } catch (e) {
-    throw new Error(`translate: ${e.name === 'AbortError' ? `no reply in ${MS / 1000}s` : e.message}`);
+    throw new Error(e.name === 'AbortError' ? `no reply in ${MS / 1000}s` : e.message);
   } finally { clearTimeout(timer); }
-
   const text = (json?.content ?? []).filter(c => c.type === 'text').map(c => c.text).join('');
-  // A model asked for JSON sometimes wraps it in a fence anyway.
   const m = /\[[\s\S]*\]/.exec(text);
   if (!m) return null;
+  const arr = JSON.parse(m[0]);
+  return Array.isArray(arr) ? arr.map(x => String(x ?? '').replace(/\s+/g, ' ').trim()) : null;
+}
+
+/**
+ * Hebrew headlines -> English lines, or null.
+ *
+ * Null on any failure at all — no key, a refused model, a timeout, a
+ * malformed reply, the wrong number of lines back. The caller keeps
+ * the structured narration it already has, which is worse English and
+ * has never once been wrong.
+ */
+export async function translate(lines) {
+  const wanted = lines.map((t, i) => ({ i, t: String(t ?? '').trim() })).filter(x => x.t);
+  if (!wanted.length) return null;
+
+  // A key upgrades the translator and is never required. Without one
+  // the free model runs; without either, the caller keeps the
+  // structured narration it already built.
+  const backend = process.env.ANTHROPIC_API_KEY ? 'claude' : 'local';
   let arr;
-  try { arr = JSON.parse(m[0]); } catch { return null; }
+  try {
+    arr = backend === 'claude'
+      ? await claudeLines(wanted.map(x => x.t))
+      : await localLines(wanted.map(x => x.t));
+  } catch (e) {
+    throw new Error(`translate (${backend}): ${e.message}`);
+  }
   if (!Array.isArray(arr) || arr.length !== wanted.length) return null;
 
   const out = Array(lines.length).fill(null);
   const rejected = [];
   wanted.forEach((w, k) => {
     const en = String(arr[k] ?? '').replace(/\s+/g, ' ').trim();
-    if (!en || en.split(' ').length > 18) return;
-    if (!keepsItsNumbers(en, w.t)) { rejected.push({ he: w.t, en }); return; }
+    if (!looksTranslated(en, w.t)) { rejected.push({ he: w.t, en, why: 'shape' }); return; }
+    if (!keepsItsNumbers(en, w.t)) { rejected.push({ he: w.t, en, why: 'invented a number' }); return; }
     out[w.i] = en;
   });
-  return { lines: out, rejected };
+  return { lines: out, rejected, backend };
 }
 
 const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',

@@ -131,6 +131,15 @@ jobs:
           path: .piper
           key: piper-en_US-lessac-medium-v1
 
+      # The translation model, cached the same way and for the same
+      # reason: it is downloaded once and then never again.
+      - name: cache the translator
+        if: inputs.mode == 'reel'
+        uses: actions/cache@v4
+        with:
+          path: .mt
+          key: mt-opus-mul-en-v1
+
       # The narrator. Piper is a pip package plus a ~60MB voice model
       # from HuggingFace — no key, no cost, no rate limit at 22:06.
       # The step cannot fail the run (a reel with the bed and no voice
@@ -264,6 +273,14 @@ jobs:
           # the card keeps its structured line. Set to '0' to go back
           # to structured narration everywhere.
           REEL_TRANSLATE: '1'
+          # The free translator, on this runner. 45MB of npm and a
+          # small model cached beside the voice — no key, no bill, and
+          # nothing that can rate-limit a reel at 17:06.
+          MT_MODEL: Xenova/opus-mt-mul-en
+          MT_CACHE: .mt
+          # Optional upgrade, not a requirement. Set this secret and
+          # the translator becomes a large model; leave it unset and
+          # the free one runs. The guards are identical either way.
           TRANSLATE_MODEL: claude-haiku-4-5-20251001
           TRANSLATE_TIMEOUT_SEC: '45'
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

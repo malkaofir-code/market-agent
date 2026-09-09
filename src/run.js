@@ -537,7 +537,12 @@ async function runReel() {
   // does not have is thrown away and that card keeps the structured
   // line it already had. The account's own cards, the tape read and
   // the closing ask, are never sent at all.
-  if (process.env.ANTHROPIC_API_KEY && process.env.REEL_TRANSLATE !== '0') {
+  //
+  // The translator is a small free model running on this machine. An
+  // ANTHROPIC_API_KEY, if one is ever set, upgrades it and changes
+  // nothing else — the guards are the same either way, because the
+  // guards are the part that matters.
+  if (process.env.REEL_TRANSLATE !== '0') {
     try {
       const { translate, speakable } = await import('./translate.js');
       const src = deck.slides.map(sl => (sl.own ? null : sl.headline ?? null));
@@ -549,12 +554,12 @@ async function runReel() {
           deck.slides[i].say = speakable(en);
           used++;
         });
-        say(`translated ${used}/${src.filter(Boolean).length} headline(s)`);
+        say(`translated ${used}/${src.filter(Boolean).length} headline(s) · ${r.backend}`);
         // A rejection is the guard doing its job, and it is the single
         // most interesting line this run can print — it means a model
         // tried to state a number the source never gave.
         for (const bad of r.rejected)
-          say(`  REJECTED (invented a number) — ${bad.en}\n     source: ${bad.he}`);
+          say(`  REJECTED (${bad.why}) — ${bad.en || '(empty)'}\n     source: ${bad.he}`);
       }
     } catch (e) {
       say(`translation unavailable — ${e.message}; keeping the structured lines`);
