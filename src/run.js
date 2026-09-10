@@ -551,7 +551,13 @@ async function runReel() {
   // ANTHROPIC_API_KEY, if one is ever set, upgrades it and changes
   // nothing else — the guards are the same either way, because the
   // guards are the part that matters.
-  if (process.env.REEL_TRANSLATE !== '0') {
+  // Translation exists to be SPOKEN. With the voice off nothing reads
+  // these lines aloud and nothing puts them on screen — the cards are
+  // Hebrew by design — so running a model to produce English that no
+  // one will ever hear is a minute of runner time and a class of bug
+  // for nothing. One condition rather than two env flags that can
+  // disagree with each other.
+  if (process.env.REEL_TRANSLATE !== '0' && process.env.REEL_VOICE !== '0') {
     try {
       const { translate, speakable } = await import('./translate.js');
       const src = deck.slides.map(sl => (sl.own ? null : sl.headline ?? null));

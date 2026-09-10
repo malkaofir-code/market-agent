@@ -72,6 +72,15 @@ concurrency:
 jobs:
   tick:
     runs-on: ubuntu-latest
+    env:
+      # The reel is silent.
+      #
+      # One switch, read by the setup steps AND by the run, so the two
+      # cannot drift: with the voice off there is no reason to spend a
+      # cold cache pulling a 60MB speech model or a translation model
+      # whose only consumer was the speech. Set to '1' and both come
+      # back on together.
+      REEL_VOICE: '0'
     # 12 was right when a tick was a carousel. A reel installs ffmpeg
     # and python, pulls a voice model on a cold cache, renders twelve
     # boards in two passes and encodes seven video segments — run #368
@@ -125,7 +134,7 @@ jobs:
       # seconds. An absolute path that exists in every image needs no
       # expression to be translated correctly and cannot drift.
       - name: cache the voice
-        if: inputs.mode == 'reel'
+        if: inputs.mode == 'reel' && env.REEL_VOICE != '0'
         uses: actions/cache@v4
         with:
           path: .piper
@@ -134,7 +143,7 @@ jobs:
       # The translation model, cached the same way and for the same
       # reason: it is downloaded once and then never again.
       - name: cache the translator
-        if: inputs.mode == 'reel'
+        if: inputs.mode == 'reel' && env.REEL_VOICE != '0'
         uses: actions/cache@v4
         with:
           path: .mt
@@ -150,7 +159,7 @@ jobs:
       # Each stage now says what it did, and the last line is the
       # answer to "is there a voice on this runner or not".
       - name: piper
-        if: inputs.mode == 'reel'
+        if: inputs.mode == 'reel' && env.REEL_VOICE != '0'
         timeout-minutes: 6
         run: |
           set +e
@@ -252,7 +261,7 @@ jobs:
           # ── the voice ────────────────────────────────────
           # English narration over the Hebrew boards. Set to '0' to
           # publish silent reels with the bed alone.
-          REEL_VOICE: '1'
+          REEL_VOICE: ${{ env.REEL_VOICE }}
           REEL_VOICE_MODEL: en_US-lessac-medium
           # Relative, resolved from the repo root the run starts in.
           # No workflow expression to be evaluated on the host and
@@ -264,7 +273,12 @@ jobs:
           REEL_VOICE_RATE: '0.95'
           # A narrated scene lasts as long as its sentence; this is the
           # floor for one nobody speaks over.
-          REEL_HOLD_SEC: '2.0'
+          # A silent card is held by how long it takes to READ, not by
+          # how long it takes to say. 2.0 was the floor under a spoken
+          # line; on its own it is faster than a Hebrew headline can be
+          # taken in. Seven cards at three seconds is a shade under
+          # twenty, which is where a summary reel wants to sit.
+          REEL_HOLD_SEC: '3.0'
           REEL_SAY_CLOSE: 'Follow for the U S market, every day.'
           # Ceilings on the two slow paths in voice.js. Narration is
           # optional; without these it is a way for an optional thing
