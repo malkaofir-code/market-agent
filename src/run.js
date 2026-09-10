@@ -610,7 +610,7 @@ async function runReel() {
   // model download, a line that will not synthesise: each costs the
   // narration and nothing else. A silent reel is a reel; no reel is
   // the day's only chance at a stranger, gone.
-  const { holdsFor, MAX_HOLD } = await import('./reel.js');
+  const { holdsFor, MAX_HOLD, moodOf } = await import('./reel.js');
   let voices = null, holds = null;
   if (process.env.REEL_VOICE !== '0') {
     const { ensureVoice, sayAll, seconds } = await import('./voice.js');
@@ -645,8 +645,9 @@ async function runReel() {
   }
 
   const mp4 = join(dir, 'reel.mp4');
-  const built = await buildReel(bgs, fgs, mp4, { audio: audioBed(), voices, holds });
-  say(`encoded ${built.seconds}s · ${built.scenes} scenes · ${built.audio}`);
+  const mood = moodOf(deck.slides);
+  const built = await buildReel(bgs, fgs, mp4, { audio: audioBed(mood), voices, holds });
+  say(`encoded ${built.seconds}s · ${built.scenes} scenes · ${built.audio} · ${mood}`);
 
   if (DRY) { say('DRY RUN OK —', mp4); return; }
 
@@ -669,7 +670,7 @@ async function runReel() {
       posted_at: Math.floor(Date.now() / 1000) });
     await setPublished(deck.key, { media_id: r.id, permalink: r.permalink,
       choices: { template: String(tpl.id), name: tpl.name, kind: 'reel',
-        seconds: built.seconds, audio: built.audio,
+        seconds: built.seconds, audio: built.audio, mood,
         // Whether a reel was narrated is the whole question this
         // format is asking, so it is recorded beside the result
         // rather than inferred from the log later.

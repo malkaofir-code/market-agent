@@ -87,11 +87,33 @@ export async function haveFfmpeg() {
  * Silence is still valid and still publishes; drop an mp3/m4a in
  * src/assets/audio/ and it gets used instead.
  */
-export function audioBed() {
+export function audioBed(mood = 'tape') {
   const dir = join(HERE, 'assets', 'audio');
   if (!existsSync(dir)) return null;
-  const f = readdirSync(dir).filter(x => /\.(mp3|m4a|aac|wav)$/i.test(x)).sort()[0];
-  return f ? join(dir, f) : null;
+  const all = readdirSync(dir).filter(x => /\.(mp3|m4a|aac|wav)$/i.test(x)).sort();
+  if (!all.length) return null;
+  // The track follows the day. Named rather than sorted-first, because
+  // "whatever is alphabetically first" is how a bed silently changes the
+  // moment somebody adds a file.
+  const want = all.find(f => f.startsWith(`bed-${mood}.`))
+    ?? all.find(f => f.startsWith('bed-tape.'))
+    ?? all[0];
+  return join(dir, want);
+}
+
+/**
+ * Which of the three the day earned.
+ *
+ * Counted off the same `dir` field the candles behind him are drawn
+ * from, so the music cannot disagree with the picture. A day with no
+ * clear lean gets the neutral bed rather than a coin toss.
+ */
+export function moodOf(slides = []) {
+  let up = 0, dn = 0;
+  for (const s of slides) { if (s.dir === 'up') up++; else if (s.dir === 'dn') dn++; }
+  if (up > dn + 1) return 'open';
+  if (dn > up + 1) return 'close';
+  return 'tape';
 }
 
 /**
