@@ -102,16 +102,36 @@ you are trying to change.
 TEST: after 30 days there are enough rows to rank openings by spread_pct.
 Until then no format change is evidence-based — and should say so.
 
-## Δ What this still owes
+## Δ Compliance
 
-| Rule | Today | Required |
-|---|---|---|
-| 03 open on the number | card 1 is "היום בשוק" + the tape strip | card 1 becomes the day's biggest move |
-| 01 send cue | closes on "עוקבים לעוד", a follow ask | closes on a situation-based send ask |
-| 06 nine words | headlines pass through at source length | cap enforced in compose |
-| 07 three seconds | was 2.0 under the voice | 3.0 — done |
-| 05 silent | narration + translation ran every build | `REEL_VOICE='0'` — done |
-| 08 safe area | never verified against the real UI | one screenshot check |
+| Rule | State |
+|---|---|
+| 01 send cue | closes on a rotating situation ask — `שלחו לחבר שעוקב אחרי השוק` |
+| 02 one a day at 17:00 | `REEL_HOURS='17'`, `MAX_REELS_PER_DAY='1'` |
+| 03 open on the number | card 1 is the day's biggest **move**, and its story is card 2 |
+| 04 nothing fades in | two-plane push-in starts at full opacity |
+| 05 silent | `REEL_VOICE='0'`, translation off with it |
+| 06 nine words | `fitCard()` — first clause, else a cut that drops dangling conjunctions |
+| 07 three seconds | `REEL_HOLD_SEC='3.0'` — seven cards, 19.9s |
+| 08 safe area | `node tools/safe-area.mjs` — all text clear of the UI rectangles |
+| 09 one accent | the figure carries it; direction is separate |
+| 10 18–30s | 19.9s |
+| 11–13 truth | number guard, no causal connectives, drop rather than approximate |
+| 14 measurement | `shares ÷ reach` recorded per reel; needs 30 days |
+
+Two things rule 3 forced that were not obvious. The lead must be a
+**move**, not merely the largest number — the first build opened on
+`מכסים 25%`, a tariff *rate*, which presents a level as the day's
+change and is the exact register this account exists not to lie in.
+And the lead story is promoted to card 2, so the hook is paid off
+immediately rather than four cards later.
+
+Rule 8 was the one that could only be settled by measuring. Every
+headline this account has published started at y=132, and Instagram's
+top bar covers the first ~150px — eighteen pixels of every headline,
+under the chrome, invisible in every render anyone ever looked at.
+`tools/safe-area.mjs` puts the UI rectangles over the page and
+measures the text boxes against them. Run it after any layout change.
 
 ## What is weak here
 

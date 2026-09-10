@@ -273,11 +273,18 @@ const ARCHETYPES = {
   // viewer has under two seconds to take it in — so the headline is
   // short, enormous, and carries a single accented word to land the
   // eye somewhere specific.
-  scene: s => `<div class="a-sn${s.photo ? ' has-ph' : ''}">
+  scene: s => `<div class="a-sn${s.photo ? ' has-ph' : ''}${s.lead ? ' is-lead' : ''}">
     ${sceneBg(s.dir, s.seed ?? 0)}
     ${s.photo ? `<img class="sn-ph" src="${esc(s.photo.src)}" alt="">
     <div class="sn-scrim"></div>` : ''}
-    <div class="sn-txt"><p class="sn-h">${s.marked ?? bidi(s.headline)}</p>
+    <div class="sn-txt">${s.lead && s.big
+      // The opening card is the number, so the number is the type.
+      // The instrument sits above it as an eyebrow rather than a
+      // headline — a stranger needs to know WHAT moved, in a size that
+      // does not compete with HOW MUCH.
+      ? `<p class="sn-eyeb">${bidi(s.headline)}</p>
+         <p class="sn-big" data-dir="${esc(s.dir || '')}">${bidi(s.big)}</p>`
+      : `<p class="sn-h">${s.marked ?? bidi(s.headline)}</p>`}
       ${s.sub ? `<p class="sn-s">${bidi(s.sub)}</p>` : ''}</div></div>`,
 
   // 08 · the ask.

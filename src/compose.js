@@ -460,7 +460,6 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
  * headline gets editorialised.
  */
 function markWord(headline, figures) {
-  const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const fig = figures?.[0]?.text;
   const cands = [];
   if (fig) cands.push(fig);
@@ -502,6 +501,17 @@ function markWord(headline, figures) {
  * where a viewer decides. "Nasdaq futures down one point three three
  * percent" is four seconds; "Nasdaq down one point three three" is
  * two, and the strip on screen already says they are futures. */
+/** HTML-escape, module scope: markWord had its own and composeReel
+ *  now needs one too. */
+const esc = t => String(t ?? '').replace(/[&<>]/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+/** The same instruments, in Hebrew, for a card rather than a voice. */
+const SAY_SYM_HE = {
+  NQ: 'נאסד״ק', ES: 'S&P 500', YM: 'דאו ג׳ונס',
+  SPX: 'S&P 500', NDX: 'נאסד״ק 100', RTY: 'ראסל 2000',
+};
+
 const SAY_SYM = {
   NQ: 'Nasdaq', ES: 'S and P', YM: 'the Dow',
   SPX: 'the S and P', NDX: 'the Nasdaq 100', RTY: 'the Russell',
@@ -611,7 +621,115 @@ const cap = t => String(t ?? '').charAt(0).toUpperCase() + String(t ?? '').slice
  * pipeline actually knows to be true.
  */
 const JOIN = ['', 'Also, ', 'Meanwhile, ', 'And ', 'On top of that, '];
+
+/**
+ * The close: a reason to forward it, not a request to follow.
+ *
+ * Sends per reach is what the ranking pays for and a follow is not,
+ * so the last card names a KIND OF PERSON the viewer knows rather
+ * than asking for something on the account's behalf. Deliberately not
+ * "שתפו" and never a number of friends — bait phrasing of that shape
+ * is separately down-ranked, and it reads like every other account.
+ *
+ * Three of them, rotating on the day, so a daily reel does not close
+ * on the identical sentence every afternoon.
+ */
+const SEND = [
+  'שלחו לחבר שעוקב אחרי השוק',
+  'מכירים מישהו שמשקיע? שלחו לו',
+  'שלחו את זה למי שמחזיק מניות',
+];
 export const connective = i => JOIN[Math.min(i, JOIN.length - 1)];
+
+/**
+ * A headline short enough to be read off a moving card.
+ *
+ * Nine words is the cap, and the order of preference matters more
+ * than the number: take the first clause if the sentence has one,
+ * because a clause is a complete thought and a truncation is not.
+ * Only when there is no clause boundary does it cut, and it cuts from
+ * the END — Hebrew puts its negations early (לא, אין, ללא), so the
+ * front of the line is where the meaning lives and dropping the tail
+ * of a list is survivable in a way that dropping a "not" is not.
+ *
+ * The untrimmed headline still goes in the caption. Nothing is lost,
+ * it is just not all on the card.
+ */
+const CARD_WORDS = Number(process.env.REEL_CARD_WORDS || 9);
+export function fitCard(headline) {
+  const t = String(headline ?? '').replace(/\s+/g, ' ').trim();
+  const words = t.split(' ');
+  if (words.length <= CARD_WORDS) return { text: t, trimmed: false };
+
+  // The FIRST clause only. Scanning on for any clause that happens to
+  // fit picked the tail off "Trump announced a 25% tariff — markets
+  // fell", and published "markets fell" as the headline: true, and
+  // about a different story than the one the card was for.
+  const first = t.split(/\s*[—–,:;]\s*/)[0].trim();
+  const fn = first.split(' ').filter(Boolean).length;
+  if (fn >= 3 && fn <= CARD_WORDS) return { text: first, trimmed: true };
+
+  return { text: trimTail(words.slice(0, CARD_WORDS)).join(' '), trimmed: true };
+}
+
+/**
+ * Never end a card on a word that was about to say something else.
+ *
+ * A hard cut landed one headline on "…בישיבה הקרובה למרות" — "despite"
+ * with nothing after it, which does not read as a shortened sentence,
+ * it reads as the opposite of one. These are the Hebrew words that
+ * promise a continuation; if the cut lands on one, it goes.
+ */
+const DANGLE = new Set(['למרות', 'אחרי', 'לאחר', 'לפני', 'בעקבות', 'בגלל', 'מול',
+  'על', 'של', 'את', 'עם', 'כי', 'כאשר', 'בזמן', 'תוך', 'ללא', 'לפי', 'בין',
+  'כדי', 'אם', 'אך', 'אבל', 'או', 'וגם', 'גם']);
+function trimTail(words) {
+  const out = [...words];
+  while (out.length > 3 && DANGLE.has(out[out.length - 1].replace(/[.,;:]$/, ''))) out.pop();
+  return out;
+}
+
+/**
+ * The number the reel opens on.
+ *
+ * The biggest move of the day, not the first story of the day and not
+ * the account's own name. Magnitude across the beats, because a stock
+ * jumping 3.75% stops a scroll and an index moving 1.33% does not,
+ * and it falls back to the tape when no story carried a figure at all.
+ *
+ * Plausibility-bounded like everything else here: a "move" outside
+ * TAPE_MAX_PCT is a level that got parsed as a percentage, which is
+ * the exact shape of the bug that put SPX +46.06% on this account.
+ */
+const LEAD_MAX_PCT = Number(process.env.TAPE_MAX_PCT || 25);
+export function leadFigure(beats, quotes) {
+  const num = t => Math.abs(parseFloat(String(t).replace(/[−־]/g, '-')
+    .replace(/,(\d{3})(?!\d)/g, '$1').replace(',', '.').replace('%', '')));
+  let best = null;
+  for (const p of beats) {
+    if (!p.figures?.length || p.figureCount >= 4) continue;
+    const f = p.figures[0], v = num(f.text);
+    if (!Number.isFinite(v) || v > LEAD_MAX_PCT || v === 0) continue;
+    // It has to be a MOVE, not merely a number.
+    //
+    // The first build of this card opened on "מכסים 25%" — a tariff
+    // RATE, the largest figure in the window and not a market move at
+    // all. A reel that opens by presenting a level as the day's
+    // biggest change is lying in exactly the register this account
+    // exists not to lie in. If direction() cannot say which way it
+    // went, it is not the day's move.
+    const d = direction(f.text, `${p.headline} ${p.stand ?? ''}`);
+    if (d !== 'up' && d !== 'dn') continue;
+    if (!best || v > best.v) best = { v, dir: d, text: f.text.replace(/[−־]/g, '-'), story: p };
+  }
+  if (best) return best;
+  for (const q of quotes ?? []) {
+    const v = num(q.chg);
+    if (!Number.isFinite(v) || v > LEAD_MAX_PCT || v === 0) continue;
+    if (!best || v > best.v) best = { v, text: String(q.chg).replace(/[−־]/g, '-'), sym: q.sym };
+  }
+  return best;
+}
 
 /** Which way the story points — the scene and his hands both follow it. */
 const GEST = { up: 'yes', dn: 'pause', '': 'explain' };
@@ -659,8 +777,12 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
     const fig = p.figures?.length && p.figureCount < 4
       ? p.figures[0].text.replace(/[−־]/g, '-') : null;
     const dir = fig ? direction(p.figures[0].text, `${p.headline} ${p.stand ?? ''}`) : '';
-    const marked = markWord(p.headline, p.figures);
-    return { type: 'scene', headline: p.headline, marked, say: sayScene(p, dir),
+    // Nine words on the card; the whole sentence still goes in the
+    // caption, so nothing is lost, it is just not all on screen.
+    const fit = fitCard(p.headline);
+    const marked = markWord(fit.text, p.figures);
+    return { type: 'scene', headline: fit.text, full: p.headline, trimmed: fit.trimmed,
+      marked, say: sayScene(p, dir),
       // The figure goes UNDER the line only when the line does not
       // already contain it. Printing 1.33% in the headline and again
       // beneath it is the board stuttering.
@@ -677,28 +799,50 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
       palette: ground(i), source: p.source };
   };
 
-  // 01 · the title. The account's own card, so a stranger knows what
-  // they are looking at before the news starts.
-  const slides = [{ type: 'scene', headline: 'היום בשוק',
-    marked: 'היום ב<em>שוק</em>', sub: hhmm(w.end), dir: '',
-    gesture: 'welcome', seed, palette: ground(0),
-    // `own` marks a card the account wrote rather than one the source
-    // did. Nothing here is ever sent to the translator: the opener is
-    // the most exact line in the reel — the tape, read off the same
-    // quotes printed on the strip — and there is nothing to gain and a
-    // number to lose by paraphrasing it.
-    own: true,
-    say: `Here's the U S market today. ${sayTape(quotes)}`.trim() }];
+  // 01 · the number.
+  //
+  // This was a masthead — "היום בשוק" over the tape strip — and a
+  // masthead spends the highest-leverage second of the reel telling a
+  // stranger the account name that Instagram is already drawing above
+  // the video. It opens on the biggest move of the day instead, at
+  // the size of the screen, and the story behind that number is
+  // promoted to the first beat so the hook is paid off immediately
+  // rather than four cards later.
+  const lead = leadFigure(beats, quotes);
+  const order = lead?.story
+    ? [lead.story, ...beats.filter(b => b !== lead.story)]
+    : beats;
+  // The direction the parser found, not one re-derived from a minus
+  // sign — the tape's chg for a fall does not always carry one.
+  const leadDir = lead?.dir
+    ?? (lead ? (String(lead.text).trim().startsWith('-') ? 'dn' : 'up') : '');
+  const leadSubject = lead?.story
+    ? (TOPICS.find(t => t.re.test(`${lead.story.headline} ${lead.story.stand ?? ''}`))?.word ?? null)
+    : (lead?.sym ? SAY_SYM_HE[lead.sym] ?? null : null);
 
-  // 02-05 · the news, one story a scene.
-  beats.forEach((p, i) => slides.push(scene(p, i + 1)));
+  const slides = [lead
+    ? { type: 'scene', lead: true, headline: leadSubject ?? 'היום בשוק',
+        marked: leadSubject ? esc(leadSubject) : 'היום ב<em>שוק</em>',
+        big: lead.text, sub: hhmm(w.end), dir: leadDir,
+        gesture: GEST[leadDir] ?? 'explain', seed, palette: ground(0), own: true,
+        say: `Here's the U S market today. ${sayTape(quotes)}`.trim() }
+    // No plausible figure in the whole window is rare and is not worth
+    // inventing a hook over. The old card stands, honestly thin.
+    : { type: 'scene', headline: 'היום בשוק', marked: 'היום ב<em>שוק</em>',
+        sub: hhmm(w.end), dir: '', gesture: 'welcome', seed,
+        palette: ground(0), own: true,
+        say: `Here's the U S market today. ${sayTape(quotes)}`.trim() }];
+
+  // 02-06 · the news, one story a scene, biggest first.
+  order.forEach((p, i) => slides.push(scene(p, i + 1)));
 
   // 06 · the ask. A stranger who watched to the end is the only
   // person on this platform worth asking for anything.
-  slides.push({ type: 'scene', headline: 'עוקבים לעוד', marked: '<em>עוקבים</em> לעוד',
+  const ask = process.env.REEL_SEND_ASK || SEND[seed % SEND.length];
+  slides.push({ type: 'scene', headline: ask, marked: markWord(ask, null),
     sub: TG_LINK, dir: '', gesture: 'point', seed: seed + 99,
     palette: ground(beats.length + 1), own: true,
-    say: process.env.REEL_SAY_CLOSE || "That's the day. Follow for the market." });
+    say: process.env.REEL_SAY_CLOSE || "That's the day. Send it to someone who trades." });
 
   return {
     key: `R:${w.key}`, template, window: span(w), date: ddmmyy(w.end),

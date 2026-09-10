@@ -672,7 +672,15 @@ html,body{margin:0;padding:0;background:var(--bg)}
   filter:drop-shadow(0 24px 60px rgba(0,0,0,.55))}
 .slide--reel .ron img{height:100%;width:auto;object-fit:contain;object-position:bottom center}
 
-.a-sn .sn-txt{position:absolute;left:46px;right:46px;top:132px;z-index:3;text-align:center}
+/* top:196, not 132 — rule 8, measured rather than assumed.
+ *
+ * Instagram draws its own bar across the top ~150px of a reel. Every
+ * headline this account has ever published started at y=132, which
+ * put the first eighteen pixels of every one of them underneath that
+ * bar. Nobody would catch that by looking at a render; it took
+ * putting the UI rectangles over the page and measuring the text
+ * box against them. 196 clears it with room for the ascenders. */
+.a-sn .sn-txt{position:absolute;left:46px;right:46px;top:196px;z-index:3;text-align:center}
 .a-sn .sn-h{font-family:var(--f-disp);font-size:118px;font-weight:800;line-height:1.0;
   letter-spacing:-.035em;margin:0;color:var(--fg);
   text-shadow:0 4px 26px rgba(0,0,0,.55),0 1px 0 rgba(0,0,0,.35)}
@@ -742,3 +750,26 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
     radial-gradient(140% 44% at 50% 100%,
       color-mix(in srgb, var(--bg) 82%, transparent) 0%, transparent 72%)}
 .a-sn .sn-txt{position:relative;z-index:2}
+
+/* ── the opening card: the number, at the size of the screen ──
+ *
+ * Rule 3. The reel used to open on a masthead, which spent the one
+ * second that decides everything telling a stranger the account name
+ * Instagram already draws above the video. It opens on the day's
+ * biggest move instead.
+ *
+ * The figure is set in the mono face at display size with tabular
+ * figures, so 3.75% and 11.20% occupy the same width and the card
+ * does not reflow between days. Direction colours it — this is the
+ * one place the semantic colour outranks the accent, because on this
+ * card the number IS the story rather than a detail inside it.
+ */
+.a-sn.is-lead .sn-eyeb{font-family:var(--f-mono);font-size:44px;font-weight:600;
+  letter-spacing:.04em;color:var(--dim);margin:0 0 6px}
+.a-sn.is-lead .sn-big{font-family:var(--f-mono);font-weight:700;
+  font-size:200px;line-height:.92;letter-spacing:-.045em;margin:0;
+  font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate;
+  color:var(--acc)}
+.a-sn.is-lead .sn-big[data-dir="up"]{color:var(--pos)}
+.a-sn.is-lead .sn-big[data-dir="dn"]{color:var(--neg)}
+.a-sn.is-lead .sn-s{margin-top:14px}
