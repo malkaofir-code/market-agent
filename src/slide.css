@@ -783,18 +783,14 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
    the thumb has to stop.
    ═══════════════════════════════════════════════════════════ */
 .slide--proof{position:relative}
-/* The torn edge — half-circles bitten out of the top and bottom in
-   the surrounding ink, so the board reads as a strip of paper. */
-.slide--proof::before,.slide--proof::after{content:"";position:absolute;
-  left:-10px;right:-10px;height:26px;z-index:6;pointer-events:none;
-  background:radial-gradient(circle at 13px 13px, #0B0E13 12.5px, transparent 13px) 0 0/26px 26px repeat-x}
-.slide--proof::before{top:0}
-.slide--proof::after{top:auto;bottom:0;transform:rotate(180deg)}
-/* A story board has 1920px to fill and a mascot standing in the
-   bottom third, so the evidence gets the room instead of the type
-   growing into a wall of words. */
-.slide--story.slide--proof .pf-chart .pl{height:340px}
-.slide--story.slide--proof .ron{height:38%}
+/* A document laid on the feed, not a board printed in it.
+   The earlier version bit half-circles out of the edges to suggest a
+   torn receipt; nobody reads a shape as a metaphor at thumb speed,
+   and it landed as a row of dots. A ruled frame inset from the edge
+   is the older, plainer signal — a certificate, a statement, a thing
+   issued rather than posted — and it needs no decoding at all. */
+.slide--proof{box-shadow:inset 0 0 0 16px var(--bg), inset 0 0 0 19px var(--fg),
+  inset 0 0 0 27px var(--bg), inset 0 0 0 28px var(--fg)}
 
 /* ── the proof header band ── */
 .pf-hd{display:flex;align-items:center;gap:20px;padding:0 0 22px;
