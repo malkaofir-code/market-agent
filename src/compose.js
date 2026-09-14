@@ -1207,7 +1207,10 @@ export function proofSlide(claim, { palette = null, variant = null } = {}) {
 
   // The seal says what was actually verified. A forecast that landed
   // may say so; a follow-up says what it is, on the same sheet.
-  const stamp = forecast ? 'אמרנו · והתממש' : 'סיקרנו · והמשיך';
+  // The loudest line on the board, and the only one that is about
+  // the account rather than the news. Two words, so it can be set at
+  // display size without wrapping: what we did, and what happened.
+  const stamp = forecast ? 'אמרנו. והתממש.' : 'סיקרנו. והמשיך.';
   const when = `פורסם ${dmy(Number(claim.posted_at))} · אומת ${dayOf(claim.out_date)}`;
   if (type === 'proofVerdict') return { ...base, stamp, when };
   return { ...base, stamp, when };

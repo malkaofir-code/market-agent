@@ -138,9 +138,9 @@ const ARCHETYPES = {
   // the evidence: the reasoning, the path, the two closes.
   proofCert: s => `<div class="a-pf">
     <div class="pf-block">
-      <span class="pf-seal">${bidi(s.stamp || 'אומת')}</span>
-      <span class="pf-when">${bidi(s.when)}</span>
+      <p class="pf-verdict"><span class="pf-tick"></span>${bidi(s.stamp || 'אמרנו — והתממש')}</p>
       <p class="pf-said">${bidi(s.said)}</p>
+      <span class="pf-when">${bidi(s.when)}</span>
     </div>
     ${s.why ? `<div class="pf-why"><span class="pf-lbl">${bidi('למה')}</span>
       <p>${bidi(s.why)}</p></div>` : ''}
@@ -156,7 +156,7 @@ const ARCHETYPES = {
   // white, the reasoning in one line, the two closes as the working.
   // It exists so two proof boards on the same day cannot look alike.
   proofVerdict: s => `<div class="a-pd">
-    <span class="pd-seal">${bidi(s.stamp || 'אומת')}</span>
+    <p class="pd-verdict"><span class="pd-tick"></span>${bidi(s.stamp || 'אמרנו — והתממש')}</p>
     <p class="pd-move fig" data-protect="the figure">${esc(s.figure)}</p>
     <p class="pd-said">${bidi(s.said)}</p>
     ${s.why ? `<p class="pd-why"><span class="pd-tag">${bidi('למה')}</span>${bidi(s.why)}</p>` : ''}
