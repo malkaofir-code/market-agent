@@ -313,9 +313,14 @@ jobs:
           WINDOW_MINUTES: '60'
           # Windows run XX:15 -> XX+1:15; the tick fires at XX:16.
           WINDOW_OFFSET_MIN: '15'
-          # Nothing new for this long, during active hours, and the
-          # agent says so in Telegram instead of staying green.
-          STALE_SOURCE_HOURS: '8'
+          # The source-silent alarm. Checked only on a US trading day
+          # (Sat and Sun the market is shut and so is the channel) and
+          # only from mid-afternoon, by which time a live channel has
+          # posted. Eight hours with no day check would have fired
+          # every single morning — the channel is quiet overnight by
+          # design — and an alarm that cries wolf is worse than none.
+          STALE_SOURCE_HOURS: '6'
+          STALE_CHECK_HOUR: '14'
           ACTIVE_FROM_HOUR: '7'
           ACTIVE_TO_HOUR: '24'
           MAX_POSTS_PER_DAY: '12'

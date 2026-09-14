@@ -76,6 +76,8 @@ const localHour = () => Number(new Intl.DateTimeFormat('en-GB',
   { timeZone: process.env.TZ || 'Asia/Jerusalem', hour: '2-digit', hour12: false })
   .format(new Date()));
 
+const TZ = process.env.TZ || 'Asia/Jerusalem';
+
 const CARRY_KEY = 'tape-carry';
 // One shared memory across BOTH tracks. Separate lists would let an
 // hour's stories and the digest that follows them land on the same
@@ -712,20 +714,36 @@ async function main() {
       // 2 messages in the window") and none of them said why.
       say(`ingested ${rows.length} message(s), ${fresh} new`);
 
-      // And if the source has stopped talking, say so out loud.
+      // And if the source has stopped talking, say so out loud —
+      // but only when silence would actually be strange.
       //
-      // A silent source is indistinguishable from a healthy quiet
-      // hour unless something is watching the clock. During active
-      // hours, nothing new for STALE_SOURCE_HOURS means the channel
-      // has stopped, been renamed, or the session has died — and all
-      // three look identical from in here: green runs, forever.
+      // The first version of this alarm used "nothing new for eight
+      // hours", which is wrong twice over and would have cried wolf
+      // until it was ignored. The channel posts US market news: it
+      // goes quiet overnight for twelve hours as a matter of course,
+      // and all weekend, because the market it reports on is shut. It
+      // was exactly that weekend silence — Saturday the 12th and
+      // Sunday the 13th — that looked like a dead pipeline and was
+      // not one.
+      //
+      // So the question is not "how long has it been quiet" but "has
+      // it been quiet when it had no business being". On a US trading
+      // day, by early afternoon in Israel, a live channel has posted.
+      // That is the only moment worth checking.
       const { newestMessageTs } = await import('./db.js');
       const newest = await newestMessageTs();
-      const staleH = Number(process.env.STALE_SOURCE_HOURS || 8);
+      const staleH = Number(process.env.STALE_SOURCE_HOURS || 6);
       const ageH = newest ? (Date.now() / 1000 - newest) / 3600 : Infinity;
-      if (ageH > staleH) {
+      const parts = new Intl.DateTimeFormat('en-GB', { timeZone: TZ,
+        weekday: 'short', hour: '2-digit', hour12: false })
+        .formatToParts(new Date()).reduce((a, x) => (a[x.type] = x.value, a), {});
+      // Saturday and Sunday the US market is closed and so is the
+      // channel. Friday is a trading day and is checked like any other.
+      const tradingDay = !['Sat', 'Sun'].includes(parts.weekday);
+      const afternoon = Number(parts.hour) >= Number(process.env.STALE_CHECK_HOUR || 14);
+      if (tradingDay && afternoon && ageH > staleH) {
         const hrs = Number.isFinite(ageH) ? ageH.toFixed(1) : '∞';
-        say(`SOURCE STALE — newest message is ${hrs}h old`);
+        say(`SOURCE STALE — newest message is ${hrs}h old on a trading afternoon`);
         const last = Number((await getState('stale-alert')) ?? 0);
         // One alert a day, not one an hour.
         if (Date.now() / 1000 - last > 20 * 3600) {
