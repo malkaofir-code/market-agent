@@ -51,7 +51,10 @@ export function scoreClaim(claim, series) {
     if (want && dir !== want) continue;
     if (Math.abs(move) < need) continue;
     return { status: 'hit', base_px: base.c, base_date: base.d,
-      out_px: p.c, out_date: p.d, move_pct: Number(move.toFixed(2)), days_after: i + 1 };
+      out_px: p.c, out_date: p.d, move_pct: Number(move.toFixed(2)), days_after: i + 1,
+      // Every close from the one before we published through the one
+      // that settled it — the board draws this rather than asserting it.
+      path: [base, ...after.slice(0, i + 1)] };
   }
 
   // Out of sessions. The last one on the board is the honest final
@@ -61,7 +64,7 @@ export function scoreClaim(claim, series) {
     const move = (last.c - base.c) / base.c * 100;
     return { status: 'miss', base_px: base.c, base_date: base.d,
       out_px: last.c, out_date: last.d, move_pct: Number(move.toFixed(2)),
-      days_after: after.length };
+      days_after: after.length, path: [base, ...after] };
   }
   return { status: 'open', base_px: base.c, base_date: base.d };
 }

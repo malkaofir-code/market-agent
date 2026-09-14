@@ -30,18 +30,31 @@ const GESTURES = {
   explain: /explaining/, welcome: /welcome/, yes: /-yes|assured/,
   pause: /pause|thinking|listening/,
 };
-function loadPoses() {
-  const dir = join(HERE, 'assets', 'ron');
+// The proof boards have their own wardrobe, in its own folder.
+//
+// A callback is the one thing this account publishes that asks to be
+// BELIEVED, and it should not look like the hourly bulletin wearing
+// the same overshirt. These are the same man in the same style,
+// standing differently: assured rather than explaining, and in one
+// case in a blazer. Keyed 'proof-*' so nothing else can reach them —
+// an archetype gets this wardrobe only by naming it.
+const PROOF = {
+  'proof-assured': /assured/, 'proof-point': /point/,
+  'proof-open':    /open/,    'proof-steady': /steady/,
+  'proof-patient': /patient/,
+};
+function loadPoses(folder = 'ron', map = GESTURES) {
+  const dir = join(HERE, 'assets', folder);
   if (!existsSync(dir)) return {};
   const out = {};
   for (const f of readdirSync(dir).filter(f => f.endsWith('.png')).sort()) {
     const uri = 'data:image/png;base64,' + readFileSync(join(dir, f)).toString('base64');
-    for (const [g, re] of Object.entries(GESTURES))
+    for (const [g, re] of Object.entries(map))
       if (re.test(f)) (out[g] ??= []).push(uri);
   }
   return out;
 }
-const POSES = loadPoses();
+const POSES = { ...loadPoses(), ...loadPoses('ron-proof', PROOF) };
 
 // How far the type may shrink before we admit defeat, and in what steps.
 const SQUEEZE_STEP = 0.06;
@@ -82,7 +95,7 @@ const MASCOT_RETRIES = ['smaller', 'far-edge', 'smaller-far-edge'];
  * row and re-measure. Every other archetype still fails loudly - there
  * is nothing to shed on a cover.
  */
-export async function renderDeck(deck, outDir, { scale = 1, format = 'png', story = false, layer = null } = {}) {
+export async function renderDeck(deck, outDir, { scale = 1, format = 'png', story = false } = {}) {
   mkdirSync(outDir, { recursive: true });
   const size = story ? STORY : CANVAS;
   const browser = await chromium.launch();
@@ -147,7 +160,7 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
 
 
       for (let attempt = 0; attempt < 20; attempt++) {
-        await p.setContent(page(buildSlide(slide, meta, i, slides.length, { story, layer }), CSS),
+        await p.setContent(page(buildSlide(slide, meta, i, slides.length, { story }), CSS),
           { waitUntil: 'networkidle' });
         try { await p.evaluate(() => document.fonts.ready); } catch {}
         await p.waitForTimeout(120);
@@ -263,19 +276,9 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
       // The API path needs JPEG (Meta accepts nothing else). Quality 95
       // because the ground is a 5.5%-ink graph-paper grid and hairline
       // rules - exactly the content JPEG smears at the usual 80.
-      // A layered pass names its files by plane, and the foreground
-      // is always a PNG whatever the deck's format says — JPEG has no
-      // alpha and the whole point of that pass is the alpha.
-      const stem = layer ? layer : 'slide';
-      const ext = layer === 'fg' ? 'png' : format;
-      const file = join(outDir, `${stem}-${String(i + 1).padStart(2, '0')}.${ext}`);
-      // The foreground pass must keep its alpha: it is composited over
-      // a background that moves independently, and an opaque cut-out
-      // has nothing to composite against.
+      const file = join(outDir, `slide-${String(i + 1).padStart(2, '0')}.${format}`);
       await p.locator('.slide').screenshot(
-        layer === 'fg' ? { path: file, omitBackground: true }
-        : format === 'jpeg' ? { path: file, type: 'jpeg', quality: 100 }
-        : { path: file });
+        format === 'jpeg' ? { path: file, type: 'jpeg', quality: 100 } : { path: file });
       files.push(file);
     }
   } finally {

@@ -32,6 +32,14 @@ create table if not exists agent.claims (
   base_px     numeric, base_date date,   -- the last close BEFORE we posted
   out_px      numeric, out_date date,
   move_pct    numeric, days_after int,
+  -- Every close from the one before we published through the one that
+  -- settled it. The board DRAWS this rather than asserting it: two
+  -- numbers in a table are a claim, the line between them is evidence.
+  path        jsonb,
+  -- A proven claim can appear twice — once as the story the day it
+  -- settles, once inside the weekly proof carousel — so the two
+  -- surfaces are tracked apart and neither starves the other.
+  in_post_at  bigint,
   status      text not null default 'open',      -- open|hit|miss|shown|nodata
   checked_at  bigint, shown_at bigint,
   created_at  bigint not null default extract(epoch from now())::bigint,

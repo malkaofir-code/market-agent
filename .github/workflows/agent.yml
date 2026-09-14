@@ -262,10 +262,18 @@ jobs:
           # One board a day at most, and nothing at all on a day when
           # no claim settled — which is most days. A second callback in
           # one day would turn a record into a boast.
-          MAX_CALLBACKS_PER_DAY: '1'
+          MAX_CALLBACKS_PER_DAY: '2'
           # Nine in the morning, Israel. The number on the board is a
           # CLOSE, and last night's US session is settled by then.
-          CALLBACK_HOURS: '9'
+          CALLBACK_HOURS: '9,17'
+          # And one carousel at noon, on the days there is a record to
+          # show. Two proven calls minimum: one is a story, a record
+          # needs at least two.
+          CALLBACK_POST_HOURS: '12'
+          MAX_CALLBACK_POSTS_PER_DAY: '1'
+          PROOF_POST_MIN: '2'
+          PROOF_POST_MAX: '3'
+          PROOF_POST_DAYS: '7'
           # How far back the first run reaches to find claims the
           # account already made. Costs nothing after that: the unique
           # key on (tg_id, symbol, kind) makes every later pass a

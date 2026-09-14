@@ -1150,37 +1150,156 @@ const cut = (t, max = 96) => {
   return `${s.slice(0, at > 40 ? at : max)}…`;
 };
 
-export function composeCallback(claim, { palette = 'deep', now = null } = {}) {
-  const at = now ?? Math.floor(Date.now() / 1000);
+/** A close, written the way a trader reads it. */
+function px(v, klass) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '—';
+  const dp = klass === 'stock' ? 2 : (Math.abs(n) >= 1000 ? 0 : 2);
+  return n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+}
+
+/** Postgres hands a `date` back as a Date; a fixture hands a string. */
+function dayOf(v) {
+  if (!v) return '';
+  const iso = v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10);
+  const [, m, d] = iso.split('-');
+  return `${d}.${m}`;
+}
+
+// Three ways to say one true thing.
+//
+// A proof board that looks identical every time stops being read
+// after the second one, and this is the format the account most needs
+// people to keep reading. The variant comes from the claim's own id,
+// so a rerun reproduces the board it reran and two boards in a day
+// are never the same shape.
+const PROOF_VARIANTS = ['called', 'calledStamp', 'calledThen'];
+
+/**
+ * One settled claim as one board.
+ *
+ * "אמרנו" is only ever printed over a post that actually made the
+ * claim. A follow-up — we covered this, here is what happened since —
+ * says exactly that instead, on the same three layouts.
+ */
+export function proofSlide(claim, { palette = null, variant = null } = {}) {
   const move = Number(claim.move_pct);
   const dir = move >= 0 ? 'up' : 'dn';
   const forecast = claim.kind === 'forecast';
-  // A forecast that landed is the only case allowed to say "we said
-  // so". A follow-up says what it is: we covered it, here is what
-  // happened since. The distinction is the difference between a
-  // record and a brag.
-  const eyebrow = forecast ? 'אמרנו · והתממש' : 'מאז שסיקרנו';
-  const label = forecast ? 'ומאז' : 'מאז הפוסט';
   const figure = `${move > 0 ? '+' : ''}${move.toFixed(1)}%`;
+  const said = cut(claim.headline);
+  const sub = `${claim.asset} · ${sessions(Number(claim.days_after) || 1)} אחרי`;
+  const type = variant ?? PROOF_VARIANTS[Number(claim.id ?? 0) % PROOF_VARIANTS.length];
+  const when = `הפוסט שלנו · ${dmy(Number(claim.posted_at))}`;
+  // Every proof board carries the same three things beyond its own
+  // layout: the price path it is asserting, the word in the header
+  // band, and the method in the footer. The method line is not
+  // decoration — it is what separates a record from a boast, and it
+  // is printed on every single one of these boards.
+  const path = Array.isArray(claim.path) ? claim.path : null;
+  const base = { palette, dir, figure, said, sub, type, path,
+    fromPx: px(claim.base_px, claim.klass), toPx: px(claim.out_px, claim.klass),
+    tag: forecast ? 'אומת' : 'מעקב',
+    method: 'נמדד ממחיר הסגירה שלפני הפוסט' };
 
-  const slide = {
-    type: 'called', palette,
-    eyebrow,
-    when: `הפוסט שלנו · ${dmy(Number(claim.posted_at))}`,
-    said: cut(claim.headline),
-    label,
-    figure,
-    dir,
-    sub: `${claim.asset} · ${sessions(Number(claim.days_after) || 1)} אחרי`,
-    gesture: forecast ? 'point' : 'explain',
-  };
+  if (type === 'calledStamp') return { ...base,
+    eyebrow: forecast ? 'אמרנו' : 'סיקרנו',
+    stamp: forecast ? 'התממש' : 'המשיך', when };
 
+  if (type === 'calledThen') return { ...base,
+    eyebrow: forecast ? 'אמרנו · וזה מה שקרה' : 'סיקרנו · וזה מה שקרה',
+    fromLabel: `סגירה לפני הפוסט · ${dayOf(claim.base_date)}`,
+    toLabel: `סגירה · ${dayOf(claim.out_date)}`,
+    sub: `${claim.asset} · ${sessions(Number(claim.days_after) || 1)} אחרי` };
+
+  return { ...base,
+    eyebrow: forecast ? 'אמרנו · והתממש' : 'מאז שסיקרנו',
+    label: forecast ? 'ומאז' : 'מאז הפוסט', when };
+}
+
+/** One board, for the story track. */
+export function composeCallback(claim, { palette = null, now = null, variant = null } = {}) {
+  const at = now ?? Math.floor(Date.now() / 1000);
   return {
     key: `C:${localDay(at)}T${hhmm(at)}`,
     window: `${dmy(Number(claim.posted_at))}\u2013${dmy(at)}`,
     date: ddmmyy(at),
     stamp: '', quotes: [],
-    slides: [slide],
+    slides: [proofSlide(claim, { palette, variant })],
     claimId: claim.id,
+  };
+}
+
+// ── the proof post ───────────────────────────────────────────
+//
+// The stories reach followers. This is the one that reaches the grid,
+// where a stranger decides in two seconds whether an account is worth
+// following — and "here is what we said and here is what the market
+// did, twice, with the closes" is the strongest two seconds this
+// account has.
+//
+// It is never a single call. One proven call is a story; a post has
+// to be a RECORD, which is why it needs two and ends on the method.
+
+const PROOF_GROUNDS = ['deep', 'ink', 'slate'];
+
+export function composeCallbackPost(hits, { now = null, score = null } = {}) {
+  const at = now ?? Math.floor(Date.now() / 1000);
+  if (!hits?.length) return { skip: 'nothing proven' };
+
+  // The grounds come from the archetype now — paper for the
+  // receipts, the accent field for the verdict — so the cards only
+  // have to alternate SHAPE, which they do by variant.
+  const cards = hits.map((h, i) =>
+    proofSlide(h, { palette: null, variant: PROOF_VARIANTS[i % PROOF_VARIANTS.length] }));
+
+  const n = hits.length;
+  const cover = {
+    type: 'coverProof', palette: null, tag: 'אומת',
+    method: 'כל מספר נמדד ממחירי סגירה',
+    eyebrow: 'הקריאות שלנו',
+    headline: 'אמרנו. וזה מה שקרה.',
+    stand: `${n === 1 ? 'עדכון אחד' : `${n} עדכונים`} מהשבוע האחרון, `
+         + 'והמספרים שהגיעו אחריהם.',
+  };
+
+  // The record board, and the only place the method is written down.
+  // A hit rate with nothing under it is a number anybody can print.
+  const items = hits.slice(0, 5).map(h => ({
+    asset: h.asset,
+    when: dmy(Number(h.posted_at)),
+    move: `${Number(h.move_pct) > 0 ? '+' : ''}${Number(h.move_pct).toFixed(1)}%`,
+    dir: Number(h.move_pct) >= 0 ? 'up' : 'dn',
+  }));
+  const hit30 = score?.hit ?? n;
+  const rec = {
+    type: 'record', palette: null, tag: 'השיא', method: 'ללא בחירת תאריכים בדיעבד',
+    eyebrow: '30 הימים האחרונים',
+    count: String(hit30),
+    of: hit30 === 1 ? 'עדכון שהשוק אישר' : 'עדכונים שהשוק אישר',
+    items,
+    note: 'נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
+        + 'עד שלושה ימי מסחר. בלי בחירת תאריכים בדיעבד.',
+  };
+
+  const lines = hits.map(h =>
+    `▪ ${dmy(Number(h.posted_at))} · ${h.asset} — ${h.headline ?? ''}\n`
+    + `   ${Number(h.move_pct) > 0 ? '+' : ''}${Number(h.move_pct).toFixed(1)}% `
+    + `תוך ${sessions(Number(h.days_after) || 1)}`).join('\n');
+  const caption = 'שוק ההון האמריקאי | מה שאמרנו · ומה שקרה\n\n'
+    + `${lines}\n\n`
+    + 'כל מספר כאן נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
+    + 'עד שלושה ימי מסחר, בלי לבחור תאריכים בדיעבד.\n'
+    + `עדכונים שוטפים · @marketalert.il\n`
+    + '#שוקההון #מסחר #וולסטריט';
+
+  return {
+    key: `CP:${localDay(at)}T${hhmm(at)}`,
+    window: `${dmy(Number(hits[hits.length - 1].posted_at))}\u2013${dmy(at)}`,
+    date: ddmmyy(at),
+    stamp: '', quotes: [],
+    slides: [cover, ...cards, rec],
+    caption,
+    claimIds: hits.map(h => h.id),
   };
 }

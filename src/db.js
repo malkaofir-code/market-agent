@@ -158,7 +158,8 @@ const DAY_START = `extract(epoch from date_trunc('day', now() at time zone $tz) 
 // than on "not a story", because the moment a third kind existed
 // "not a story" quietly meant "post or reel" — one reel would have
 // eaten a digest slot and opened the minimum gap in front of it.
-const POSTS_ONLY = `key not like 'S:%' and key not like 'R:%' and key not like 'C:%'`;
+const POSTS_ONLY = `key not like 'S:%' and key not like 'R:%'
+  and key not like 'C:%' and key not like 'CP:%'`;
 
 export const postsToday = () =>
   q(`select count(*)::int n from agent.windows
@@ -249,6 +250,32 @@ export const reelsToday = () =>
      where status='posted' and key like 'R:%'
        and posted_at >= ${DAY_START}`)
     .then(r => r.rows[0].n);
+
+/**
+ * Proven claims not yet used in a proof POST.
+ *
+ * The story track and the post track read the same settled claims and
+ * must not starve each other, so inclusion in a carousel is tracked on
+ * its own column. A claim shown as a story is still good material for
+ * the post — being right once is worth saying on both surfaces — but
+ * being in one post twice is just a repeat.
+ */
+export const provenSince = (days = 7, limit = 3) =>
+  q(`select * from agent.claims
+     where status in ('hit','shown') and in_post_at is null
+       and checked_at > extract(epoch from now())::bigint - $1 * 86400
+     order by (kind = 'forecast') desc, abs(move_pct) desc
+     limit $2`, [days, limit]).then(r => r.rows);
+
+export const markClaimsPosted = ids =>
+  ids.length ? q(`update agent.claims set in_post_at = extract(epoch from now())::bigint
+                  where id = any($1::bigint[])`, [ids]) : null;
+
+/** The proof carousel's own rail — one a day, never more. */
+export const callbackPostsToday = () =>
+  q(`select count(*)::int n from agent.windows
+     where status='posted' and key like 'CP:%'
+       and posted_at >= ${DAY_START}`).then(r => r.rows[0].n);
 
 /** A callback is a story too — its own rail, on the same ceiling. */
 export const callbacksToday = () =>
@@ -374,11 +401,12 @@ export const closesFor = (symbol, fromDate) =>
 
 export const setClaimOutcome = (id, o) =>
   q(`update agent.claims set status=$2, base_px=$3, base_date=$4, out_px=$5,
-       out_date=$6, move_pct=$7, days_after=$8,
+       out_date=$6, move_pct=$7, days_after=$8, path=$9,
        checked_at=extract(epoch from now())::bigint
      where id=$1`,
     [id, o.status, o.base_px ?? null, o.base_date ?? null, o.out_px ?? null,
-     o.out_date ?? null, o.move_pct ?? null, o.days_after ?? null]);
+     o.out_date ?? null, o.move_pct ?? null, o.days_after ?? null,
+     o.path ? JSON.stringify(o.path) : null]);
 
 /**
  * The best unpublished hit — a forecast that landed beats a follow-up.

@@ -20,9 +20,11 @@ import {
   lastStoryAt, reelsToday, lastReelAt,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   putClaims, bestHit, markClaimShown, claimScore, callbacksToday, publishedMessages,
+  provenSince, markClaimsPosted, callbackPostsToday,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
-import { compose, composeStories, composeReel, composeCallback, windowOf, WIN } from './compose.js';
+import { compose, composeStories, composeReel, composeCallback, composeCallbackPost,
+  windowOf, WIN } from './compose.js';
 import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
 import { connect, alert } from './tg.js';
@@ -442,10 +444,16 @@ async function runCallback() {
   // 09:00 Israel last night's US session is settled and final, and
   // anything earlier in the day would be quoting a price that is
   // still moving.
-  const hours = (process.env.CALLBACK_HOURS || '9').split(',').map(x => x.trim()).filter(Boolean);
-  if (hours.length && process.env.IGNORE_SCHEDULE !== '1' && !DRY
-      && !hours.includes(String(localHour()))) {
-    say(`SKIP — ${localHour()}:xx is not a callback hour (${hours.join(', ')})`);
+  const list = k => (process.env[k] || '').split(',').map(x => x.trim()).filter(Boolean);
+  const storyHours = list('CALLBACK_HOURS').length ? list('CALLBACK_HOURS') : ['9', '17'];
+  const postHours = list('CALLBACK_POST_HOURS').length ? list('CALLBACK_POST_HOURS') : ['12'];
+  const forced = process.env.IGNORE_SCHEDULE === '1' || DRY;
+  const hour = String(localHour());
+  const doStory = forced || storyHours.includes(hour);
+  const doPost = forced || postHours.includes(hour);
+  if (!doStory && !doPost) {
+    say(`SKIP — ${hour}:xx is not a callback hour `
+      + `(stories ${storyHours.join(', ')} · post ${postHours.join(', ')})`);
     return 'none';
   }
 
@@ -476,7 +484,16 @@ async function runCallback() {
   const score = await claimScore(30);
   for (const r of score) say(`  30d ${r.kind}: ${r.hit} hit / ${r.miss} miss / ${r.open} open`);
 
-  const cap = Number(process.env.MAX_CALLBACKS_PER_DAY || 1);
+  // The post first: it needs two proven calls, and a story published
+  // seconds earlier has not consumed them — but a post is the bigger
+  // surface, and on the one hour a day it runs it gets first refusal.
+  if (doPost) {
+    const out = await runCallbackPost();
+    if (out !== 'none' || !doStory) return out;
+  }
+  if (!doStory) return 'none';
+
+  const cap = Number(process.env.MAX_CALLBACKS_PER_DAY || 2);
   const done = await callbacksToday();
   if (!DRY && done >= cap) { say(`SKIP — callback cap reached (${done}/${cap})`); return 'none'; }
 
@@ -525,6 +542,82 @@ async function runCallback() {
     await logRun(deck.key, 'callback', false, failure?.message ?? 'nothing posted');
     await notify(`❌ callback ${deck.key}\n${failure?.message ?? 'nothing posted'}`);
   }
+  return 'done';
+}
+
+/**
+ * The proof carousel — the one proof surface that reaches the grid.
+ *
+ * A stranger meets this account on the grid, and "here is what we
+ * said and here is what the market did, twice, with the closes" is
+ * the strongest two seconds it has. Never built from a single call:
+ * one proven call is a story, a record needs at least two, and the
+ * last board is the method rather than another number.
+ */
+async function runCallbackPost() {
+  const cap = Number(process.env.MAX_CALLBACK_POSTS_PER_DAY || 1);
+  const done = await callbackPostsToday();
+  if (!DRY && done >= cap) { say(`SKIP — proof post cap reached (${done}/${cap})`); return 'none'; }
+
+  const need = Number(process.env.PROOF_POST_MIN || 2);
+  const days = Number(process.env.PROOF_POST_DAYS || 7);
+  const hits = await provenSince(days, Number(process.env.PROOF_POST_MAX || 3));
+  if (hits.length < need) {
+    say(`SKIP — only ${hits.length} proven call(s) in ${days}d (need ${need})`);
+    return 'none';
+  }
+
+  // A post is a post: it keeps the feed's spacing even though it does
+  // not spend the digest's daily budget.
+  const gap = Number(process.env.MIN_MINUTES_BETWEEN_POSTS || 12);
+  const last = await lastPostAt();
+  if (!DRY && last && (Date.now() / 1000 - last) < gap * 60) {
+    say(`SKIP — only ${Math.round((Date.now() / 1000 - last) / 60)}min since the last post`);
+    return 'none';
+  }
+
+  const score = (await claimScore(30)).reduce((a, r) => a + Number(r.hit || 0), 0);
+  const deck = composeCallbackPost(hits, { score: { hit: score } });
+  if (deck.skip) { say(`SKIP — ${deck.skip}`); return 'none'; }
+  say(`${deck.key} — ${hits.length} proven call(s) -> ${deck.slides.length} slides `
+    + `[${deck.slides.map(x => x.type)}]`);
+
+  const dir = join('./out', deck.key.replace(/[:]/g, ''));
+  const { files } = await renderDeck(deck, dir, { format: 'jpeg' });
+  if (!files.length) { say('SKIP — nothing rendered'); return 'none'; }
+
+  if (DRY || REVIEW) {
+    say(`${DRY ? 'DRY' : 'REVIEW'} — ${files.length} proof slides rendered, NOT published`);
+    return 'done';
+  }
+
+  const { upload, remove, publish } = await import('./publish/api.js');
+  const prefix = deck.key.replace(/[:]/g, '');
+  const urls = await upload(files, prefix);
+
+  await upsertWindow(deck.key, Number(hits[hits.length - 1].posted_at),
+    Math.floor(Date.now() / 1000));
+  await markClaimsPosted(hits.map(h => h.id));
+
+  let r = null, failure = null;
+  try { r = await publish(urls, deck.caption); }
+  catch (e) { failure = e; }
+  finally { await remove(files, prefix); }
+
+  if (r) {
+    await setWindow({ key: deck.key, status: 'posted', slides: files.length,
+      posted_at: Math.floor(Date.now() / 1000) });
+    await setPublished(deck.key, { media_id: r.id ?? null, permalink: r.permalink ?? null,
+      choices: { kind: 'proof', calls: hits.length, record: score,
+        types: deck.slides.map(x => x.type) } });
+    await logRun(deck.key, 'proof-post', true, `${hits.length} calls`);
+    say(`POSTED proof carousel ${r.id}`);
+    await notify(`🧾 פוסט הוכחות — ${hits.length} קריאות\n${r.permalink ?? ''}`);
+    return 'done';
+  }
+  await setWindow({ key: deck.key, status: 'failed', slides: 0, error: failure?.message });
+  await logRun(deck.key, 'proof-post', false, failure?.message ?? 'nothing posted');
+  await notify(`❌ proof post ${deck.key}\n${failure?.message ?? 'nothing posted'}`);
   return 'done';
 }
 

@@ -4,8 +4,9 @@
 -- Run cron.sql FIRST (extensions, agent.secrets, the GitHub token)
 -- and callbacks.sql (the two tables). This adds one job.
 --
---   callback  every hour at :41 — run.js acts only on the hour in
---                                 CALLBACK_HOURS (9 local).
+--   callback  every hour at :41 — run.js acts only on the hours in
+--                                 CALLBACK_HOURS (9, 17 local) and
+--                                 CALLBACK_POST_HOURS (12 local).
 --
 -- Hourly for the same reason as the reel: pg_cron thinks in UTC and
 -- Israel moves its clocks twice a year, so a job pinned to 06:41 UTC
@@ -16,8 +17,9 @@
 -- stories :16, digest :31 — because the workflow's concurrency group
 -- runs one tick at a time.
 --
--- Morning, because the number on the board is a CLOSE. At nine in the
--- Israeli morning last night's US session is settled and final.
+-- Morning and late afternoon for the two stories, noon for the
+-- carousel. The number on every one of these boards is a CLOSE, and
+-- by nine in the Israeli morning last night's US session is final.
 -- ─────────────────────────────────────────────────────────────
 
 select cron.unschedule('market-agent-callback')

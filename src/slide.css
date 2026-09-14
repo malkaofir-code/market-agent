@@ -774,20 +774,132 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 .a-sn.is-lead .sn-big[data-dir="dn"]{color:var(--neg)}
 .a-sn.is-lead .sn-s{margin-top:14px}
 
-/* ── 14 · the callback ── */
-/* Two blocks, one rule between them: what we said, then what the
-   market said. The quote is set small and quiet on purpose — it is
-   evidence, not the headline of this board. The number is. */
-.a-cl{display:flex;flex-direction:column;gap:34px}
-.a-cl .cl-said{border-inline-start:9px solid var(--acc);padding-inline-start:30px}
-.a-cl .cl-when{font-family:var(--f-mono);font-size:25px;font-weight:700;letter-spacing:.1em;
-  color:var(--acc);display:block;margin-bottom:14px}
-.a-cl .cl-hd{font-size:52px;font-weight:800;line-height:1.22;letter-spacing:-.018em;margin:0;max-width:22ch}
-.a-cl .cl-then{border-top:1.5px solid var(--rule);padding-top:30px}
-.a-cl .cl-lbl{font-family:var(--f-mono);font-size:26px;letter-spacing:.16em;color:var(--dim2);
-  display:block;margin-bottom:18px;font-weight:700}
-.a-cl .fig{font-family:var(--f-mono);font-weight:600;line-height:.82;letter-spacing:-.05em;
-  direction:ltr;unicode-bidi:isolate;margin:0;display:block;padding-inline-end:.09em;
-  width:fit-content;margin-inline-start:auto;white-space:nowrap}
+
+/* ═══════════════════════════════════════════════════════════
+   THE PROOF WORLD
+   A printed receipt, not a news board. Paper, monospace, a torn
+   edge top and bottom, its own header band and no tape. Nothing
+   else on this account looks like this, which is the entire point:
+   the thumb has to stop.
+   ═══════════════════════════════════════════════════════════ */
+.slide--proof{position:relative}
+/* The torn edge — half-circles bitten out of the top and bottom in
+   the surrounding ink, so the board reads as a strip of paper. */
+.slide--proof::before,.slide--proof::after{content:"";position:absolute;
+  left:-10px;right:-10px;height:26px;z-index:6;pointer-events:none;
+  background:radial-gradient(circle at 13px 13px, #0B0E13 12.5px, transparent 13px) 0 0/26px 26px repeat-x}
+.slide--proof::before{top:0}
+.slide--proof::after{top:auto;bottom:0;transform:rotate(180deg)}
+/* A story board has 1920px to fill and a mascot standing in the
+   bottom third, so the evidence gets the room instead of the type
+   growing into a wall of words. */
+.slide--story.slide--proof .pf-chart .pl{height:340px}
+.slide--story.slide--proof .ron{height:38%}
+
+/* ── the proof header band ── */
+.pf-hd{display:flex;align-items:center;gap:20px;padding:0 0 22px;
+  border-bottom:3px solid var(--fg)}
+.pf-tag{font-family:var(--f-mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+  background:var(--fg);color:var(--bg);padding:9px 18px 8px}
+.pf-tag::before{content:"\2713";margin-inline-end:10px;font-size:24px}
+.pf-name{font-family:var(--f-mono);font-weight:700;font-size:26px;letter-spacing:.24em;color:var(--fg)}
+.pf-date{font-family:var(--f-mono);font-size:24px;letter-spacing:.1em;color:var(--dim2);
+  margin-inline-start:auto;direction:ltr}
+.pf-ft{display:flex;align-items:baseline;gap:20px;padding-top:20px;
+  border-top:1.5px dashed var(--rule);font-family:var(--f-mono);font-size:22px;
+  letter-spacing:.04em;color:var(--dim)}
+.pf-ft .pf-hd2{margin-inline-start:auto;color:var(--fg);font-weight:700;direction:ltr}
+
+/* ── the price path ── */
+/* Time runs left to right even here. Every chart anybody has ever
+   seen runs that way, and a mirrored one tells a different story. */
+.pf-chart{position:relative;direction:ltr;margin:6px 0}
+.pf-chart .pl{display:block;width:100%;height:250px}
+.pl-line{fill:none;stroke:var(--fg);stroke-width:6;stroke-linejoin:round;stroke-linecap:round;
+  vector-effect:non-scaling-stroke}
+.pl-area{fill:var(--fg);opacity:.08}
+.pl.up .pl-line{stroke:var(--pos)} .pl.up .pl-area{fill:var(--pos);opacity:.14}
+.pl.dn .pl-line{stroke:var(--neg)} .pl.dn .pl-area{fill:var(--neg);opacity:.14}
+.pl-mark{stroke:var(--fg);stroke-width:3;stroke-dasharray:9 9;opacity:.45;vector-effect:non-scaling-stroke}
+.pl-dot{fill:var(--bg);stroke:var(--fg);stroke-width:6;vector-effect:non-scaling-stroke}
+.pl.up .pl-dot{stroke:var(--pos)} .pl.dn .pl-dot{stroke:var(--neg)}
+.pf-chart .pl-then{position:absolute;top:2px;left:22px;font-family:var(--f-mono);
+  font-size:22px;letter-spacing:.12em;color:var(--dim2)}
+/* The two closes, printed where they actually are on the line. A
+   chart with no numbers on it is a mood; with them it is evidence. */
+.pf-chart .pl-px{position:absolute;bottom:-6px;font-family:var(--f-mono);font-size:27px;
+  font-weight:600;font-variant-numeric:tabular-nums;color:var(--dim2)}
+.pf-chart .pl-from{left:16px}
+.pf-chart .pl-to{right:16px;color:var(--fg);font-weight:700}
+
+/* ── 15 · the receipt, stamped ── */
+.a-cs{display:flex;flex-direction:column;gap:22px;position:relative}
+.a-cs .cs-hd{font-size:58px;font-weight:800;line-height:1.18;letter-spacing:-.022em;
+  margin:0;max-width:19ch}
+.a-cs .cs-when{font-family:var(--f-mono);font-size:24px;letter-spacing:.08em;
+  color:var(--dim2);margin:0}
+.a-cs .cs-foot{display:flex;align-items:flex-end;gap:28px;
+  border-top:1.5px dashed var(--rule);padding-top:24px}
+.a-cs .cs-num{flex:1 1 auto}
+.a-cs .fig{font-family:var(--f-mono);font-weight:600;font-size:154px;line-height:.82;
+  letter-spacing:-.05em;direction:ltr;unicode-bidi:isolate;margin:0;white-space:nowrap}
+.a-cs .fig.up{color:var(--pos)} .a-cs .fig.dn{color:var(--neg)}
+.a-cs .cs-sub{font-size:30px;color:var(--dim2);display:block;margin-top:12px}
+/* The stamp: rotated, double-ruled, slightly transparent — pressed
+   onto the paper rather than printed with it. */
+.a-cs .cs-stamp{flex:0 0 auto;transform:rotate(-11deg);font-family:var(--f-mono);
+  font-weight:700;font-size:60px;letter-spacing:.08em;padding:16px 30px 14px;
+  border:7px double var(--fg);border-radius:12px;color:var(--fg);opacity:.9;
+  margin-bottom:72px;margin-inline-start:-6px}
+.a-cs .cs-stamp.up{color:var(--pos);border-color:var(--pos)}
+.a-cs .cs-stamp.dn{color:var(--neg);border-color:var(--neg)}
+
+/* ── 16 · the verdict ── */
+.a-ct{display:flex;flex-direction:column;gap:18px}
+.a-ct .ct-move{font-family:var(--f-mono);font-weight:600;font-size:250px;line-height:.8;
+  letter-spacing:-.06em;direction:ltr;unicode-bidi:isolate;margin:8px 0 4px;color:var(--fg)}
+.a-ct .ct-hd{font-size:46px;font-weight:800;line-height:1.22;margin:0;max-width:18ch;
+  letter-spacing:-.016em}
+.a-ct .ct-rows{display:flex;flex-direction:column;border-top:2px solid var(--rule);margin-top:8px}
+.a-ct .ct-row{display:flex;align-items:baseline;justify-content:space-between;gap:20px;
+  padding:18px 0;border-bottom:2px solid var(--rule)}
+.a-ct .ct-lbl{font-family:var(--f-mono);font-size:25px;letter-spacing:.08em;color:var(--dim2)}
+.a-ct .ct-px{font-family:var(--f-mono);font-size:54px;font-weight:600;letter-spacing:-.03em;
+  direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+.a-ct .ct-sub{font-size:29px;color:var(--dim2);margin:0;max-width:28ch}
+
+/* ── 17 · the receipt, charted ── */
+.a-cl{display:flex;flex-direction:column;gap:20px}
+.a-cl .cl-hd{font-size:50px;font-weight:800;line-height:1.2;letter-spacing:-.02em;
+  margin:0;max-width:20ch}
+.a-cl .cl-foot{display:flex;align-items:flex-end;gap:26px;
+  border-top:1.5px dashed var(--rule);padding-top:22px}
+.a-cl .fig{font-family:var(--f-mono);font-weight:600;font-size:150px;line-height:.82;
+  letter-spacing:-.05em;direction:ltr;unicode-bidi:isolate;margin:0;white-space:nowrap}
 .a-cl .fig.up{color:var(--pos)} .a-cl .fig.dn{color:var(--neg)}
-.a-cl .cl-sub{font-size:33px;line-height:1.4;color:var(--dim2);margin:24px 0 0;max-width:26ch}
+.a-cl .cl-meta{display:flex;flex-direction:column;gap:8px;padding-bottom:14px}
+.a-cl .cl-when{font-family:var(--f-mono);font-size:24px;letter-spacing:.08em;color:var(--dim2)}
+.a-cl .cl-sub{font-size:30px;font-weight:700}
+
+/* ── 17 · the proof post's opening ── */
+.a-pv{display:flex;flex-direction:column;gap:26px}
+.a-pv h1{font-family:var(--f-disp);font-weight:900;font-size:118px;line-height:.98;
+  letter-spacing:-.035em;margin:0;max-width:11ch}
+.a-pv .pv-rule{width:220px;height:8px;background:var(--acc)}
+.a-pv .pv-sub{font-size:34px;line-height:1.42;color:var(--dim2);margin:0;max-width:26ch}
+
+/* ── 18 · the record ── */
+.a-rc{display:flex;flex-direction:column;gap:28px}
+.a-rc .rc-head{display:flex;align-items:baseline;gap:22px}
+.a-rc .rc-n{font-family:var(--f-mono);font-size:132px;font-weight:600;line-height:.84;
+  letter-spacing:-.05em;color:var(--acc)}
+.a-rc .rc-of{font-size:38px;font-weight:800;line-height:1.2;max-width:12ch}
+.a-rc .rc-list{list-style:none;margin:0;padding:0;border-top:1.5px solid var(--rule)}
+.a-rc .rc-list li{display:flex;align-items:baseline;gap:18px;padding:20px 0;
+  border-bottom:1.5px solid var(--rule)}
+.a-rc .rc-a{font-size:34px;font-weight:700;flex:1 1 auto}
+.a-rc .rc-d{font-family:var(--f-mono);font-size:24px;color:var(--dim2);letter-spacing:.06em}
+.a-rc .rc-m{font-family:var(--f-mono);font-size:40px;font-weight:600;direction:ltr;
+  unicode-bidi:isolate;font-variant-numeric:tabular-nums;min-width:4.6ch;text-align:end}
+.a-rc .rc-m.up{color:var(--pos)} .a-rc .rc-m.dn{color:var(--neg)}
+.a-rc .rc-note{font-size:27px;line-height:1.45;color:var(--dim2);margin:0;max-width:34ch}
