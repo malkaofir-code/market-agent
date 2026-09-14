@@ -38,13 +38,23 @@ export async function putMessages(rows) {
   });
   // coalesce on media_url: a re-ingest of an old message carries no
   // buffer, and must not blank a URL we already harvested.
-  const { rowCount } = await q(
+  // `xmax = 0` is true only for a row this statement INSERTED; an
+  // updated row carries the id of the transaction that touched it.
+  // It is the only way to tell "80 arrived" from "80 were re-read",
+  // and that distinction is the whole point — see below.
+  const { rows: back } = await q(
     `insert into agent.messages (tg_id, ts, text, has_media, media_url, media_at) values ${vals.join(',')}
      on conflict (tg_id) do update set text = excluded.text,
        media_url = coalesce(agent.messages.media_url, excluded.media_url),
-       media_at  = coalesce(agent.messages.media_at,  excluded.media_at)`, params);
-  return rowCount;
+       media_at  = coalesce(agent.messages.media_at,  excluded.media_at)
+     returning (xmax = 0) as inserted`, params);
+  return back.filter(r => r.inserted).length;
 }
+
+/** The timestamp of the newest message in the table — the only honest
+ *  answer to "is the source still talking to us". */
+export const newestMessageTs = () =>
+  q(`select max(ts) t from agent.messages`).then(r => Number(r.rows[0]?.t ?? 0));
 
 export const messagesIn = (from, to) =>
   q(`select * from agent.messages

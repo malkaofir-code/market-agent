@@ -699,9 +699,42 @@ async function main() {
       const { withMedia } = await import('./db.js');
       const pinned = (await getState(PEER_KEY)) ?? null;
       const { rows, peer } = await fetchRecent(80, await withMedia(), pinned);
-      await putMessages(rows);
+      const fresh = await putMessages(rows);
       if (peer) await setState(PEER_KEY, peer);
-      say('ingested', rows.length, 'message(s)');
+      // "ingested 80" for four days running, while nothing published.
+      //
+      // 80 was the number FETCHED, and fetchRecent always fetches 80.
+      // The log said the same thing whether the channel had posted
+      // thirty times or not at all since the last tick, so the one
+      // number that mattered — how many were NEW — was the one number
+      // it did not print. Every track then went quiet in its own
+      // vocabulary ("nothing unstoried", "nothing unconsumed", "only
+      // 2 messages in the window") and none of them said why.
+      say(`ingested ${rows.length} message(s), ${fresh} new`);
+
+      // And if the source has stopped talking, say so out loud.
+      //
+      // A silent source is indistinguishable from a healthy quiet
+      // hour unless something is watching the clock. During active
+      // hours, nothing new for STALE_SOURCE_HOURS means the channel
+      // has stopped, been renamed, or the session has died — and all
+      // three look identical from in here: green runs, forever.
+      const { newestMessageTs } = await import('./db.js');
+      const newest = await newestMessageTs();
+      const staleH = Number(process.env.STALE_SOURCE_HOURS || 8);
+      const ageH = newest ? (Date.now() / 1000 - newest) / 3600 : Infinity;
+      if (ageH > staleH) {
+        const hrs = Number.isFinite(ageH) ? ageH.toFixed(1) : '∞';
+        say(`SOURCE STALE — newest message is ${hrs}h old`);
+        const last = Number((await getState('stale-alert')) ?? 0);
+        // One alert a day, not one an hour.
+        if (Date.now() / 1000 - last > 20 * 3600) {
+          await setState('stale-alert', Math.floor(Date.now() / 1000));
+          await notify(`⚠️ המקור שקט — ההודעה החדשה ביותר בת ${hrs} שעות.\n\n`
+            + `הערוץ הפסיק לפרסם, שונה שמו, או שה-session של טלגרם מת. `
+            + `כל עוד זה כך, אין סטוריז, אין דייג׳סט ואין ריל — והריצות ימשיכו להיות ירוקות.`);
+        }
+      }
     } catch (e) {
       // This used to be swallowed with a log line and nothing else.
       //

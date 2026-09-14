@@ -313,6 +313,9 @@ jobs:
           WINDOW_MINUTES: '60'
           # Windows run XX:15 -> XX+1:15; the tick fires at XX:16.
           WINDOW_OFFSET_MIN: '15'
+          # Nothing new for this long, during active hours, and the
+          # agent says so in Telegram instead of staying green.
+          STALE_SOURCE_HOURS: '8'
           ACTIVE_FROM_HOUR: '7'
           ACTIVE_TO_HOUR: '24'
           MAX_POSTS_PER_DAY: '12'
