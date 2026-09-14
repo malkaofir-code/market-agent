@@ -124,6 +124,41 @@ const photo = (p, stat) => p
   : '';
 
 const ARCHETYPES = {
+  // 19 · the proof reel's scene.
+  //
+  // The reel is the only surface a stranger ever sees, and until now
+  // it spent that on a summary of the day — which every finance
+  // account in the country also posts. This spends it on the one
+  // thing none of them can copy without having done the work: a call
+  // this account published, the reason it gave at the time, and the
+  // closes that settled it.
+  //
+  // One archetype, six beats, because a reel is a sequence and the
+  // sequence IS the argument: claim, reason, evidence, verdict.
+  sceneProof: s => {
+    const beat = s.beat ?? 'said';
+    const inner = {
+      hook: () => `<p class="sp-tick"></p>
+        <p class="sp-hook">${bidi(s.headline)}</p>
+        <p class="sp-sub">${bidi(s.sub)}</p>`,
+      said: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
+        <p class="sp-h">${bidi(s.headline)}</p>`,
+      why: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
+        <p class="sp-why">${bidi(s.headline)}</p>`,
+      chart: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
+        ${priceLine(s.path, s.dir, { from: s.fromPx, to: s.toPx })}
+        <p class="sp-sub">${bidi(s.sub)}</p>`,
+      number: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
+        <p class="sp-big">${esc(s.big)}</p>
+        <p class="sp-sub">${bidi(s.sub)}</p>`,
+      record: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
+        <p class="sp-rec"><b>${esc(s.big)}</b>${bidi(s.headline)}</p>
+        <p class="sp-note">${bidi(s.sub)}</p>
+        <p class="sp-handle">${HANDLE}</p>`,
+    }[beat] ?? (() => `<p class="sp-h">${bidi(s.headline)}</p>`);
+    return `<div class="a-sp2 sp-${esc(beat)}"><div class="sp-txt">${inner()}</div></div>`;
+  },
+
   // 15 · the certificate — the proof board.
   //
   // White sheet, and green means exactly one thing on it: VERIFIED.
@@ -547,7 +582,7 @@ const POSE = {
   hero: 'point', note: 'explain', chart: 'upward',
   watch: 'pause', telegram: 'yes', ask: 'welcome',
   coverSplit: 'presenting', coverIndex: 'thinking', coverBracket: 'explain',
-  coverFigure: 'point', scene: 'explain',
+  coverFigure: 'point', scene: 'explain', sceneProof: 'proof-steady',
   // The proof boards have their own wardrobe — see PROOF below.
   proofCert: 'proof-point', proofVerdict: 'proof-steady',
   coverProof: 'proof-assured',
@@ -592,6 +627,9 @@ const STORY_RON = new Set(['top', 'base', 'bar', 'rules']);
 function ronLayer(slide, ctx, i = 0) {
   // A scene without him is a background. He is the subject of the
   // reel, so no rule downstream gets to drop him from one.
+  // A day-summary scene is ABOUT him — no rule downstream may drop
+  // him from one. A proof scene is about the evidence, and he stands
+  // on it only where he is invited.
   if (slide.type !== 'scene') {
     if (slide.ron === null || NO_RON.has(slide.type)) return '';
     if (slide.story && !STORY_RON.has(slide.story)) return '';
@@ -599,7 +637,7 @@ function ronLayer(slide, ctx, i = 0) {
   // A slide already carrying a photo has its image. Ron standing in
   // front of a screenshot is two subjects fighting, and on the framed
   // cover the frame landed across his face. One picture per board.
-  if (slide.photo && slide.type !== 'scene') return '';
+  if (slide.photo && slide.type !== 'scene' && slide.type !== 'sceneProof') return '';
   // A scene names its own gesture: the reel matches him to the story
   // — a hand up for a fall, an open hand for a rally — rather than to
   // the archetype, which is the same on every board.
@@ -618,7 +656,8 @@ function ronLayer(slide, ctx, i = 0) {
 const SECONDARY = new Set(['item', 'list', 'chart', 'watch', 'telegram', 'record']);
 
 // The tape is the news board's signature row. A receipt has no tape.
-const NO_TAPE = new Set(['telegram', 'proofCert', 'proofVerdict', 'coverProof', 'record']);
+const NO_TAPE = new Set(['telegram', 'proofCert', 'proofVerdict', 'coverProof', 'record',
+  'sceneProof']);
 const COVERS = new Set(['cover', 'coverFramed']);   // overlay grid
 const BLEED = new Set(['cover']);                  // photo escapes the band
 
@@ -682,7 +721,7 @@ export function buildSlide(slide, ctx, i, n, { story = false, layer = null } = {
   // getting both classes, and slide--story pins him to an edge and
   // alternates sides down the set — which on a frame that centres him
   // meant half the scenes rendered with him sliced off at the margin.
-  const reel = slide.type === 'scene';
+  const reel = slide.type === 'scene' || slide.type === 'sceneProof';
   // A reel scene can be rendered as one flat frame, or split into the
   // layers that make it move: the market behind and the man in front.
   // Rendered apart they can be given different motion, and different

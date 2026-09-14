@@ -232,6 +232,16 @@ jobs:
           # The hour lives here and not in the cron expression for the
           # same reason the digest hours do: pg_cron is UTC and Israel
           # changes its clocks twice a year.
+          # ── the reel is a proof film first ───────────────
+          # The reel is the only surface a stranger is ever served,
+          # and a summary of the day is what every finance account in
+          # the country posts. A proven call cannot be copied: it
+          # needs a post that already exists, a reason given at the
+          # time, and closes that settled it. So on any day one is
+          # waiting, that is the film; the day summary is the
+          # fallback. Set REEL_PROOF to '0' to go back.
+          REEL_PROOF: '1'
+          PROOF_REEL_DAYS: '7'
           REEL_HOURS: '17'
           MAX_REELS_PER_DAY: '1'
           # And "the day" means the last twenty-four hours, not since

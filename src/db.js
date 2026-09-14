@@ -267,6 +267,25 @@ export const provenSince = (days = 7, limit = 3) =>
      order by (kind = 'forecast') desc, abs(move_pct) desc
      limit $2`, [days, limit]).then(r => r.rows);
 
+/**
+ * The single best proven call for a reel, and the reel alone.
+ *
+ * The reel gets ONE, not a list: a film with three arguments in it
+ * has none. A forecast that landed outranks a follow-up at any size,
+ * because "we said this would happen" is a different sentence from
+ * "we were on this early" and only one of them is a prediction.
+ */
+export const provenForReel = (days = 7) =>
+  q(`select * from agent.claims
+     where status in ('hit','shown') and in_reel_at is null
+       and checked_at > extract(epoch from now())::bigint - $1 * 86400
+     order by (kind = 'forecast') desc, abs(move_pct) desc limit 1`, [days])
+    .then(r => r.rows[0] ?? null);
+
+export const markClaimReeled = id =>
+  q(`update agent.claims set in_reel_at = extract(epoch from now())::bigint
+     where id = $1`, [id]);
+
 export const markClaimsPosted = ids =>
   ids.length ? q(`update agent.claims set in_post_at = extract(epoch from now())::bigint
                   where id = any($1::bigint[])`, [ids]) : null;

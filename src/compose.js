@@ -1302,3 +1302,57 @@ export function composeCallbackPost(hits, { now = null, score = null } = {}) {
     claimIds: hits.map(h => h.id),
   };
 }
+
+// ── the proof reel ───────────────────────────────────────────
+//
+// Six beats, and the sequence is the argument: the claim, the date,
+// the reasoning, the evidence, the verdict, the record. A reel is
+// watched with the sound off at arm's length, so each beat is one
+// idea at one size, and the only one that repeats is the colour.
+export function composeProofReel(claim, { now = null, score = null } = {}) {
+  const at = now ?? Math.floor(Date.now() / 1000);
+  const move = Number(claim.move_pct);
+  const dir = move >= 0 ? 'up' : 'dn';
+  const forecast = claim.kind === 'forecast';
+  const figure = `${move > 0 ? '+' : ''}${move.toFixed(1)}%`;
+  const days = sessions(Number(claim.days_after) || 1);
+  const why = cut(claim.reason ?? '', 130);
+  const path = Array.isArray(claim.path) ? claim.path : null;
+
+  // He opens the film and then gets out of the way. On the evidence
+  // beats the chart and the number ARE the subject, and a mascot
+  // standing in front of them is two subjects fighting.
+  const S = (beat, o) => ({ type: 'sceneProof', beat, dir, ron: beat === 'hook' ? undefined : null, ...o });
+  const slides = [
+    S('hook', { palette: null, ground: 'verd',
+      headline: forecast ? 'אמרנו.\nוהתממש.' : 'סיקרנו.\nוהמשיך.',
+      sub: `${claim.asset} · ${dmy(Number(claim.posted_at))}` }),
+    S('said', { ground: 'sheet',
+      eyebrow: forecast ? `מה אמרנו · ${dmy(Number(claim.posted_at))}`
+                        : `מה סיקרנו · ${dmy(Number(claim.posted_at))}`,
+      headline: cut(claim.headline, 78) }),
+    ...(why ? [S('why', { ground: 'sheet', eyebrow: 'למה', headline: why })] : []),
+    S('chart', { ground: 'sheet', eyebrow: 'ומה קרה', path,
+      fromPx: px(claim.base_px, claim.klass), toPx: px(claim.out_px, claim.klass),
+      // Written in words, not with an arrow: an arrow between two
+      // dates on an RTL line is reordered by the bidi algorithm and
+      // the range comes out backwards — which on this board would be
+      // a false statement about when the move happened.
+      sub: `מהסגירה ב-${dayOf(claim.base_date)} עד הסגירה ב-${dayOf(claim.out_date)}` }),
+    S('number', { ground: 'verd', eyebrow: claim.asset, big: figure,
+      sub: `${days} אחרי הפוסט` }),
+    S('record', { ground: 'sheet', eyebrow: '30 הימים האחרונים',
+      big: String(score?.hit ?? 1), headline: 'קריאות שהשוק אישר',
+      sub: 'נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו. בלי בחירת תאריכים בדיעבד.' }),
+  ];
+
+  const caption = `${forecast ? 'אמרנו. והתממש.' : 'סיקרנו. והמשיך.'}\n\n`
+    + `${claim.headline ?? ''}\n`
+    + `פורסם ${dmy(Number(claim.posted_at))} · ${claim.asset} ${figure} תוך ${days}\n`
+    + (why ? `למה: ${why}\n` : '')
+    + `\nכל מספר נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, `
+    + `בלי לבחור תאריכים בדיעבד.\n@marketalert.il\n#שוקההון #מסחר #וולסטריט`;
+
+  return { key: `R:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
+    stamp: '', quotes: [], slides, caption, claimId: claim.id, proof: true };
+}

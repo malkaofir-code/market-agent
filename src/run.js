@@ -20,11 +20,11 @@ import {
   lastStoryAt, reelsToday, lastReelAt,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   putClaims, bestHit, markClaimShown, claimScore, callbacksToday, publishedMessages,
-  provenSince, markClaimsPosted, callbackPostsToday,
+  provenSince, markClaimsPosted, callbackPostsToday, provenForReel, markClaimReeled,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
 import { compose, composeStories, composeReel, composeCallback, composeCallbackPost,
-  windowOf, WIN } from './compose.js';
+  composeProofReel, windowOf, WIN } from './compose.js';
 import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
 import { connect, alert } from './tg.js';
@@ -284,7 +284,8 @@ async function runStories() {
   if (deck.carry) await setState(CARRY_KEY, deck.carry);
 
   say(`${deck.key} — ${rows.length} msgs -> ${deck.slides.length} story(ies) `
-    + `[${deck.slides.map(x => x.type)}] · template ${tpl.id} ${tpl.name}`);
+    + `[${deck.slides.map(x => x.beat ?? x.type)}]`
+    + (tpl ? ` · template ${tpl.id} ${tpl.name}` : ' · proof'));
 
   const dir = join('./out', deck.key.replace(/[:]/g, '').replace('S', 'S-'));
   const { files } = await renderDeck(deck, dir, { format: 'jpeg', story: true });
@@ -754,17 +755,40 @@ async function runReel() {
   const back = Number(process.env.REEL_LOOKBACK_HOURS || 24) * 3600;
   const floor = (!forced && last && last > day) ? Number(last)
     : Math.min(day, now - back);
-  const rows = await messagesInAll(floor, now);
-  const need = Number(process.env.REEL_MIN_MESSAGES || 5);
-  if (rows.length < need) {
-    say(`SKIP — only ${rows.length} message(s) in the window (need ${need})`);
-    return;
+  // ── the proof reel comes first ───────────────────────────
+  //
+  // The reel is the only thing this account publishes that a stranger
+  // is ever served, and it was spending that on a summary of the day
+  // — which every finance account in the country also posts, and none
+  // of them can be told apart in a feed. A proven call cannot be
+  // copied: it needs a post that already exists, a reason given at
+  // the time, and closes that settled it.
+  //
+  // So on any day one is available, that is the film. The day summary
+  // is the fallback, not the format.
+  let rows = [], tpl = null, tplRecent = null, deck = null, proofHit = null;
+  if (process.env.REEL_PROOF !== '0') {
+    proofHit = await provenForReel(Number(process.env.PROOF_REEL_DAYS || 7));
+    if (proofHit) {
+      const score = (await claimScore(30)).reduce((a, r) => a + Number(r.hit || 0), 0);
+      deck = composeProofReel(proofHit, { score: { hit: score } });
+      say(`proof reel — ${proofHit.kind} on ${proofHit.symbol}: `
+        + `${proofHit.move_pct}% in ${proofHit.days_after} session(s)`);
+    } else say('no proven call waiting — falling back to the day summary');
   }
 
-  const { t: tpl, recent: tplRecent } = await nextTemplate(`R:${stampKey(now)}`);
-  const deck = composeReel(rows, {
-    carry: (await getState(CARRY_KEY)) ?? {}, template: tpl.id, endTs: now });
-  if (deck.skip) { say('SKIP — reel', `(${deck.skip})`); return; }
+  if (!deck) {
+    rows = await messagesInAll(floor, now);
+    const need = Number(process.env.REEL_MIN_MESSAGES || 5);
+    if (rows.length < need) {
+      say(`SKIP — only ${rows.length} message(s) in the window (need ${need})`);
+      return;
+    }
+    ({ t: tpl, recent: tplRecent } = await nextTemplate(`R:${stampKey(now)}`));
+    deck = composeReel(rows, {
+      carry: (await getState(CARRY_KEY)) ?? {}, template: tpl.id, endTs: now });
+    if (deck.skip) { say('SKIP — reel', `(${deck.skip})`); return; }
+  }
 
   // One row per reel, not one row per day.
   //
@@ -776,7 +800,8 @@ async function runReel() {
   deck.key = `R:${stampKey(now)}`;
 
   say(`${deck.key} — ${rows.length} msgs -> ${deck.slides.length} frames `
-    + `[${deck.slides.map(x => x.type)}] · template ${tpl.id} ${tpl.name}`);
+    + `[${deck.slides.map(x => x.beat ?? x.type)}]`
+    + (tpl ? ` · template ${tpl.id} ${tpl.name}` : ' · proof'));
 
   // ── the headlines, in English ─────────────────────────────
   // The structured line — "Chip stocks, up three point seven five
@@ -906,11 +931,18 @@ async function runReel() {
   try {
     const r = await publishReel(urls[0], deck.caption, { coverUrl: urls[1] });
     say(`POSTED ${r.permalink ?? r.id}`);
-    await keepTemplate(tplRecent, tpl.id);
+    // A proof reel has no template — it has a claim. Rotating the
+    // wardrobe on one would push the news templates out of order for
+    // a film that never used them.
+    if (tpl) await keepTemplate(tplRecent, tpl.id);
+    if (proofHit) await markClaimReeled(proofHit.id);
     await setWindow({ key: deck.key, status: 'posted', slides: bgs.length,
       posted_at: Math.floor(Date.now() / 1000) });
     await setPublished(deck.key, { media_id: r.id, permalink: r.permalink,
-      choices: { template: String(tpl.id), name: tpl.name, kind: 'reel',
+      choices: { kind: proofHit ? 'proof-reel' : 'reel',
+        ...(tpl ? { template: String(tpl.id), name: tpl.name } : {}),
+        ...(proofHit ? { claim: proofHit.id, symbol: proofHit.symbol,
+                         move: proofHit.move_pct, days: proofHit.days_after } : {}),
         seconds: built.seconds, audio: built.audio, mood,
         // Whether a reel was narrated is the whole question this
         // format is asking, so it is recorded beside the result
