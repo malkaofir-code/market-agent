@@ -380,11 +380,21 @@ export const setClaimOutcome = (id, o) =>
     [id, o.status, o.base_px ?? null, o.base_date ?? null, o.out_px ?? null,
      o.out_date ?? null, o.move_pct ?? null, o.days_after ?? null]);
 
-/** The best unpublished hit — a forecast that landed beats a follow-up. */
-export const bestHit = () =>
+/**
+ * The best unpublished hit — a forecast that landed beats a follow-up.
+ *
+ * Fresh ones only. With roughly nine claims filed a day and one board
+ * published, hits queue up; ordering the queue by size alone would
+ * eventually reach past a quiet week and post a fortnight-old call as
+ * though it had just landed. A callback is news about a number that
+ * settled YESTERDAY. Anything older has missed its moment and stays
+ * in the table as a record instead.
+ */
+export const bestHit = (freshHours = Number(process.env.CALLBACK_FRESH_HOURS || 36)) =>
   q(`select * from agent.claims
      where status = 'hit' and shown_at is null
-     order by (kind = 'forecast') desc, abs(move_pct) desc limit 1`)
+       and checked_at > extract(epoch from now())::bigint - $1 * 3600
+     order by (kind = 'forecast') desc, abs(move_pct) desc limit 1`, [freshHours])
     .then(r => r.rows[0] ?? null);
 
 export const markClaimShown = id =>
