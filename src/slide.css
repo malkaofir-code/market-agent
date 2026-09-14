@@ -791,6 +791,11 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
    issued rather than posted — and it needs no decoding at all. */
 .slide--proof{box-shadow:inset 0 0 0 16px var(--bg), inset 0 0 0 19px var(--fg),
   inset 0 0 0 27px var(--bg), inset 0 0 0 28px var(--fg)}
+/* And no texture inside the frame. Every other board on the account
+   stands on a faint plotted grid; here the only ruled thing is the
+   frame and the only drawn thing is the price. A blank sheet is what
+   makes the line on it look like evidence. */
+.slide--proof .bgm{display:none}
 
 /* ── the proof header band ── */
 .pf-hd{display:flex;align-items:center;gap:20px;padding:0 0 22px;
