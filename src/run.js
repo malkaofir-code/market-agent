@@ -911,7 +911,14 @@ async function runReel() {
   }
 
   const mp4 = join(dir, 'reel.mp4');
-  const mood = moodOf(deck.slides);
+  // A proof film does not take its mood from the market.
+  //
+  // moodOf reads the direction of the day's numbers and picks the bed
+  // to match — right for a bulletin, wrong here: a call that correctly
+  // predicted a crash is a GOOD day for this account, and scoring it
+  // with the falling-market bed tells the viewer the opposite of the
+  // thing the film is about. The proof reel always gets its own bed.
+  const mood = proofHit ? 'proof' : moodOf(deck.slides);
   const built = await buildReel(bgs, fgs, mp4, { audio: audioBed(mood), voices, holds });
   say(`encoded ${built.seconds}s · ${built.scenes} scenes · ${built.audio} · ${mood}`);
 

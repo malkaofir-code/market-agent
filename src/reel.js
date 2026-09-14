@@ -95,6 +95,11 @@ export function audioBed(mood = 'tape') {
   // The track follows the day. Named rather than sorted-first, because
   // "whatever is alphabetically first" is how a bed silently changes the
   // moment somebody adds a file.
+  // bed-proof is the one bed that is never chosen by the market: it
+  // belongs to the proof film, which is about the account being right
+  // rather than about prices going up or down. Major key, a soft
+  // thump on one and three, and deliberately no tick — the ticking
+  // tape bed is the sound of a bulletin, and this is not one.
   const want = all.find(f => f.startsWith(`bed-${mood}.`))
     ?? all.find(f => f.startsWith('bed-tape.'))
     ?? all[0];
