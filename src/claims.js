@@ -193,6 +193,24 @@ export const MOVE = { index: 0.9, stock: 3.0, crypto: 3.0, commodity: 2.0 };
  */
 export const MOVE_WATCH = { index: 1.8, stock: 5.0, crypto: 5.0, commodity: 3.5 };
 
+/**
+ * The line that says WHY.
+ *
+ * "We said it and it happened" is a coincidence until the board can
+ * also show the reasoning, and this channel writes that line itself:
+ * every interpretive message ends with 💡 משמעות. It is the single
+ * most valuable sentence in the message for this format, because it
+ * is the only one that explains rather than reports. Falling back to
+ * the forecast sentence keeps a board possible when there is no note.
+ */
+const NOTE = /^\s*(?:💡)?\s*משמעות\s*:\s*/;
+export function reasonIn(text, fallback = '') {
+  for (const l of String(text ?? '').split('\n').map(clean)) {
+    if (NOTE.test(l)) return l.replace(NOTE, '').trim().slice(0, 240);
+  }
+  return String(fallback ?? '').trim().slice(0, 240);
+}
+
 /** Split into sentences a claim can be read off. Newlines count. */
 function sentences(text) {
   return String(text ?? '').split('\n').map(clean).filter(Boolean)
@@ -239,6 +257,7 @@ export function subjectFrom(row) {
     symbol: a.sym, asset: a.he, klass: a.klass, dir,
     kind: 'watch', horizon: HORIZON[a.klass] ?? 3,
     headline, quote: (ss[1] ?? headline).slice(0, 300),
+    reason: reasonIn(row.text, ss[1] ?? ''),
     tg_id: Number(row.tg_id), msg_ts: Number(row.ts ?? 0),
   };
 }
@@ -282,7 +301,7 @@ export function claimsFrom(row) {
       out.set(k, {
         symbol: a.sym, asset: a.he, klass: a.klass, dir,
         kind: 'forecast', horizon: HORIZON[a.klass] ?? 3,
-        headline, quote: s.slice(0, 300),
+        headline, quote: s.slice(0, 300), reason: reasonIn(text, s),
         tg_id: Number(row.tg_id), msg_ts: Number(row.ts ?? 0),
       });
     }

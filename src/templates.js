@@ -19,7 +19,19 @@
  * clean green on near-black and a highlighter on paper. Same for the
  * grid, which has to be ink on a light ground and light on a dark one.
  */
-export const PALETTES = {
+export // Violet is not in this table, and must not be added to it.
+//
+// It is the proof boards' colour and nothing else on the account may
+// wear it — the whole point of reserving a hue is that a reader
+// scrolling past knows what they are looking at before reading a
+// word. Two palettes here were purple (plum, violet) and four
+// templates used them, which meant an ordinary Tuesday digest could
+// come out the same colour as a verified call. They were repointed
+// at midnight, steel, carbon and oxblood.
+//
+// The reserved grounds live in slide.css as .g-vow / .g-vowl and are
+// reachable only through the proof archetypes' GROUND map.
+const PALETTES = {
   // ── dark worlds ────────────────────────────────────────────
   ink:      { bg:'#0B0D10', fg:'#F2F0EB', dim:'#9AA0AA', dim2:'#C3C7CE', rule:'#262B33',
               acc:'#FF6B1A', pos:'#35D07F', neg:'#FF5A5A', grid:'rgba(242,240,235,.035)' },
@@ -31,8 +43,6 @@ export const PALETTES = {
               acc:'#6E8BFF', pos:'#4FD9A4', neg:'#FF6B8A', grid:'rgba(237,239,250,.04)' },
   forest:   { bg:'#0B2418', fg:'#ECF5EE', dim:'#86AE96', dim2:'#C2DCCB', rule:'#1B4230',
               acc:'#F2B33D', pos:'#59E39B', neg:'#FF7A6E', grid:'rgba(236,245,238,.04)' },
-  plum:     { bg:'#1E1030', fg:'#F3EDFA', dim:'#A48FC4', dim2:'#D4C7E6', rule:'#341E4E',
-              acc:'#FF8FCF', pos:'#5FE0B0', neg:'#FF6B8A', grid:'rgba(243,237,250,.04)' },
   oxblood:  { bg:'#2A0F14', fg:'#F8ECEC', dim:'#BE9095', dim2:'#E4C9CB', rule:'#4A1F27',
               acc:'#F2A33D', pos:'#5FD79B', neg:'#FF8A7A', grid:'rgba(248,236,236,.04)' },
   steel:    { bg:'#152230', fg:'#EAF0F6', dim:'#8DA0B4', dim2:'#C2CFDC', rule:'#26384B',
@@ -68,9 +78,6 @@ export const PALETTES = {
   jade:     { bg:'#0FA97A', fg:'#04211A', dim:'rgba(4,33,26,.62)', dim2:'rgba(4,33,26,.85)',
               rule:'rgba(4,33,26,.28)', acc:'#04211A', pos:'#04211A', neg:'#04211A',
               grid:'rgba(4,33,26,.05)' },
-  violet:   { bg:'#6B3BE8', fg:'#F5F1FF', dim:'rgba(245,241,255,.66)', dim2:'rgba(245,241,255,.88)',
-              rule:'rgba(245,241,255,.3)', acc:'#E8FF4F', pos:'#9BF5CE', neg:'#FFB0C4',
-              grid:'rgba(245,241,255,.06)' },
 
   // ── added with the second thirty ──────────────────────────
 
@@ -135,13 +142,13 @@ export const TEMPLATES = [
   T(13, 'Meridian',      'coverEdge',   'cobalt',   'midnight'),
   T(14, 'Foundry',       'coverFramed', 'espresso', 'sand'),
   T(15, 'Almanac',       'coverBand',   'doc',      'sand'),
-  T(16, 'Nocturne',      'coverStack',  'plum',     'midnight'),
-  T(17, 'Beacon',        'coverPoster', 'rose',     'plum'),
+  T(16, 'Nocturne',      'coverStack',  'midnight', 'steel'),
+  T(17, 'Beacon',        'coverPoster', 'rose',     'oxblood'),
   T(18, 'Glasshouse',    'coverRule',   'mint',     'forest'),
   T(19, 'Ironworks',     'coverEdge',   'slate',    'carbon'),
   T(20, 'Verdigris',     'coverFramed', 'jade',     'forest'),
   T(21, 'Dispatch',      'coverBand',   'ink',      'deep'),
-  T(22, 'Ultraviolet',   'coverPoster', 'violet',   'plum'),
+  T(22, 'Blackout',      'coverPoster', 'carbon',   'steel'),
   T(23, 'Frostline',     'coverStack',  'ice',      'midnight'),
   T(24, 'Kiln',          'coverEdge',   'oxblood',  'flare'),
   T(25, 'Counting House','coverRule',   'sand',     'doc'),
@@ -168,7 +175,7 @@ export const TEMPLATES = [
   T(40, 'Salt Flat',     'coverMargin',  'sky',      'ice'),
   T(41, 'Long Exposure', 'coverBleed',   'abyss',    'navy'),
   T(42, 'Tally',         'coverFigure',  'moss',     'forest'),
-  T(43, 'Vintner',       'coverSplit',   'wine',     'plum'),
+  T(43, 'Vintner',       'coverSplit',   'wine',     'oxblood'),
   T(44, 'Index Card',    'coverIndex',   'newsprint','graphite'),
   T(45, 'Basalt',        'coverBracket', 'basalt',   'graphite'),
   T(46, 'Long Shore',    'coverMargin',  'linen',    'doc'),

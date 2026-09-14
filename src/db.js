@@ -339,16 +339,18 @@ export async function putClaims(claims, { wkey, media_id = null, permalink = nul
   if (!claims.length) return 0;
   const vals = [], params = [];
   claims.forEach((c, i) => {
-    const b = i * 13;
-    vals.push(`(${Array.from({ length: 13 }, (_, k) => `$${b + k + 1}`).join(',')})`);
+    const b = i * 15;
+    vals.push(`(${Array.from({ length: 15 }, (_, k) => `$${b + k + 1}`).join(',')})`);
     params.push(c.tg_id, wkey, media_id, permalink, posted_at, c.msg_ts,
       c.symbol, c.asset, c.klass, c.dir ?? null, c.kind, c.horizon,
-      `${c.headline ?? ''}`.slice(0, 300));
+      `${c.headline ?? ''}`.slice(0, 300),
+      `${c.quote ?? ''}`.slice(0, 300) || null,
+      `${c.reason ?? ''}`.slice(0, 300) || null);
   });
   const { rows } = await q(
     `insert into agent.claims
        (tg_id, wkey, media_id, permalink, posted_at, msg_ts,
-        symbol, asset, klass, dir, kind, horizon, headline)
+        symbol, asset, klass, dir, kind, horizon, headline, quote, reason)
      values ${vals.join(',')}
      on conflict (tg_id, symbol, kind) do nothing
      returning id`, params);

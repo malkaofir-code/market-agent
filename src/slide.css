@@ -776,32 +776,38 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 
 
 /* ═══════════════════════════════════════════════════════════
-   THE PROOF WORLD
-   A printed receipt, not a news board. Paper, monospace, a torn
-   edge top and bottom, its own header band and no tape. Nothing
-   else on this account looks like this, which is the entire point:
-   the thumb has to stop.
+   THE PROOF WORLD — and the one colour that is only ever this.
+
+   The account's news lives on ink, deep teal, slate, paper and the
+   orange accent. Nothing in it is violet, and after this nothing
+   else may be: the two grounds below are declared here, used by the
+   four proof archetypes in builder.js, and reachable by no template.
+   That reservation is the whole mechanism — a reader scrolling past
+   should know a proof board from a bulletin at arm's length, before
+   a single word is read.
    ═══════════════════════════════════════════════════════════ */
-.slide--proof{position:relative}
-/* A document laid on the feed, not a board printed in it.
-   The earlier version bit half-circles out of the edges to suggest a
-   torn receipt; nobody reads a shape as a metaphor at thumb speed,
-   and it landed as a row of dots. A ruled frame inset from the edge
-   is the older, plainer signal — a certificate, a statement, a thing
-   issued rather than posted — and it needs no decoding at all. */
+.slide.g-vow {--bg:#1B1040; --fg:#F4EFFF; --dim:#A08CD6; --dim2:#D9CFF8;
+               --rule:#3B2775; --acc:#B18CFF; --pos:#5BE6A2; --neg:#FF7D9E;
+               --grid:rgba(255,255,255,.035)}
+.slide.g-vowl{--bg:#F2EDFF; --fg:#170E36; --dim:#6E5F9C; --dim2:#382A66;
+               --rule:#CFC2F2; --acc:#6C2BD9; --pos:#0B7C46; --neg:#B7203F;
+               --grid:rgba(23,14,54,.05)}
+/* The top rule is the account's orange everywhere else. Here it is
+   the reserved colour, so even the 10px of chrome agrees. */
+.slide--proof::after{background:var(--acc)}
+/* A ruled frame inset from the edge: a certificate, a statement,
+   something ISSUED rather than posted. */
 .slide--proof{box-shadow:inset 0 0 0 16px var(--bg), inset 0 0 0 19px var(--fg),
   inset 0 0 0 27px var(--bg), inset 0 0 0 28px var(--fg)}
-/* And no texture inside the frame. Every other board on the account
-   stands on a faint plotted grid; here the only ruled thing is the
-   frame and the only drawn thing is the price. A blank sheet is what
-   makes the line on it look like evidence. */
+/* And no texture inside it. Every other board stands on a plotted
+   grid; here the only ruled thing is the frame and the only drawn
+   thing is the price. */
 .slide--proof .bgm{display:none}
 
 /* ── the proof header band ── */
-.pf-hd{display:flex;align-items:center;gap:20px;padding:0 0 22px;
-  border-bottom:3px solid var(--fg)}
+.pf-hd{display:flex;align-items:center;gap:20px;padding:0 0 22px;border-bottom:3px solid var(--fg)}
 .pf-tag{font-family:var(--f-mono);font-weight:700;font-size:26px;letter-spacing:.14em;
-  background:var(--fg);color:var(--bg);padding:9px 18px 8px}
+  background:var(--acc);color:var(--bg);padding:9px 18px 8px}
 .pf-tag::before{content:"\2713";margin-inline-end:10px;font-size:24px}
 .pf-name{font-family:var(--f-mono);font-weight:700;font-size:26px;letter-spacing:.24em;color:var(--fg)}
 .pf-date{font-family:var(--f-mono);font-size:24px;letter-spacing:.1em;color:var(--dim2);
@@ -814,73 +820,76 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 /* ── the price path ── */
 /* Time runs left to right even here. Every chart anybody has ever
    seen runs that way, and a mirrored one tells a different story. */
-.pf-chart{position:relative;direction:ltr;margin:6px 0}
-.pf-chart .pl{display:block;width:100%;height:250px}
+.pf-chart{position:relative;direction:ltr;margin:14px 0 6px}
+.pf-chart .pl{display:block;width:100%;height:230px}
 .pl-line{fill:none;stroke:var(--fg);stroke-width:6;stroke-linejoin:round;stroke-linecap:round;
   vector-effect:non-scaling-stroke}
 .pl-area{fill:var(--fg);opacity:.08}
 .pl.up .pl-line{stroke:var(--pos)} .pl.up .pl-area{fill:var(--pos);opacity:.14}
 .pl.dn .pl-line{stroke:var(--neg)} .pl.dn .pl-area{fill:var(--neg);opacity:.14}
-.pl-mark{stroke:var(--fg);stroke-width:3;stroke-dasharray:9 9;opacity:.45;vector-effect:non-scaling-stroke}
+.pl-mark{stroke:var(--acc);stroke-width:3;stroke-dasharray:9 9;vector-effect:non-scaling-stroke}
 .pl-dot{fill:var(--bg);stroke:var(--fg);stroke-width:6;vector-effect:non-scaling-stroke}
 .pl.up .pl-dot{stroke:var(--pos)} .pl.dn .pl-dot{stroke:var(--neg)}
-.pf-chart .pl-then{position:absolute;top:2px;left:22px;font-family:var(--f-mono);
-  font-size:22px;letter-spacing:.12em;color:var(--dim2)}
-/* The two closes, printed where they actually are on the line. A
-   chart with no numbers on it is a mood; with them it is evidence. */
-.pf-chart .pl-px{position:absolute;bottom:-6px;font-family:var(--f-mono);font-size:27px;
+.pf-chart .pl-then{position:absolute;top:0;left:22px;font-family:var(--f-mono);
+  font-size:22px;letter-spacing:.12em;color:var(--acc);font-weight:700}
+.pf-chart .pl-px{position:absolute;bottom:-4px;font-family:var(--f-mono);font-size:26px;
   font-weight:600;font-variant-numeric:tabular-nums;color:var(--dim2)}
 .pf-chart .pl-from{left:16px}
 .pf-chart .pl-to{right:16px;color:var(--fg);font-weight:700}
 
-/* ── 15 · the receipt, stamped ── */
-.a-cs{display:flex;flex-direction:column;gap:22px;position:relative}
-.a-cs .cs-hd{font-size:58px;font-weight:800;line-height:1.18;letter-spacing:-.022em;
-  margin:0;max-width:19ch}
-.a-cs .cs-when{font-family:var(--f-mono);font-size:24px;letter-spacing:.08em;
-  color:var(--dim2);margin:0}
-.a-cs .cs-foot{display:flex;align-items:flex-end;gap:28px;
-  border-top:1.5px dashed var(--rule);padding-top:24px}
-.a-cs .cs-num{flex:1 1 auto}
-.a-cs .fig{font-family:var(--f-mono);font-weight:600;font-size:154px;line-height:.82;
+/* ── 15 · the chain ── */
+/* Three numbered links strung on a rule down the reading edge. The
+   rule is the argument: each step only means anything because of the
+   one above it. */
+.a-pc{position:relative}
+.a-pc .pc-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:30px}
+.a-pc .pc-step{position:relative;padding-inline-start:0;padding-inline-end:76px}
+/* The connector, drawn between one marker and the next. */
+.a-pc .pc-step:not(:last-child)::before{content:"";position:absolute;top:56px;bottom:-38px;
+  inset-inline-end:25px;width:3px;background:var(--rule)}
+.a-pc .pc-n{position:absolute;top:0;inset-inline-end:0;width:52px;height:52px;border-radius:50%;
+  background:var(--acc);color:var(--bg);font-family:var(--f-mono);font-weight:700;font-size:28px;
+  display:flex;align-items:center;justify-content:center}
+.a-pc .pc-lbl{font-family:var(--f-mono);font-size:24px;letter-spacing:.16em;color:var(--acc);
+  font-weight:700;display:block;padding-top:11px}
+.a-pc .pc-said{font-size:52px;font-weight:800;line-height:1.2;letter-spacing:-.02em;
+  margin:12px 0 0;max-width:19ch}
+.a-pc .pc-when{font-family:var(--f-mono);font-size:23px;letter-spacing:.08em;color:var(--dim2);
+  display:block;margin-top:12px}
+/* The middle link is the one that turns a coincidence into an
+   argument, so it is set as a quotation and given the accent edge. */
+.a-pc .pc-reason{font-size:37px;line-height:1.36;margin:14px 0 0;max-width:24ch;
+  border-inline-start:6px solid var(--acc);padding-inline-start:22px;color:var(--dim2)}
+.a-pc .pc-foot{display:flex;align-items:center;gap:22px;margin-top:20px}
+.a-pc .fig{font-family:var(--f-mono);font-weight:600;font-size:132px;line-height:.84;
   letter-spacing:-.05em;direction:ltr;unicode-bidi:isolate;margin:0;white-space:nowrap}
-.a-cs .fig.up{color:var(--pos)} .a-cs .fig.dn{color:var(--neg)}
-.a-cs .cs-sub{font-size:30px;color:var(--dim2);display:block;margin-top:12px}
-/* The stamp: rotated, double-ruled, slightly transparent — pressed
-   onto the paper rather than printed with it. */
-.a-cs .cs-stamp{flex:0 0 auto;transform:rotate(-11deg);font-family:var(--f-mono);
-  font-weight:700;font-size:60px;letter-spacing:.08em;padding:16px 30px 14px;
-  border:7px double var(--fg);border-radius:12px;color:var(--fg);opacity:.9;
-  margin-bottom:72px;margin-inline-start:-6px}
-.a-cs .cs-stamp.up{color:var(--pos);border-color:var(--pos)}
-.a-cs .cs-stamp.dn{color:var(--neg);border-color:var(--neg)}
+.a-pc .fig.up{color:var(--pos)} .a-pc .fig.dn{color:var(--neg)}
+.a-pc .pc-sub{font-size:28px;color:var(--dim2);line-height:1.3;max-width:13ch}
+/* The stamp sits at the far end of the result line, tilted, in the
+   reserved colour. In the flow rather than floating: an absolutely
+   placed one landed across the number, which is the one thing on the
+   board that must never be obscured. */
+.a-pc .pc-stamp{margin-inline-start:auto;transform:rotate(-8deg);flex:0 0 auto;
+  font-family:var(--f-mono);font-weight:700;font-size:40px;letter-spacing:.08em;
+  padding:11px 22px 9px;border:6px double var(--acc);border-radius:12px;color:var(--acc)}
 
 /* ── 16 · the verdict ── */
-.a-ct{display:flex;flex-direction:column;gap:18px}
-.a-ct .ct-move{font-family:var(--f-mono);font-weight:600;font-size:250px;line-height:.8;
-  letter-spacing:-.06em;direction:ltr;unicode-bidi:isolate;margin:8px 0 4px;color:var(--fg)}
-.a-ct .ct-hd{font-size:46px;font-weight:800;line-height:1.22;margin:0;max-width:18ch;
+.a-pd{display:flex;flex-direction:column;gap:16px}
+.a-pd .pd-move{font-family:var(--f-mono);font-weight:600;font-size:250px;line-height:.8;
+  letter-spacing:-.06em;direction:ltr;unicode-bidi:isolate;margin:6px 0 2px;color:var(--fg)}
+.a-pd .pd-move.up{color:var(--pos)} .a-pd .pd-move.dn{color:var(--neg)}
+.a-pd .pd-said{font-size:46px;font-weight:800;line-height:1.22;margin:0;max-width:18ch;
   letter-spacing:-.016em}
-.a-ct .ct-rows{display:flex;flex-direction:column;border-top:2px solid var(--rule);margin-top:8px}
-.a-ct .ct-row{display:flex;align-items:baseline;justify-content:space-between;gap:20px;
-  padding:18px 0;border-bottom:2px solid var(--rule)}
-.a-ct .ct-lbl{font-family:var(--f-mono);font-size:25px;letter-spacing:.08em;color:var(--dim2)}
-.a-ct .ct-px{font-family:var(--f-mono);font-size:54px;font-weight:600;letter-spacing:-.03em;
+.a-pd .pd-why{font-size:31px;line-height:1.4;color:var(--dim2);margin:4px 0 0;max-width:27ch}
+.a-pd .pd-tag{font-family:var(--f-mono);font-size:22px;letter-spacing:.16em;color:var(--acc);
+  font-weight:700;margin-inline-end:14px}
+.a-pd .pd-rows{display:flex;flex-direction:column;border-top:2px solid var(--rule);margin-top:6px}
+.a-pd .pd-row{display:flex;align-items:baseline;justify-content:space-between;gap:20px;
+  padding:16px 0;border-bottom:2px solid var(--rule)}
+.a-pd .pd-lbl{font-family:var(--f-mono);font-size:24px;letter-spacing:.08em;color:var(--dim2)}
+.a-pd .pd-px{font-family:var(--f-mono);font-size:50px;font-weight:600;letter-spacing:-.03em;
   direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
-.a-ct .ct-sub{font-size:29px;color:var(--dim2);margin:0;max-width:28ch}
-
-/* ── 17 · the receipt, charted ── */
-.a-cl{display:flex;flex-direction:column;gap:20px}
-.a-cl .cl-hd{font-size:50px;font-weight:800;line-height:1.2;letter-spacing:-.02em;
-  margin:0;max-width:20ch}
-.a-cl .cl-foot{display:flex;align-items:flex-end;gap:26px;
-  border-top:1.5px dashed var(--rule);padding-top:22px}
-.a-cl .fig{font-family:var(--f-mono);font-weight:600;font-size:150px;line-height:.82;
-  letter-spacing:-.05em;direction:ltr;unicode-bidi:isolate;margin:0;white-space:nowrap}
-.a-cl .fig.up{color:var(--pos)} .a-cl .fig.dn{color:var(--neg)}
-.a-cl .cl-meta{display:flex;flex-direction:column;gap:8px;padding-bottom:14px}
-.a-cl .cl-when{font-family:var(--f-mono);font-size:24px;letter-spacing:.08em;color:var(--dim2)}
-.a-cl .cl-sub{font-size:30px;font-weight:700}
+.a-pd .pd-sub{font-size:28px;color:var(--dim2);margin:0;max-width:28ch}
 
 /* ── 17 · the proof post's opening ── */
 .a-pv{display:flex;flex-direction:column;gap:26px}

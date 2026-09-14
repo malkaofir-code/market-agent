@@ -1173,7 +1173,7 @@ function dayOf(v) {
 // people to keep reading. The variant comes from the claim's own id,
 // so a rerun reproduces the board it reran and two boards in a day
 // are never the same shape.
-const PROOF_VARIANTS = ['called', 'calledStamp', 'calledThen'];
+const PROOF_VARIANTS = ['proofChain', 'proofVerdict'];
 
 /**
  * One settled claim as one board.
@@ -1190,31 +1190,28 @@ export function proofSlide(claim, { palette = null, variant = null } = {}) {
   const said = cut(claim.headline);
   const sub = `${claim.asset} · ${sessions(Number(claim.days_after) || 1)} אחרי`;
   const type = variant ?? PROOF_VARIANTS[Number(claim.id ?? 0) % PROOF_VARIANTS.length];
-  const when = `הפוסט שלנו · ${dmy(Number(claim.posted_at))}`;
-  // Every proof board carries the same three things beyond its own
-  // layout: the price path it is asserting, the word in the header
-  // band, and the method in the footer. The method line is not
-  // decoration — it is what separates a record from a boast, and it
-  // is printed on every single one of these boards.
   const path = Array.isArray(claim.path) ? claim.path : null;
-  const base = { palette, dir, figure, said, sub, type, path,
+
+  // The middle link. Without it the board says "we were right" and
+  // stops, which is a coincidence told loudly; with it the board says
+  // why we thought so, which is the only version worth publishing.
+  // It is the channel's own interpretation line, never ours.
+  const why = cut(claim.reason ?? '', 150) || null;
+
+  const base = { palette, dir, figure, said, sub, type, path, why,
     fromPx: px(claim.base_px, claim.klass), toPx: px(claim.out_px, claim.klass),
+    fromLabel: `סגירה לפני הפוסט · ${dayOf(claim.base_date)}`,
+    toLabel: `סגירה · ${dayOf(claim.out_date)}`,
     tag: forecast ? 'אומת' : 'מעקב',
     method: 'נמדד ממחיר הסגירה שלפני הפוסט' };
 
-  if (type === 'calledStamp') return { ...base,
-    eyebrow: forecast ? 'אמרנו' : 'סיקרנו',
-    stamp: forecast ? 'התממש' : 'המשיך', when };
-
-  if (type === 'calledThen') return { ...base,
-    eyebrow: forecast ? 'אמרנו · וזה מה שקרה' : 'סיקרנו · וזה מה שקרה',
-    fromLabel: `סגירה לפני הפוסט · ${dayOf(claim.base_date)}`,
-    toLabel: `סגירה · ${dayOf(claim.out_date)}`,
-    sub: `${claim.asset} · ${sessions(Number(claim.days_after) || 1)} אחרי` };
+  if (type === 'proofVerdict') return { ...base,
+    eyebrow: forecast ? 'אמרנו · וזה מה שקרה' : 'סיקרנו · וזה מה שקרה' };
 
   return { ...base,
-    eyebrow: forecast ? 'אמרנו · והתממש' : 'מאז שסיקרנו',
-    label: forecast ? 'ומאז' : 'מאז הפוסט', when };
+    stepSaid: forecast ? 'מה אמרנו' : 'מה סיקרנו',
+    stamp: forecast ? 'התממש' : 'המשיך',
+    when: `הפוסט שלנו · ${dmy(Number(claim.posted_at))}` };
 }
 
 /** One board, for the story track. */
