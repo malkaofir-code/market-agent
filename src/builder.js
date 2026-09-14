@@ -67,6 +67,28 @@ const photo = (p, stat) => p
   : '';
 
 const ARCHETYPES = {
+  // 14 · the callback — what we published, and what happened next.
+  //
+  // The only board on the account that talks about the account. It is
+  // built as a receipt, not a boast: the original headline is quoted
+  // with the date it went out, the market's answer sits underneath as
+  // a plain number, and the two are separated by a rule so nobody can
+  // mistake the second for a continuation of the first. "אמרנו" is the
+  // strongest word on it, and it is only allowed when the post it
+  // points at actually made the claim.
+  called: s => {
+    const room = s.ronSide ? 560 : 900;
+    const size = Math.min(s.ronSide ? 190 : 240,
+      Math.floor(room / (String(s.figure).length * 0.62)));
+    return `<div class="a-cl">
+    <p class="eyeb">${bidi(s.eyebrow || 'אמרנו')}</p>
+    <div class="cl-said"><span class="cl-when">${bidi(s.when)}</span>
+    <p class="cl-hd">${bidi(s.said)}</p></div>
+    <div class="cl-then"><span class="cl-lbl">${bidi(s.label || 'מאז')}</span>
+    <p class="fig ${s.dir ?? ''}" data-protect="the figure" style="font-size:${size}px">${esc(s.figure)}</p>
+    <p class="cl-sub">${bidi(s.sub)}</p></div></div>`;
+  },
+
   // 01 · cover — the photo bleeds off the top and dissolves into the
   // ground; the headline sits inside the fade rather than beside it.
   cover: s => `<div class="a-cv">
@@ -409,6 +431,7 @@ const GROUND = {
   telegram:    'deep',    // the sign-off
   ask:         'deep',    // the one board that asks for something
   coverBleed:  'ink',     // a scrim is mixed for a dark ground
+  called:      'deep',    // the receipt — quiet ground, loud number
 };
 
 // Which pose suits which board. The wardrobe rotates on top of this —
@@ -421,7 +444,7 @@ const POSE = {
   hero: 'point', note: 'explain', chart: 'upward',
   watch: 'pause', telegram: 'yes', ask: 'welcome',
   coverSplit: 'presenting', coverIndex: 'thinking', coverBracket: 'explain',
-  coverFigure: 'point', scene: 'explain',
+  coverFigure: 'point', scene: 'explain', called: 'point',
 };
 // Boards carrying evidence, plus the edged opening — there the accent
 // bar already owns the reading edge, and a mascot lane on the other
@@ -443,7 +466,7 @@ const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed'
 // leave him a lane, and the lane has to be on HIS side — in Hebrew the
 // text starts at the right edge, so a mascot on the right is standing
 // exactly where the first word lands.
-const SIDE = { cover: 'right', coverFramed: 'right', coverRule: 'right',
+const SIDE = { called: 'right', cover: 'right', coverFramed: 'right', coverRule: 'right',
                coverBand: 'right', coverStack: 'right', coverPoster: 'right',
                coverEdge: 'left' };   // everything else: left
 

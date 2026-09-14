@@ -1126,3 +1126,61 @@ export function caption(parsed, w) {
   }
   return out;
 }
+
+// ── the callback deck ────────────────────────────────────────
+//
+// One board, built from one settled claim. Everything on it is a
+// fact the database can produce: the date we published, the headline
+// we published, the close before it and the close after. No adjective
+// is added anywhere in this function — if the move was small, the
+// board says a small number, and the rule that let it get this far
+// (callback.js) is where the size is judged.
+
+/** "יומיים", not "2 ימים" — Hebrew has a dual and using it matters. */
+function sessions(n) {
+  if (n <= 1) return 'יום מסחר אחד';
+  if (n === 2) return 'יומיים';
+  return `${n} ימי מסחר`;
+}
+
+const cut = (t, max = 96) => {
+  const s = String(t ?? '').replace(/\s+/g, ' ').trim();
+  if (s.length <= max) return s;
+  const at = s.lastIndexOf(' ', max);
+  return `${s.slice(0, at > 40 ? at : max)}…`;
+};
+
+export function composeCallback(claim, { palette = 'deep', now = null } = {}) {
+  const at = now ?? Math.floor(Date.now() / 1000);
+  const move = Number(claim.move_pct);
+  const dir = move >= 0 ? 'up' : 'dn';
+  const forecast = claim.kind === 'forecast';
+  // A forecast that landed is the only case allowed to say "we said
+  // so". A follow-up says what it is: we covered it, here is what
+  // happened since. The distinction is the difference between a
+  // record and a brag.
+  const eyebrow = forecast ? 'אמרנו · והתממש' : 'מאז שסיקרנו';
+  const label = forecast ? 'ומאז' : 'מאז הפוסט';
+  const figure = `${move > 0 ? '+' : ''}${move.toFixed(1)}%`;
+
+  const slide = {
+    type: 'called', palette,
+    eyebrow,
+    when: `הפוסט שלנו · ${dmy(Number(claim.posted_at))}`,
+    said: cut(claim.headline),
+    label,
+    figure,
+    dir,
+    sub: `${claim.asset} · ${sessions(Number(claim.days_after) || 1)} אחרי`,
+    gesture: forecast ? 'point' : 'explain',
+  };
+
+  return {
+    key: `C:${localDay(at)}T${hhmm(at)}`,
+    window: `${dmy(Number(claim.posted_at))}\u2013${dmy(at)}`,
+    date: ddmmyy(at),
+    stamp: '', quotes: [],
+    slides: [slide],
+    claimId: claim.id,
+  };
+}

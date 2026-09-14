@@ -19,9 +19,10 @@ import {
   setPublished, publishedSince, putInsight, performanceBy,
   lastStoryAt, reelsToday, lastReelAt,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
+  putClaims, bestHit, markClaimShown, claimScore, callbacksToday, publishedMessages,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
-import { compose, composeStories, composeReel, windowOf, WIN } from './compose.js';
+import { compose, composeStories, composeReel, composeCallback, windowOf, WIN } from './compose.js';
 import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
 import { connect, alert } from './tg.js';
@@ -34,6 +35,9 @@ const DRY = process.argv.includes('--dry') || process.env.DRY_RUN === '1';
 const STORIES = process.argv.includes('--stories') || process.env.MODE === 'stories';
 const INSIGHTS = process.argv.includes('--insights') || process.env.MODE === 'insights';
 const REEL = process.argv.includes('--reel') || process.env.MODE === 'reel';
+// The fourth track. Not a news track at all: it reads what the account
+// already published and asks the market whether it was right.
+const CALLBACK = process.argv.includes('--callback') || process.env.MODE === 'callback';
 // Scheduled ticks render for review only; publishing needs a person.
 const REVIEW = process.env.REVIEW === '1';
 // Telling an hour late, on purpose.
@@ -348,6 +352,8 @@ async function runStories() {
     if (firstId) await setPublished(deck.key, { media_id: firstId,
       choices: { template: String(tpl.id), name: tpl.name, cover: deck.slides[0]?.type,
         types: deck.slides.map(x => x.type) } });
+    await recordClaims(rows, deck, { wkey: deck.key, media_id: firstId,
+      posted_at: Math.floor(Date.now() / 1000) });
     await logRun(deck.key, 'stories', true, `${posted}/${urls.length}`);
     say(`POSTED ${posted} story(ies)`);
     // Stories used to report only their failures, which made "three
@@ -382,6 +388,146 @@ async function runStories() {
  * tune itself on three data points; the numbers are for a person to
  * read and decide with.
  */
+
+/**
+ * File every checkable claim the post just made.
+ *
+ * Only messages that actually reached the board are read. A claim is
+ * the account saying something in public; a message that sat in the
+ * window and never appeared on a slide or in the caption said nothing,
+ * and a callback card built on one would quote a headline nobody was
+ * ever shown. The deck as published is the evidence, so that is what
+ * is searched — slides and caption together.
+ */
+async function recordClaims(rows, deck, meta) {
+  if (process.env.CLAIMS === '0') return 0;
+  try {
+    const { claimsFrom } = await import('./claims.js');
+    const shown = JSON.stringify(deck);
+    const out = [];
+    for (const r of rows) {
+      const head = String(r.text ?? '').split('\n')[0].replace(/[\u200e\u200f]/g, '').trim();
+      // 24 characters, not the whole headline: a reel card trims to
+      // nine words and a story board can squeeze, so an exact match
+      // would file nothing at all from the two tracks that publish most.
+      if (head.length < 12 || !shown.includes(head.slice(0, 24))) continue;
+      out.push(...claimsFrom(r));
+    }
+    const n = await putClaims(out, meta);
+    if (n) say(`filed ${n} claim(s) from ${meta.wkey}`);
+    return n;
+  } catch (e) {
+    // A claim that failed to file costs a callback in three days. It
+    // must never cost the post that is already live.
+    say('claims NOT filed —', e.message);
+    return 0;
+  }
+}
+
+/**
+ * The callback track — the only thing on this account that looks back.
+ *
+ * Everything else answers "what just happened". This answers "and were
+ * we right", which is the only question that compounds: a stranger who
+ * sees a board saying what we published on Monday and what the market
+ * did by Wednesday learns something about the account, not about the
+ * news. It runs once a day, publishes at most one board, and publishes
+ * nothing at all on a day when no claim settled — which will be most
+ * days, and is the correct behaviour.
+ */
+async function runCallback() {
+  // One slot a day, gated on the LOCAL hour — the cron dispatches
+  // hourly because pg_cron is UTC and Israel moves its clocks twice a
+  // year. Morning, because the number on the board is a CLOSE: at
+  // 09:00 Israel last night's US session is settled and final, and
+  // anything earlier in the day would be quoting a price that is
+  // still moving.
+  const hours = (process.env.CALLBACK_HOURS || '9').split(',').map(x => x.trim()).filter(Boolean);
+  if (hours.length && process.env.IGNORE_SCHEDULE !== '1' && !DRY
+      && !hours.includes(String(localHour()))) {
+    say(`SKIP — ${localHour()}:xx is not a callback hour (${hours.join(', ')})`);
+    return 'none';
+  }
+
+  // ── the backfill ─────────────────────────────────────────
+  // Without it the first callback card is three days away, on an
+  // account that has been publishing for weeks and already has the
+  // claims sitting in its own archive. Runs once — the unique key on
+  // (tg_id, symbol, kind) makes a second pass a no-op — and reaches
+  // only as far back as a claim could still be settling.
+  const backDays = Number(process.env.BACKFILL_DAYS || 0);
+  if (backDays > 0) {
+    const { claimsFrom } = await import('./claims.js');
+    const rows = await publishedMessages(backDays);
+    let filed = 0;
+    for (const r of rows) {
+      const cs = claimsFrom(r);
+      if (!cs.length) continue;
+      filed += await putClaims(cs, { wkey: r.wkey, media_id: r.media_id,
+        permalink: r.permalink, posted_at: Number(r.posted_at) });
+    }
+    say(`backfill — ${rows.length} published message(s) read, ${filed} claim(s) filed`);
+  }
+
+  const { checkAll } = await import('./callback.js');
+  const res = await checkAll(say);
+  say(`checked ${res.checked} claim(s) — ${res.hits} hit, ${res.misses} miss, ${res.open ?? 0} still open`);
+
+  const score = await claimScore(30);
+  for (const r of score) say(`  30d ${r.kind}: ${r.hit} hit / ${r.miss} miss / ${r.open} open`);
+
+  const cap = Number(process.env.MAX_CALLBACKS_PER_DAY || 1);
+  const done = await callbacksToday();
+  if (!DRY && done >= cap) { say(`SKIP — callback cap reached (${done}/${cap})`); return 'none'; }
+
+  const hit = await bestHit();
+  if (!hit) { say('SKIP — nothing settled worth showing'); return 'none'; }
+
+  const deck = composeCallback(hit);
+  say(`${deck.key} — ${hit.kind} on ${hit.symbol}: ${hit.move_pct}% in ${hit.days_after} session(s)`);
+
+  const dir = join('./out', deck.key.replace(/[:]/g, '').replace('C', 'C-'));
+  const { files } = await renderDeck(deck, dir, { format: 'jpeg', story: true });
+  if (!files.length) { say('SKIP — nothing rendered'); return 'none'; }
+
+  if (DRY || REVIEW) {
+    say(`${DRY ? 'DRY' : 'REVIEW'} — callback board rendered, NOT published (${files[0]})`);
+    return 'done';
+  }
+
+  const { upload, remove, publishStory } = await import('./publish/api.js');
+  const prefix = deck.key.replace(/[:]/g, '');
+  const urls = await upload(files, prefix);
+
+  // The claim is marked BEFORE the board goes up, for the same reason
+  // the story track claims its hour first: a run that dies half way
+  // must not show the same callback again tomorrow.
+  await upsertWindow(deck.key, Number(hit.posted_at), Math.floor(Date.now() / 1000));
+  await markClaimShown(hit.id);
+
+  let r = null, failure = null;
+  try { r = await publishStory(urls[0], { dryRun: false }); }
+  catch (e) { failure = e; }
+  finally { await remove(files, prefix); }
+
+  if (r) {
+    await setWindow({ key: deck.key, status: 'posted', slides: 1,
+      posted_at: Math.floor(Date.now() / 1000) });
+    await setPublished(deck.key, { media_id: r.id ?? null,
+      choices: { kind: hit.kind, symbol: hit.symbol, move: hit.move_pct,
+        days: hit.days_after, claim: hit.id } });
+    await logRun(deck.key, 'callback', true, `${hit.symbol} ${hit.move_pct}%`);
+    say(`POSTED callback ${r.id}`);
+    await notify(`🎯 ${hit.kind === 'forecast' ? 'אמרנו והתממש' : 'עדכון המשך'} — `
+      + `${hit.asset} ${hit.move_pct}% תוך ${hit.days_after} ימי מסחר\n${hit.headline ?? ''}`);
+  } else {
+    await setWindow({ key: deck.key, status: 'failed', slides: 0, error: failure?.message });
+    await logRun(deck.key, 'callback', false, failure?.message ?? 'nothing posted');
+    await notify(`❌ callback ${deck.key}\n${failure?.message ?? 'nothing posted'}`);
+  }
+  return 'done';
+}
+
 async function runInsights() {
   const { mediaInsights, accountInsights } = await import('./publish/insights.js');
   const days = Number(process.env.INSIGHT_DAYS || 14);
@@ -677,6 +823,8 @@ async function runReel() {
         // format is asking, so it is recorded beside the result
         // rather than inferred from the log later.
         voice: voices ? voices.filter(Boolean).length : 0 } });
+    await recordClaims(rows, deck, { wkey: deck.key, media_id: r.id,
+      permalink: r.permalink ?? null, posted_at: Math.floor(Date.now() / 1000) });
     await logRun(deck.key, 'reel', true, r.permalink ?? r.id);
     await notify(`🎬 ${deck.key} — reel live (${built.seconds}s)\n${r.permalink ?? ''}`);
   } catch (e) {
@@ -781,12 +929,14 @@ async function main() {
 
   // A review run publishes nothing, so the post-rate guards have no
   // opinion about it — let it render even at the daily cap.
-  const stop = (DRY || REVIEW) ? null : await blocked({ stories: STORIES, reel: REEL });
+  const stop = (DRY || REVIEW) ? null : await blocked({ stories: STORIES || CALLBACK, reel: REEL });
   if (stop) { say('SKIP —', stop); return; }
 
   // A reel publishes, so unlike insights it sits BEHIND the kill
   // switch, the active hours and the failure latch — not in front of
   // them with the read-only mode.
+  if (CALLBACK) return runCallback();
+
   if (REEL) {
     // Two slots a day, gated on the LOCAL hour for the same reason the
     // digest is: pg_cron thinks in UTC and Israel moves its clocks
@@ -975,6 +1125,8 @@ async function main() {
   await setPublished(w.key, { media_id: result.id, permalink: result.permalink,
     choices: { template: String(tpl.id), name: tpl.name, cover: deck.slides[0]?.type,
       types: deck.slides.map(x => x.type), slot: deck.slot ?? null } });
+  await recordClaims(w.rows ?? [], deck, { wkey: w.key, media_id: result.id,
+    permalink: result.permalink ?? null, posted_at: Math.floor(Date.now() / 1000) });
   await logRun(w.key, 'publish', true, result.permalink ?? result.id);
   await notify(`✅ ${w.key} — ${deck.slides.length} slides\n${result.permalink ?? ''}`);
 }

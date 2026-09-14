@@ -158,7 +158,7 @@ const DAY_START = `extract(epoch from date_trunc('day', now() at time zone $tz) 
 // than on "not a story", because the moment a third kind existed
 // "not a story" quietly meant "post or reel" — one reel would have
 // eaten a digest slot and opened the minimum gap in front of it.
-const POSTS_ONLY = `key not like 'S:%' and key not like 'R:%'`;
+const POSTS_ONLY = `key not like 'S:%' and key not like 'R:%' and key not like 'C:%'`;
 
 export const postsToday = () =>
   q(`select count(*)::int n from agent.windows
@@ -229,7 +229,7 @@ export const lastStoryAt = () =>
 /** Instagram's own ceiling is 100 published items per 24h, shared. */
 export const storiesToday = () =>
   q(`select coalesce(sum(slides),0)::int n from agent.windows
-     where status='posted' and key like 'S:%'
+     where status='posted' and (key like 'S:%' or key like 'C:%')
        and posted_at >= ${DAY_START}`)
     .then(r => r.rows[0].n);
 
@@ -249,6 +249,12 @@ export const reelsToday = () =>
      where status='posted' and key like 'R:%'
        and posted_at >= ${DAY_START}`)
     .then(r => r.rows[0].n);
+
+/** A callback is a story too — its own rail, on the same ceiling. */
+export const callbacksToday = () =>
+  q(`select count(*)::int n from agent.windows
+     where status='posted' and key like 'C:%'
+       and posted_at >= ${DAY_START}`).then(r => r.rows[0].n);
 
 export const lastReelAt = () =>
   q(`select max(posted_at) t from agent.windows
@@ -295,5 +301,104 @@ export const setState = (k, v) =>
 export const getToken = () => getState('ig-token').then(v => v?.access_token ?? null);
 export const setToken = (access_token, expires_in) =>
   setState('ig-token', { access_token, expires_in, set_at: Math.floor(Date.now() / 1000) });
+
+
+// ── claims: what we said, and what the market did about it ───
+//
+// A claim is written at PUBLISH time, never at ingest. The account
+// can only be right about something it actually posted, so a claim
+// that never went out is not a claim — it is a message.
+export async function putClaims(claims, { wkey, media_id = null, permalink = null, posted_at }) {
+  if (!claims.length) return 0;
+  const vals = [], params = [];
+  claims.forEach((c, i) => {
+    const b = i * 13;
+    vals.push(`(${Array.from({ length: 13 }, (_, k) => `$${b + k + 1}`).join(',')})`);
+    params.push(c.tg_id, wkey, media_id, permalink, posted_at, c.msg_ts,
+      c.symbol, c.asset, c.klass, c.dir ?? null, c.kind, c.horizon,
+      `${c.headline ?? ''}`.slice(0, 300));
+  });
+  const { rows } = await q(
+    `insert into agent.claims
+       (tg_id, wkey, media_id, permalink, posted_at, msg_ts,
+        symbol, asset, klass, dir, kind, horizon, headline)
+     values ${vals.join(',')}
+     on conflict (tg_id, symbol, kind) do nothing
+     returning id`, params);
+  return rows.length;
+}
+
+/**
+ * Messages that a DIGEST actually published, for the backfill.
+ *
+ * Only the digest track, and only through consumed_by. A digest's
+ * caption carries every headline in its window, so "consumed by a
+ * posted digest" really does mean "this text went out on the
+ * account". The story track's cursor cannot make that promise — it
+ * marks every message in the hour, including the two the set did not
+ * have room to tell — and a callback quoting one of those would be
+ * the account taking credit for something it never said.
+ */
+export const publishedMessages = (days = 7) =>
+  q(`select m.tg_id, m.ts, m.text, w.key wkey, w.media_id, w.permalink, w.posted_at
+     from agent.messages m
+     join agent.windows w on w.key = m.consumed_by
+     where w.status = 'posted' and w.media_id is not null
+       and w.posted_at > extract(epoch from now())::bigint - $1 * 86400
+     order by w.posted_at asc`, [days]).then(r => r.rows);
+
+/** Claims still inside their horizon, oldest first. */
+export const openClaims = (grace = 2) =>
+  q(`select * from agent.claims
+     where status = 'open'
+       and posted_at > extract(epoch from now())::bigint - (horizon + $1) * 86400 - 86400
+     order by posted_at asc`, [grace]).then(r => r.rows);
+
+export async function putPrices(symbol, series) {
+  if (!series.length) return 0;
+  const vals = [], params = [];
+  series.forEach((p, i) => {
+    const b = i * 3;
+    vals.push(`($${b + 1},$${b + 2},$${b + 3})`);
+    params.push(symbol, p.d, p.c);
+  });
+  await q(`insert into agent.prices (symbol, d, close) values ${vals.join(',')}
+           on conflict (symbol, d) do update set close = excluded.close`, params);
+  return series.length;
+}
+
+export const closesFor = (symbol, fromDate) =>
+  q(`select to_char(d,'YYYY-MM-DD') d, close::float8 c from agent.prices
+     where symbol = $1 and d >= $2::date order by d asc`, [symbol, fromDate])
+    .then(r => r.rows);
+
+export const setClaimOutcome = (id, o) =>
+  q(`update agent.claims set status=$2, base_px=$3, base_date=$4, out_px=$5,
+       out_date=$6, move_pct=$7, days_after=$8,
+       checked_at=extract(epoch from now())::bigint
+     where id=$1`,
+    [id, o.status, o.base_px ?? null, o.base_date ?? null, o.out_px ?? null,
+     o.out_date ?? null, o.move_pct ?? null, o.days_after ?? null]);
+
+/** The best unpublished hit — a forecast that landed beats a follow-up. */
+export const bestHit = () =>
+  q(`select * from agent.claims
+     where status = 'hit' and shown_at is null
+     order by (kind = 'forecast') desc, abs(move_pct) desc limit 1`)
+    .then(r => r.rows[0] ?? null);
+
+export const markClaimShown = id =>
+  q(`update agent.claims set status='shown', shown_at=extract(epoch from now())::bigint
+     where id=$1`, [id]);
+
+/** How the account is doing at this, in one row. */
+export const claimScore = (days = 30) =>
+  q(`select kind,
+            count(*) filter (where status in ('hit','shown'))::int hit,
+            count(*) filter (where status = 'miss')::int miss,
+            count(*) filter (where status = 'open')::int open
+     from agent.claims
+     where posted_at > extract(epoch from now())::bigint - $1 * 86400
+     group by kind order by kind`, [days]).then(r => r.rows);
 
 export const close = () => pool.end();

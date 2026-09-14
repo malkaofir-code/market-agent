@@ -773,3 +773,21 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 .a-sn.is-lead .sn-big[data-dir="up"]{color:var(--pos)}
 .a-sn.is-lead .sn-big[data-dir="dn"]{color:var(--neg)}
 .a-sn.is-lead .sn-s{margin-top:14px}
+
+/* ── 14 · the callback ── */
+/* Two blocks, one rule between them: what we said, then what the
+   market said. The quote is set small and quiet on purpose — it is
+   evidence, not the headline of this board. The number is. */
+.a-cl{display:flex;flex-direction:column;gap:34px}
+.a-cl .cl-said{border-inline-start:9px solid var(--acc);padding-inline-start:30px}
+.a-cl .cl-when{font-family:var(--f-mono);font-size:25px;font-weight:700;letter-spacing:.1em;
+  color:var(--acc);display:block;margin-bottom:14px}
+.a-cl .cl-hd{font-size:52px;font-weight:800;line-height:1.22;letter-spacing:-.018em;margin:0;max-width:22ch}
+.a-cl .cl-then{border-top:1.5px solid var(--rule);padding-top:30px}
+.a-cl .cl-lbl{font-family:var(--f-mono);font-size:26px;letter-spacing:.16em;color:var(--dim2);
+  display:block;margin-bottom:18px;font-weight:700}
+.a-cl .fig{font-family:var(--f-mono);font-weight:600;line-height:.82;letter-spacing:-.05em;
+  direction:ltr;unicode-bidi:isolate;margin:0;display:block;padding-inline-end:.09em;
+  width:fit-content;margin-inline-start:auto;white-space:nowrap}
+.a-cl .fig.up{color:var(--pos)} .a-cl .fig.dn{color:var(--neg)}
+.a-cl .cl-sub{font-size:33px;line-height:1.4;color:var(--dim2);margin:24px 0 0;max-width:26ch}

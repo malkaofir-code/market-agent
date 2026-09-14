@@ -51,9 +51,9 @@ on:
         type: boolean
         default: false
       mode:
-        description: 'digest = the carousel; stories = the hour as story boards; insights = read the account back, publish nothing; reel = one MP4 to the only surface strangers see'
+        description: 'digest = the carousel; stories = the hour as story boards; insights = read the account back, publish nothing; reel = one MP4 to the only surface strangers see; callback = check what we claimed against what the market did'
         type: choice
-        options: [digest, stories, insights, reel]
+        options: [digest, stories, insights, reel, callback]
         default: digest
       now:
         description: 'Ignore the digest schedule and post this one now'
@@ -258,6 +258,20 @@ jobs:
           # surface that collects every reel using it; an unnamed one
           # is dead space.
           REEL_AUDIO_NAME: 'מרקט אלרט'
+          # ── the callback track ───────────────────────────
+          # One board a day at most, and nothing at all on a day when
+          # no claim settled — which is most days. A second callback in
+          # one day would turn a record into a boast.
+          MAX_CALLBACKS_PER_DAY: '1'
+          # Nine in the morning, Israel. The number on the board is a
+          # CLOSE, and last night's US session is settled by then.
+          CALLBACK_HOURS: '9'
+          # How far back the first run reaches to find claims the
+          # account already made. Costs nothing after that: the unique
+          # key on (tg_id, symbol, kind) makes every later pass a
+          # no-op, and six days is the furthest a claim can still be
+          # inside its horizon.
+          BACKFILL_DAYS: '6'
           # ── the voice ────────────────────────────────────
           # English narration over the Hebrew boards. Set to '0' to
           # publish silent reels with the bed alone.
