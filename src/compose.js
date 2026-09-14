@@ -1173,7 +1173,7 @@ function dayOf(v) {
 // people to keep reading. The variant comes from the claim's own id,
 // so a rerun reproduces the board it reran and two boards in a day
 // are never the same shape.
-const PROOF_VARIANTS = ['proofChain', 'proofVerdict'];
+const PROOF_VARIANTS = ['proofCert', 'proofVerdict'];
 
 /**
  * One settled claim as one board.
@@ -1205,13 +1205,12 @@ export function proofSlide(claim, { palette = null, variant = null } = {}) {
     tag: forecast ? 'אומת' : 'מעקב',
     method: 'נמדד ממחיר הסגירה שלפני הפוסט' };
 
-  if (type === 'proofVerdict') return { ...base,
-    eyebrow: forecast ? 'אמרנו · וזה מה שקרה' : 'סיקרנו · וזה מה שקרה' };
-
-  return { ...base,
-    stepSaid: forecast ? 'מה אמרנו' : 'מה סיקרנו',
-    stamp: forecast ? 'התממש' : 'המשיך',
-    when: `הפוסט שלנו · ${dmy(Number(claim.posted_at))}` };
+  // The seal says what was actually verified. A forecast that landed
+  // may say so; a follow-up says what it is, on the same sheet.
+  const stamp = forecast ? 'אמרנו · והתממש' : 'סיקרנו · והמשיך';
+  const when = `פורסם ${dmy(Number(claim.posted_at))} · אומת ${dayOf(claim.out_date)}`;
+  if (type === 'proofVerdict') return { ...base, stamp, when };
+  return { ...base, stamp, when };
 }
 
 /** One board, for the story track. */

@@ -69,10 +69,10 @@ function foot(i, n, src) {
 // that it stops someone — so it gets its own world: a printed receipt
 // rather than a news board, its own header band, no tape, and a
 // price line no other archetype has.
-const PROOF = new Set(['proofChain', 'proofVerdict', 'coverProof', 'record']);
+const PROOF = new Set(['proofCert', 'proofVerdict', 'coverProof', 'record']);
 
 function proofHead({ date }, slide) {
-  return `<header class="pf-hd"><span class="pf-tag">${bidi(slide.tag || 'אומת')}</span>
+  return `<header class="pf-hd"><span class="pf-check"></span>
 <span class="pf-name">MARKET ALERT</span><span class="pf-date">${bidi(date)}</span></header>`;
 }
 
@@ -124,44 +124,40 @@ const photo = (p, stat) => p
   : '';
 
 const ARCHETYPES = {
-  // 15 · the chain — the proof board.
+  // 15 · the certificate — the proof board.
   //
-  // "We said it and it happened" is a coincidence. Three numbered
-  // steps turn it into an argument: what we published, WHY we
-  // published it, and what the market did about it. The middle step
-  // is the whole difference and it is the channel's own reasoning —
-  // the 💡 משמעות line — not a sentence this pipeline invented.
+  // White sheet, and green means exactly one thing on it: VERIFIED.
+  // Not "up" — the price line is drawn in ink whichever way it went,
+  // so a confirmed fall is as green a board as a confirmed rally. On
+  // every other board on this account green is the direction of a
+  // number; here it is the status of a claim, and keeping those two
+  // meanings apart is what makes the sheet readable at a glance.
   //
-  // The steps are numbered and strung on a rule down the reading
-  // edge, because a chain is the shape of the claim: each link only
-  // means anything because of the one above it.
-  proofChain: s => `<div class="a-pc">
-    <ol class="pc-steps">
-      <li class="pc-step"><span class="pc-n">1</span>
-        <span class="pc-lbl">${bidi(s.stepSaid || 'מה אמרנו')}</span>
-        <p class="pc-said">${bidi(s.said)}</p>
-        <span class="pc-when">${bidi(s.when)}</span></li>
-      ${s.why ? `<li class="pc-step pc-why"><span class="pc-n">2</span>
-        <span class="pc-lbl">${bidi('למה')}</span>
-        <p class="pc-reason">${bidi(s.why)}</p></li>` : ''}
-      <li class="pc-step pc-out"><span class="pc-n">${s.why ? 3 : 2}</span>
-        <span class="pc-lbl">${bidi('ומה קרה')}</span>
-        ${priceLine(s.path, s.dir, { from: s.fromPx, to: s.toPx })}
-        <div class="pc-foot">
-          <p class="fig ${s.dir ?? ''}" data-protect="the figure">${esc(s.figure)}</p>
-          <span class="pc-sub">${bidi(s.sub)}</span>
-          <span class="pc-stamp">${bidi(s.stamp || 'התממש')}</span>
-        </div></li>
-    </ol></div>`,
+  // The claim is inside a solid green block at the top, the way a
+  // stamped header sits on a certificate, and everything below it is
+  // the evidence: the reasoning, the path, the two closes.
+  proofCert: s => `<div class="a-pf">
+    <div class="pf-block">
+      <span class="pf-seal">${bidi(s.stamp || 'אומת')}</span>
+      <span class="pf-when">${bidi(s.when)}</span>
+      <p class="pf-said">${bidi(s.said)}</p>
+    </div>
+    ${s.why ? `<div class="pf-why"><span class="pf-lbl">${bidi('למה')}</span>
+      <p>${bidi(s.why)}</p></div>` : ''}
+    ${priceLine(s.path, s.dir, { from: s.fromPx, to: s.toPx })}
+    <div class="pf-foot">
+      <p class="fig" data-protect="the figure">${esc(s.figure)}</p>
+      <span class="pf-sub">${bidi(s.sub)}</span>
+    </div></div>`,
 
-  // 16 · the verdict — the same argument, shouted.
+  // 16 · the verdict — the sheet inverted.
   //
-  // One number at 250px on the reserved ground, the reasoning under
-  // it in a single line, and the two closes as the working. It exists
-  // so two proof boards on the same day cannot look alike.
+  // The same argument on a solid green field: the move enormous in
+  // white, the reasoning in one line, the two closes as the working.
+  // It exists so two proof boards on the same day cannot look alike.
   proofVerdict: s => `<div class="a-pd">
-    <p class="eyeb">${bidi(s.eyebrow || 'אמרנו · וזה מה שקרה')}</p>
-    <p class="pd-move fig ${s.dir ?? ''}" data-protect="the figure">${esc(s.figure)}</p>
+    <span class="pd-seal">${bidi(s.stamp || 'אומת')}</span>
+    <p class="pd-move fig" data-protect="the figure">${esc(s.figure)}</p>
     <p class="pd-said">${bidi(s.said)}</p>
     ${s.why ? `<p class="pd-why"><span class="pd-tag">${bidi('למה')}</span>${bidi(s.why)}</p>` : ''}
     <div class="pd-rows">
@@ -186,7 +182,7 @@ const ARCHETYPES = {
       <span class="rc-of">${bidi(s.of)}</span></div>
     <ul class="rc-list">${(s.items ?? []).map(i =>
       `<li><span class="rc-a">${bidi(i.asset)}</span><span class="rc-d">${bidi(i.when)}</span>
-       <b class="rc-m ${i.dir}">${esc(i.move)}</b></li>`).join('')}</ul>
+       <b class="rc-m">${esc(i.move)}</b></li>`).join('')}</ul>
     <p class="rc-note">${bidi(s.note)}</p></div>`,
 
   // 01 · cover — the photo bleeds off the top and dissolves into the
@@ -535,10 +531,10 @@ const GROUND = {
   // on the account is allowed to touch it — see the violet grounds in
   // slide.css. A reader should be able to tell a proof board from a
   // bulletin at arm's length, before reading a word of it.
-  proofChain:   'vowl',   // the light violet sheet
-  proofVerdict: 'vow',    // the deep violet field
-  coverProof:   'vow',
-  record:       'vowl',
+  proofCert:    'sheet',  // white, with green reserved for VERIFIED
+  proofVerdict: 'verd',   // the green field
+  coverProof:   'verd',
+  record:       'sheet',
 };
 
 // Which pose suits which board. The wardrobe rotates on top of this —
@@ -553,7 +549,7 @@ const POSE = {
   coverSplit: 'presenting', coverIndex: 'thinking', coverBracket: 'explain',
   coverFigure: 'point', scene: 'explain',
   // The proof boards have their own wardrobe — see PROOF below.
-  proofChain: 'proof-point', proofVerdict: 'proof-steady',
+  proofCert: 'proof-point', proofVerdict: 'proof-steady',
   coverProof: 'proof-assured',
 };
 // Boards carrying evidence, plus the edged opening — there the accent
@@ -578,7 +574,7 @@ const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed'
 // leave him a lane, and the lane has to be on HIS side — in Hebrew the
 // text starts at the right edge, so a mascot on the right is standing
 // exactly where the first word lands.
-const SIDE = { proofChain: 'right', proofVerdict: 'right',
+const SIDE = { proofCert: 'right', proofVerdict: 'right',
                coverProof: 'right', cover: 'right', coverFramed: 'right', coverRule: 'right',
                coverBand: 'right', coverStack: 'right', coverPoster: 'right',
                coverEdge: 'left' };   // everything else: left
@@ -622,7 +618,7 @@ function ronLayer(slide, ctx, i = 0) {
 const SECONDARY = new Set(['item', 'list', 'chart', 'watch', 'telegram', 'record']);
 
 // The tape is the news board's signature row. A receipt has no tape.
-const NO_TAPE = new Set(['telegram', 'proofChain', 'proofVerdict', 'coverProof', 'record']);
+const NO_TAPE = new Set(['telegram', 'proofCert', 'proofVerdict', 'coverProof', 'record']);
 const COVERS = new Set(['cover', 'coverFramed']);   // overlay grid
 const BLEED = new Set(['cover']);                  // photo escapes the band
 

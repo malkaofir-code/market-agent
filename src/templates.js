@@ -19,18 +19,23 @@
  * clean green on near-black and a highlighter on paper. Same for the
  * grid, which has to be ink on a light ground and light on a dark one.
  */
-export // Violet is not in this table, and must not be added to it.
+export // No green FIELD and no white SHEET may be added to this table.
 //
-// It is the proof boards' colour and nothing else on the account may
-// wear it — the whole point of reserving a hue is that a reader
-// scrolling past knows what they are looking at before reading a
-// word. Two palettes here were purple (plum, violet) and four
-// templates used them, which meant an ordinary Tuesday digest could
-// come out the same colour as a verified call. They were repointed
-// at midnight, steel, carbon and oxblood.
+// Green is the proof boards' colour and white is their paper, and the
+// whole point of reserving them is that a reader scrolling past knows
+// what they are looking at before reading a word. A green ground on
+// an ordinary Tuesday digest spends that recognition for nothing.
 //
-// The reserved grounds live in slide.css as .g-vow / .g-vowl and are
-// reachable only through the proof archetypes' GROUND map.
+// Two grounds here were green fields (jade, mint) and three templates
+// stood on them; they were repointed at sand, ice and steel and the
+// palettes deleted. Green as a FIGURE colour is untouched and stays
+// everywhere — `pos` below is green in almost every palette, because
+// on a news board green is the direction of a number. On a proof
+// board it is the status of a claim. Those two meanings must not be
+// allowed to meet.
+//
+// The reserved grounds live in slide.css as .g-sheet / .g-verd and
+// are reachable only through the proof archetypes' GROUND map.
 const PALETTES = {
   // ── dark worlds ────────────────────────────────────────────
   ink:      { bg:'#0B0D10', fg:'#F2F0EB', dim:'#9AA0AA', dim2:'#C3C7CE', rule:'#262B33',
@@ -57,8 +62,6 @@ const PALETTES = {
               acc:'#FF6B1A', pos:'#12833F', neg:'#B0271F', grid:'rgba(20,22,26,.05)' },
   ice:      { bg:'#E8EFF5', fg:'#0F1A24', dim:'#5E7387', dim2:'#2C3E4E', rule:'#BACBD9',
               acc:'#0F62C4', pos:'#0E7A47', neg:'#B0271F', grid:'rgba(15,26,36,.05)' },
-  mint:     { bg:'#E4F0E9', fg:'#0D1E16', dim:'#5B7A69', dim2:'#284535', rule:'#B7D2C2',
-              acc:'#0E7A47', pos:'#0E7A47', neg:'#B0271F', grid:'rgba(13,30,22,.05)' },
   sand:     { bg:'#F2E7D3', fg:'#1D1710', dim:'#7A6A50', dim2:'#413523', rule:'#D3C2A2',
               acc:'#C4520F', pos:'#12833F', neg:'#B0271F', grid:'rgba(29,23,16,.05)' },
 
@@ -75,9 +78,6 @@ const PALETTES = {
   rose:     { bg:'#E8467A', fg:'#FFF2F6', dim:'rgba(255,242,246,.68)', dim2:'rgba(255,242,246,.9)',
               rule:'rgba(255,242,246,.32)', acc:'#FFE45C', pos:'#9BF5CE', neg:'#FFD2D8',
               grid:'rgba(255,242,246,.06)' },
-  jade:     { bg:'#0FA97A', fg:'#04211A', dim:'rgba(4,33,26,.62)', dim2:'rgba(4,33,26,.85)',
-              rule:'rgba(4,33,26,.28)', acc:'#04211A', pos:'#04211A', neg:'#04211A',
-              grid:'rgba(4,33,26,.05)' },
 
   // ── added with the second thirty ──────────────────────────
 
@@ -135,7 +135,7 @@ export const TEMPLATES = [
   T( 6, 'Ledger',        'coverBand',   'sand',     'espresso'),
   T( 7, 'Terminal',      'coverStack',  'carbon',   'ink'),
   T( 8, 'Deepwater',     'coverFramed', 'steel',    'midnight'),
-  T( 9, 'Orchard',       'coverBand',   'forest',   'mint'),
+  T( 9, 'Orchard',       'coverBand',   'forest',   'sand'),
   T(10, 'Bulletin',      'coverRule',   'ice',      'steel'),
   T(11, 'Voltage',       'coverPoster', 'citrus',   'carbon'),
   T(12, 'Cellar',        'coverStack',  'oxblood',  'espresso'),
@@ -144,9 +144,9 @@ export const TEMPLATES = [
   T(15, 'Almanac',       'coverBand',   'doc',      'sand'),
   T(16, 'Nocturne',      'coverStack',  'midnight', 'steel'),
   T(17, 'Beacon',        'coverPoster', 'rose',     'oxblood'),
-  T(18, 'Glasshouse',    'coverRule',   'mint',     'forest'),
+  T(18, 'Glasshouse',    'coverRule',   'ice',      'steel'),
   T(19, 'Ironworks',     'coverEdge',   'slate',    'carbon'),
-  T(20, 'Verdigris',     'coverFramed', 'jade',     'forest'),
+  T(20, 'Anchorage',     'coverFramed', 'steel',    'midnight'),
   T(21, 'Dispatch',      'coverBand',   'ink',      'deep'),
   T(22, 'Blackout',      'coverPoster', 'carbon',   'steel'),
   T(23, 'Frostline',     'coverStack',  'ice',      'midnight'),
@@ -286,4 +286,4 @@ export function vars(name) {
 
 /** Light grounds need a different scrim and shadow than dark ones. */
 export const isLight = name =>
-  ['doc', 'ice', 'mint', 'sand', 'flare', 'citrus', 'jade'].includes(name);
+  ['doc', 'ice', 'sand', 'flare', 'citrus'].includes(name);
