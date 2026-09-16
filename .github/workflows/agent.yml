@@ -276,6 +276,12 @@ jobs:
           # Nine in the morning, Israel. The number on the board is a
           # CLOSE, and last night's US session is settled by then.
           CALLBACK_HOURS: '9,17'
+          # How often an off-hour dispatch bothers to re-score. The
+          # cron fires every hour so the publishing slots land at the
+          # right LOCAL time all year; there is no reason for eighteen
+          # rounds of quote fetching a day. The publishing hours score
+          # regardless of this.
+          CALLBACK_CHECK_MIN: '60'
           # And one carousel at noon, on the days there is a record to
           # show. Two proven calls minimum: one is a story, a record
           # needs at least two.

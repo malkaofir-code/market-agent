@@ -427,6 +427,22 @@ async function recordClaims(rows, deck, meta) {
   }
 }
 
+const CHECK_KEY = 'callback-checked';
+
+/**
+ * Score at most once an hour on the off-hour dispatches.
+ *
+ * The cron fires every hour so the two publishing slots land at the
+ * right LOCAL time all year; that is eighteen dispatches a day and
+ * there is no reason for eighteen rounds of quote fetching. The
+ * publishing hours always score, whatever this says.
+ */
+async function checkDue() {
+  const last = Number((await getState(CHECK_KEY)) ?? 0);
+  const mins = Number(process.env.CALLBACK_CHECK_MIN || 60);
+  return (Date.now() / 1000 - last) > mins * 60;
+}
+
 /**
  * The callback track — the only thing on this account that looks back.
  *
@@ -452,11 +468,19 @@ async function runCallback() {
   const hour = String(localHour());
   const doStory = forced || storyHours.includes(hour);
   const doPost = forced || postHours.includes(hour);
-  if (!doStory && !doPost) {
-    say(`SKIP — ${hour}:xx is not a callback hour `
-      + `(stories ${storyHours.join(', ')} · post ${postHours.join(', ')})`);
-    return 'none';
-  }
+  // The hour gates PUBLISHING, never CHECKING.
+  //
+  // It used to gate both, and that is why the first proof reel never
+  // happened: 26 claims sat in the table for days, every one of them
+  // still 'open', because the only code that scores a claim lived
+  // behind a gate that opened twice a day — and the reel, which asks
+  // for a PROVEN call, ran at 17:06, before the 17:41 dispatch that
+  // would have proven one. A claim nobody scores is not a claim.
+  //
+  // Scoring is cheap and has no side effect on the account: a handful
+  // of quote fetches and an UPDATE. So every dispatch scores, and the
+  // hours only decide whether anything goes out.
+  const checking = doStory || doPost || await checkDue();
 
   // ── the backfill ─────────────────────────────────────────
   // Without it the first callback card is three days away, on an
@@ -479,7 +503,11 @@ async function runCallback() {
   }
 
   const { checkAll } = await import('./callback.js');
-  const res = await checkAll(say);
+  let res = { checked: 0, hits: 0, misses: 0, open: 0 };
+  if (checking) {
+    res = await checkAll(say);
+    await setState(CHECK_KEY, Math.floor(Date.now() / 1000));
+  } else say('skipped the check — scored within the last hour');
   say(`checked ${res.checked} claim(s) — ${res.hits} hit, ${res.misses} miss, ${res.open ?? 0} still open`);
 
   const score = await claimScore(30);
@@ -493,6 +521,12 @@ async function runCallback() {
     if (out !== 'none' || !doStory) return out;
   }
   if (!doStory) return 'none';
+
+  if (!doStory && !doPost) {
+    say(`checked only — ${hour}:xx is not a publishing hour `
+      + `(stories ${storyHours.join(', ')} · post ${postHours.join(', ')})`);
+    return 'none';
+  }
 
   const cap = Number(process.env.MAX_CALLBACKS_PER_DAY || 2);
   const done = await callbacksToday();
