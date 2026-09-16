@@ -146,11 +146,24 @@ function assetsIn(sentence) {
   const colon = f.indexOf(':');
   const found = [];
   for (const a of ASSETS) {
-    let at = -1;
-    for (const p of a.pat) { const m = p.exec(f); if (m) { at = m.index + m[0].length; break; } }
+    let at = -1, from = -1;
+    for (const p of a.pat) {
+      const m = p.exec(f);
+      if (m) { from = m.index; at = m.index + m[0].length; break; }
+    }
     if (at < 0) continue;
-    if (SAYS.test(f.slice(at, at + 26))) continue;                 // "X מזהיר ש…"
-    if (CITED.test(f.slice(Math.max(0, at - 30), at))) continue;   // "לפי X…"
+    if (SAYS.test(f.slice(at, at + 26))) continue;                     // "X מזהיר ש…"
+    // BEFORE THE NAME STARTS, not before it ends.
+    //
+    // This read the thirty characters ending at the END of the match,
+    // which of course end with the name itself, so the "לפי X" guard
+    // never fired once. It filed a claim that Bank of America's stock
+    // would fall off a sentence reading "…ולפי בנק אוף אמריקה החברה
+    // לא הצליחה למכור" — a line in which the bank is the source and
+    // the subject is somebody else entirely. The board would have
+    // quoted a headline about Cooper Companies over Bank of America's
+    // price, which is not a near miss; it is a different company.
+    if (CITED.test(f.slice(Math.max(0, from - 30), from))) continue;    // "לפי X…"
     found.push({ a, at });
   }
   // A name in front of the colon, with another instrument behind it,
@@ -225,6 +238,20 @@ const SNAPSHOT = [he('החוזים'), he('תמונה טכנית'), he('סיכו�
   he('נעילה'), he('המסחר באסיה'), he('אסיה מעורבת'), he('סיכום שבועי')];
 
 /**
+ * A diary is not a claim.
+ *
+ * "מה על השולחן מחר", "יום שלישי, 15 בספטמבר: היום הראשון של ישיבת
+ * הפד" — these are agendas. The body underneath often does carry a
+ * real forecast, and the extractor is right to read it, but the
+ * HEADLINE is the line a proof board quotes back as the thing we
+ * said, and quoting a calendar entry beside a price move makes the
+ * account look like it is claiming credit for a Tuesday.
+ */
+const DIARY = [he('מה על השולחן'), he('מה קורה היום'), he('היום בשוק'),
+  he('לוח השבוע'), he('השבוע בשוק'), he('מה צפוי היום'), he('סדר היום'),
+  /^יום (ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)[ ,]/];
+
+/**
  * What the message is ABOUT, when it forecasts nothing.
  *
  * Most of what the channel writes is reporting, and a pipeline that
@@ -238,7 +265,7 @@ const SNAPSHOT = [he('החוזים'), he('תמונה טכנית'), he('סיכו�
 export function subjectFrom(row) {
   const ss = sentences(row.text);
   const headline = ss[0] ?? '';
-  if (!headline || hits(SNAPSHOT, flat(headline))) return null;
+  if (!headline || hits(SNAPSHOT, flat(headline)) || hits(DIARY, flat(headline))) return null;
 
   let named = assetsIn(headline);
   // A headline with no instrument, but a body that names exactly one,
@@ -276,6 +303,12 @@ export function claimsFrom(row) {
   const out = new Map();
 
   let carried = null;              // the last instrument this message named
+  const head = sentences(text)[0] ?? '';
+  // The headline is what a proof board quotes. If it is an agenda,
+  // nothing in this message can be published as a claim of ours —
+  // the forecast in the body may be perfectly real, but there is no
+  // honest line to put on the card above the number.
+  if (hits(DIARY, flat(head))) return [];
   for (const s of sentences(text)) {
     const here = assetsIn(s);
     if (here.length === 1) carried = here[0];

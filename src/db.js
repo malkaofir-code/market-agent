@@ -275,12 +275,20 @@ export const provenSince = (days = 7, limit = 3) =>
  * because "we said this would happen" is a different sentence from
  * "we were on this early" and only one of them is a prediction.
  */
-export const provenForReel = (days = 7) =>
-  q(`select * from agent.claims
+export async function provenForReel(days = 7) {
+  // The film has a beat that says WHY, and it is the beat that makes
+  // the whole thing an argument rather than a boast. So a claim that
+  // carries the channel's own reasoning wins over a bigger number
+  // that carries none — and a reel is only built without one when
+  // nothing in the window has one at all.
+  const pick = async where => (await q(
+    `select * from agent.claims
      where status in ('hit','shown') and in_reel_at is null
        and checked_at > extract(epoch from now())::bigint - $1 * 86400
-     order by (kind = 'forecast') desc, abs(move_pct) desc limit 1`, [days])
-    .then(r => r.rows[0] ?? null);
+       and length(coalesce(headline,'')) >= 20 ${where}
+     order by (kind = 'forecast') desc, abs(move_pct) desc limit 1`, [days])).rows[0] ?? null;
+  return await pick(`and length(coalesce(reason,'')) >= 30`) ?? await pick('');
+}
 
 export const markClaimReeled = id =>
   q(`update agent.claims set in_reel_at = extract(epoch from now())::bigint
