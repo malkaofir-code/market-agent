@@ -743,9 +743,19 @@ async function runReel() {
   // are the belt that holds it when a dispatch fires twice or a hand
   // dispatches one on top of the schedule. Same shape as the story
   // rails, and counted from local midnight for the same reason.
+  // 'now' lifts the daily cap as well as the spacing.
+  //
+  // The cap is a real limit for the SCHEDULE — two films a day split
+  // the same audience across both — and it is exactly wrong for the
+  // one thing a person does at the console: publish the format they
+  // just built, today, rather than waiting for tomorrow's slot. A
+  // forced reel is somebody deciding on purpose; the cron cannot
+  // reach this branch.
+  const forcedReel = process.env.IGNORE_SCHEDULE === '1';
   const cap = Number(process.env.MAX_REELS_PER_DAY || 2);
   const made = await reelsToday();
-  if (!DRY && made >= cap) { say(`SKIP — reel cap reached (${made}/${cap})`); return; }
+  if (!DRY && !forcedReel && made >= cap) { say(`SKIP — reel cap reached (${made}/${cap})`); return; }
+  if (forcedReel && made >= cap) say(`cap already spent today (${made}/${cap}) — forced, going anyway`);
 
   // 'now' on the dispatch lifts the spacing rail as well as the hour
   // gate — the same way 'catchup' lifts the story gap. Deliberately
