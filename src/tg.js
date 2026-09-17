@@ -31,11 +31,19 @@ export async function alert(client, text) {
  * subscription and not a scraper: it is the file arriving on the
  * phone with its caption, ready to upload by hand in half a minute.
  *
- * Sent to TG_ALERT_TARGET, which defaults to Saved Messages.
+ * Sent to TG_ALERT_TARGET, and 'me' is a trap worth naming: it is the
+ * Saved Messages of the account whose SESSION this is — the one that
+ * reads the source channel — which is not necessarily the account on
+ * the phone that has to do the uploading. Two reels were handed off
+ * successfully and neither was ever found. Name the human.
+ *
+ * Saved Messages stays as the fallback rather than the default: if the
+ * username cannot be resolved the film still lands somewhere it can be
+ * fetched from, and the log says which.
  */
 export async function deliver(client, file, caption = '') {
   const to = process.env.TG_ALERT_TARGET || 'me';
-  await client.sendFile(to, {
+  const send = where => client.sendFile(where, {
     file,
     caption: caption.slice(0, 1000),
     // Telegram compresses a document; a reel handed back squashed is
@@ -43,4 +51,13 @@ export async function deliver(client, file, caption = '') {
     forceDocument: false,
     supportsStreaming: true,
   });
+  try {
+    await send(to);
+    return to;
+  } catch (e) {
+    if (to === 'me') throw e;
+    console.warn(`hand-off to ${to} failed (${e.message}) — falling back to Saved Messages`);
+    await send('me');
+    return 'me';
+  }
 }

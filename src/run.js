@@ -1359,8 +1359,8 @@ async function handOff(file, caption) {
   let c = null;
   try {
     c = await connect(); await c.connect();
-    await deliver(c, file, caption);
-    say('handed the mp4 to Telegram for cross-posting');
+    const to = await deliver(c, file, caption);
+    say(`handed the mp4 to Telegram (${to}) for cross-posting`);
   } catch (e) { say(`telegram hand-off failed — ${e.message}`); }
   finally {
     if (c) { try { await c.disconnect(); } catch {} try { await c.destroy(); } catch {} }

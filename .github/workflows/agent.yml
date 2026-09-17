@@ -412,7 +412,10 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_SESSION: ${{ secrets.TG_SESSION }}
           TG_SOURCE_CHANNEL: ${{ secrets.TG_SOURCE_CHANNEL }}
-          TG_ALERT_TARGET: me
+          # The human who uploads, not 'me'. 'me' is Saved Messages of
+          # the session account — the reader of the source channel —
+          # and a film delivered there is delivered to nobody.
+          TG_ALERT_TARGET: '@ofir_malka'
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           IG_HANDLE: marketalert.il
