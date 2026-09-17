@@ -1303,6 +1303,21 @@ export function composeCallbackPost(hits, { now = null, score = null } = {}) {
   };
 }
 
+/**
+ * The words somebody types into Instagram's search box.
+ *
+ * Search is a real discovery surface now and this account is invisible
+ * in it: the captions were written for a reader who had already found
+ * the post. These are the terms a person actually types in Hebrew when
+ * they want to know what the market did — put in the caption prose as
+ * well as the tags, because the index reads both and a reader only
+ * reads one.
+ */
+export function searchLine() {
+  return 'שוק ההון האמריקאי · מה קרה היום בשוק · חדשות וול סטריט\n'
+       + '#שוקההון #וולסטריט #מסחר #בורסה #השקעות #נאסדק #מניות';
+}
+
 // ── the proof reel ───────────────────────────────────────────
 //
 // Six beats, and the sequence is the argument: the claim, the date,
@@ -1351,8 +1366,59 @@ export function composeProofReel(claim, { now = null, score = null } = {}) {
     + `פורסם ${dmy(Number(claim.posted_at))} · ${claim.asset} ${figure} תוך ${days}\n`
     + (why ? `למה: ${why}\n` : '')
     + `\nכל מספר נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, `
-    + `בלי לבחור תאריכים בדיעבד.\n@marketalert.il\n#שוקההון #מסחר #וולסטריט`;
+    + `בלי לבחור תאריכים בדיעבד.\n\n${searchLine()}\n@marketalert.il`;
 
   return { key: `R:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
     stamp: '', quotes: [], slides, caption, claimId: claim.id, proof: true };
+}
+
+// ── the scoreboard reel ──────────────────────────────────────
+//
+// Once a week, the record itself as the film. Not a call — the
+// COLUMN of calls, which is the only thing that answers the question
+// a stranger actually has about a finance account: does this one
+// know what it is talking about, and how would I know.
+//
+// It runs on a Sunday, when the US market is shut and there is no
+// news worth a bulletin — the emptiest slot in the week, given to the
+// piece with the longest shelf life.
+export function composeScoreboardReel(hits, { now = null, score = null, days = 30 } = {}) {
+  const at = now ?? Math.floor(Date.now() / 1000);
+  if (!hits?.length) return { skip: 'nothing proven' };
+  const n = score?.hit ?? hits.length;
+
+  const row = h => {
+    const move = Number(h.move_pct);
+    return {
+      type: 'sceneProof', beat: 'row', ron: null, ground: 'sheet',
+      dir: move >= 0 ? 'up' : 'dn',
+      eyebrow: `${h.asset} · ${dmy(Number(h.posted_at))}`,
+      big: `${move > 0 ? '+' : ''}${move.toFixed(1)}%`,
+      headline: cut(h.headline, 60),
+      sub: `${sessions(Number(h.days_after) || 1)} אחרי הפוסט`,
+    };
+  };
+
+  const slides = [
+    { type: 'sceneProof', beat: 'hook', ground: 'verd',
+      headline: `${n}\nקריאות.\nהשוק אישר.`,
+      sub: `${days} הימים האחרונים` },
+    ...hits.slice(0, 3).map(row),
+    { type: 'sceneProof', beat: 'record', ron: null, ground: 'sheet',
+      eyebrow: 'איך זה נמדד', big: String(n),
+      headline: 'קריאות שהשוק אישר',
+      sub: 'ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, עד שלושה ימי מסחר. '
+         + 'בלי בחירת תאריכים בדיעבד.' },
+  ];
+
+  const lines = hits.slice(0, 3).map(h =>
+    `▪ ${dmy(Number(h.posted_at))} · ${h.asset} ${Number(h.move_pct) > 0 ? '+' : ''}`
+    + `${Number(h.move_pct).toFixed(1)}% — ${h.headline ?? ''}`).join('\n');
+  const caption = `${n} קריאות שהשוק אישר ב-${days} הימים האחרונים\n\n${lines}\n\n`
+    + 'כל מספר נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
+    + 'עד שלושה ימי מסחר, בלי לבחור תאריכים בדיעבד.\n'
+    + `${searchLine()}\n@marketalert.il`;
+
+  return { key: `R:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
+    stamp: '', quotes: [], slides, caption, scoreboard: true, claimIds: hits.map(h => h.id) };
 }

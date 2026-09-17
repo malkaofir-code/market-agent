@@ -215,7 +215,7 @@ jobs:
           # into, and still blocks the duplicate firing it is for, which
           # arrives seconds apart rather than an hour.
           MIN_MINUTES_BETWEEN_STORIES: '75'
-          MAX_STORIES_PER_DAY: '14'
+          MAX_STORIES_PER_DAY: '8'
           # A story is about the hour it belongs to. More than two
           # windows behind and it is news, not "now".
           MAX_STORY_LAG_WINDOWS: '2'
@@ -242,8 +242,27 @@ jobs:
           # fallback. Set REEL_PROOF to '0' to go back.
           REEL_PROOF: '1'
           PROOF_REEL_DAYS: '7'
-          REEL_HOURS: '17'
-          MAX_REELS_PER_DAY: '1'
+          # Three films a day, not one.
+          #
+          # Stories reach followers; the reel is the only surface a
+          # stranger is ever served. The account was publishing eleven
+          # stories and one reel a day and reaching about a dozen
+          # people — eleven units of work buying no audience at all.
+          # The stories dropped to four slots and the difference went
+          # here: two proof films and one day summary.
+          REEL_HOURS: '9,13,17'
+          MAX_REELS_PER_DAY: '3'
+          # One slot a day stays the news. Three proof films would be
+          # three arguments and no bulletin, and a viewer who only
+          # meets the account being right about last week never learns
+          # it covers this morning.
+          REEL_SUMMARY_HOURS: '17'
+          # And once a week, the record itself: Sunday noon, when the
+          # US market is shut and there is no bulletin worth making.
+          REEL_SCORE_HOURS: '12'
+          REEL_SCORE_DAY: 'Sun'
+          SCORE_REEL_MIN: '3'
+          SCORE_REEL_DAYS: '30'
           # And "the day" means the last twenty-four hours, not since
           # midnight. At five in the afternoon the US session that
           # matters is last night's, and a window starting at midnight
@@ -252,7 +271,7 @@ jobs:
           # Hours, not minutes. A reel is the only surface a stranger
           # sees; two of them an hour apart split the same audience
           # across both and teach the ranker that neither held anyone.
-          MIN_MINUTES_BETWEEN_REELS: '180'
+          MIN_MINUTES_BETWEEN_REELS: '150'
           # Five beats plus the opener and the close: seven cards, and
           # enough of the day to be a summary rather than a headline.
           REEL_BEATS: '5'

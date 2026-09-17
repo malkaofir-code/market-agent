@@ -290,6 +290,21 @@ export async function provenForReel(days = 7) {
   return await pick(`and length(coalesce(reason,'')) >= 30`) ?? await pick('');
 }
 
+/**
+ * The most recent proven calls, for the weekly scoreboard.
+ *
+ * Unlike provenForReel this does NOT care whether a call has already
+ * been told: the scoreboard is the record, and a record that skips
+ * the ones you have already seen is not a record. Newest first,
+ * because "this week" is the claim the film is making.
+ */
+export const provenLately = (days = 30, limit = 3) =>
+  q(`select * from agent.claims
+     where status in ('hit','shown')
+       and checked_at > extract(epoch from now())::bigint - $1 * 86400
+       and length(coalesce(headline,'')) >= 20
+     order by checked_at desc limit $2`, [days, limit]).then(r => r.rows);
+
 export const markClaimReeled = id =>
   q(`update agent.claims set in_reel_at = extract(epoch from now())::bigint
      where id = $1`, [id]);

@@ -21,10 +21,11 @@ import {
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
   putClaims, bestHit, markClaimShown, claimScore, callbacksToday, publishedMessages,
   provenSince, markClaimsPosted, callbackPostsToday, provenForReel, markClaimReeled,
+  provenLately,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
 import { compose, composeStories, composeReel, composeCallback, composeCallbackPost,
-  composeProofReel, windowOf, WIN } from './compose.js';
+  composeProofReel, composeScoreboardReel, windowOf, WIN } from './compose.js';
 import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
 import { connect, alert } from './tg.js';
@@ -81,6 +82,11 @@ function stampKey(at = Math.floor(Date.now() / 1000)) {
 const localHour = () => Number(new Intl.DateTimeFormat('en-GB',
   { timeZone: process.env.TZ || 'Asia/Jerusalem', hour: '2-digit', hour12: false })
   .format(new Date()));
+
+/** 'Sun' … 'Sat', in Israel — the scoreboard reel's one slot a week. */
+const localDayName = () => new Intl.DateTimeFormat('en-GB',
+  { timeZone: process.env.TZ || 'Asia/Jerusalem', weekday: 'short' })
+  .format(new Date());
 
 const TZ = process.env.TZ || 'Asia/Jerusalem';
 
@@ -811,7 +817,33 @@ async function runReel() {
   // So on any day one is available, that is the film. The day summary
   // is the fallback, not the format.
   let rows = [], tpl = null, tplRecent = null, deck = null, proofHit = null;
-  if (process.env.REEL_PROOF !== '0') {
+  const hourList = k => (process.env[k] || '').split(',').map(x => x.trim()).filter(Boolean);
+  const hourNow = String(localHour());
+  // One slot a day still belongs to the day summary. Three proof
+  // films a day would be three arguments and no news, and a viewer
+  // who only ever meets the account being right about last week
+  // never finds out it covers this morning.
+  const summaryHours = hourList('REEL_SUMMARY_HOURS').length
+    ? hourList('REEL_SUMMARY_HOURS') : ['17'];
+  const scoreHours = hourList('REEL_SCORE_HOURS');
+  const scoreDay = (process.env.REEL_SCORE_DAY || 'Sun').trim();
+  const scoreSlot = scoreHours.includes(hourNow) && localDayName() === scoreDay;
+
+  // ── the weekly scoreboard ────────────────────────────────
+  // Sunday, when the US market is shut and there is no bulletin worth
+  // making: the emptiest slot in the week, given to the piece with
+  // the longest shelf life.
+  if (scoreSlot && process.env.REEL_PROOF !== '0') {
+    const recent = await provenLately(Number(process.env.SCORE_REEL_DAYS || 30), 3);
+    const min = Number(process.env.SCORE_REEL_MIN || 3);
+    if (recent.length >= min) {
+      const score = (await claimScore(30)).reduce((a, r) => a + Number(r.hit || 0), 0);
+      deck = composeScoreboardReel(recent, { score: { hit: score } });
+      say(`scoreboard reel — ${score} confirmed in 30d, showing ${recent.length}`);
+    } else say(`scoreboard: only ${recent.length} proven call(s) (need ${min}) — skipping it`);
+  }
+
+  if (!deck && process.env.REEL_PROOF !== '0' && !summaryHours.includes(hourNow)) {
     proofHit = await provenForReel(Number(process.env.PROOF_REEL_DAYS || 7));
     if (proofHit) {
       const score = (await claimScore(30)).reduce((a, r) => a + Number(r.hit || 0), 0);
@@ -819,7 +851,7 @@ async function runReel() {
       say(`proof reel — ${proofHit.kind} on ${proofHit.symbol}: `
         + `${proofHit.move_pct}% in ${proofHit.days_after} session(s)`);
     } else say('no proven call waiting — falling back to the day summary');
-  }
+  } else if (!deck) say(`${hourNow}:xx is the day-summary slot`);
 
   if (!deck) {
     rows = await messagesInAll(floor, now);
@@ -987,10 +1019,12 @@ async function runReel() {
     // a film that never used them.
     if (tpl) await keepTemplate(tplRecent, tpl.id);
     if (proofHit) await markClaimReeled(proofHit.id);
+    // The scoreboard RE-tells calls on purpose — it is the record, not
+    // a new claim — so it never spends them.
     await setWindow({ key: deck.key, status: 'posted', slides: bgs.length,
       posted_at: Math.floor(Date.now() / 1000) });
     await setPublished(deck.key, { media_id: r.id, permalink: r.permalink,
-      choices: { kind: proofHit ? 'proof-reel' : 'reel',
+      choices: { kind: deck.scoreboard ? 'scoreboard-reel' : proofHit ? 'proof-reel' : 'reel',
         ...(tpl ? { template: String(tpl.id), name: tpl.name } : {}),
         ...(proofHit ? { claim: proofHit.id, symbol: proofHit.symbol,
                          move: proofHit.move_pct, days: proofHit.days_after } : {}),

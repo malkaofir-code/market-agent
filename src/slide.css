@@ -961,3 +961,16 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 .a-sp2 .pf-chart .pl{height:520px}
 .a-sp2 .pf-chart .pl-px{font-size:34px}
 .a-sp2 .pf-chart .pl-then{font-size:28px}
+
+/* the scoreboard's per-call card */
+/* Every row here is a CONFIRMED call, so every row is the same
+   colour. Colouring the ups green and the downs black would put the
+   direction back into the palette, and the whole reason this world
+   reads without explanation is that green means verified and nothing
+   else. A confirmed fall is as good a row as a confirmed rally. */
+.a-sp2 .sp-big.up,.a-sp2 .sp-big.dn{color:var(--fg)}
+.a-sp2 .sp-row-h{font-size:46px;font-weight:700;line-height:1.24;margin:26px 0 0;
+  color:var(--dim2)}
+/* The hook carries a number and three short lines; it needs the room
+   the single-sentence hook does not. */
+.a-sp2 .sp-hook{white-space:pre-line}

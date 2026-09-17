@@ -151,6 +151,13 @@ const ARCHETYPES = {
       number: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
         <p class="sp-big">${esc(s.big)}</p>
         <p class="sp-sub">${bidi(s.sub)}</p>`,
+      // One proven call as one card, for the weekly scoreboard: the
+      // instrument and the date small, the move enormous, the headline
+      // underneath as the thing that was actually said.
+      row: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
+        <p class="sp-big ${s.dir ?? ''}">${esc(s.big)}</p>
+        <p class="sp-row-h">${bidi(s.headline)}</p>
+        <p class="sp-sub">${bidi(s.sub)}</p>`,
       record: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
         <p class="sp-rec"><b>${esc(s.big)}</b>${bidi(s.headline)}</p>
         <p class="sp-note">${bidi(s.sub)}</p>
