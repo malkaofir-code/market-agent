@@ -63,3 +63,25 @@ video.upload is included with the product; we use Direct Post, not drafts.
 All content is our own: we write it, render it and own it. Posts summarise
 publicly reported market news and state that they are information rather
 than investment advice.
+
+## The four URLs
+
+All four live on one static site, `marketalert-site`, served by GitHub Pages from a
+**public** repo on the same account. The agent repo stays private; the site repo holds
+nothing but four HTML files.
+
+| Field in the portal | URL |
+| --- | --- |
+| Terms of Service URL | `https://malkaofir-code.github.io/marketalert-site/terms.html` |
+| Privacy Policy URL | `https://malkaofir-code.github.io/marketalert-site/privacy.html` |
+| Web / Desktop URL | `https://malkaofir-code.github.io/marketalert-site/` |
+| Login Kit Redirect URI | `https://malkaofir-code.github.io/marketalert-site/callback.html` |
+
+TikTok verifies a URL property one of two ways: a DNS TXT record on a domain you own, or a
+**signature file** served under a URL prefix you control. `github.io` is not our domain, so
+DNS is out; the signature file is the route. TikTok hands over a file named
+`tiktokXXXXXXXXXXXX.txt` — it goes in the site repo root, and the verified prefix is
+`https://malkaofir-code.github.io/marketalert-site/`, which covers all four URLs above.
+
+Pages cannot be enabled on `market-agent` itself: *"Upgrade or make this repository public
+to enable Pages"*. Hence the separate public repo.
