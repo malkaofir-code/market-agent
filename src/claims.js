@@ -104,13 +104,25 @@ const FORWARD = [
 const UP = [
   'יעלה','תעלה','יעלו','לעלות','עלייה','זינוק','לזנק','ראלי','שיא','התאוששות',
   'יתמוך','תתמוך','חיובי','חיובית','אופטימי','שורי','יתחזק','תתחזק','להתחזק',
-  'הקלה','הורדת ריבית','ביקוש','זרימת כספים',
+  'הקלה','הורדת ריבית',
+  // Present tense. These are here so that a sentence REPORTING a rise
+  // trips both lists and the reader refuses, not so that reporting is
+  // read as forecasting — see the note on directionOf.
+  'מזנק','מזנקת','מזנקים','זינק','זינקה','קופץ','קופצת','מרקיע','ממריא',
+  'עולה','עולות','מתחזק','מתחזקת',
 ].map(w => he(flat(w)));
 const DOWN = [
   'ירידה','ירידות','ירד','תרד','ירדו','לרדת','צניחה','לצנוח','התרסקות','לקרוס',
   'ילחץ','תלחץ','לחץ','שלילי','שלילית','פסימי','דובי','ייחלש','תיחלש','להיחלש',
-  'הפסד','הפסדים','חשש','חששות','סיכון','מיתון','העלאת ריבית','מכסים','פיטורים',
+  'הפסד','הפסדים','חשש','חששות','מיתון','העלאת ריבית','מכסים','פיטורים',
   'תיקון','בועה','מכירות מסיביות','אינפלציה גבוהה',
+  // The same present tense, on this side. Their absence is what let
+  // "הביקוש העולמי לנפט צונח" be read as bullish: צניחה was listed
+  // and צונח was not, so the only word either list matched was
+  // ביקוש — which used to sit in UP.
+  'צונח','צונחת','צונחים','צולל','צוללת','קורס','קורסת','מתרסק','מתרסקת',
+  'נחתך','נחתכה','חתך','חתכה','מתכווץ','נחלש','נחלשת','נופל','נופלת',
+  'מאבד','מאבדת',
 ].map(w => he(flat(w)));
 
 const hits = (pats, text) => pats.some(p => p.test(text));
@@ -133,6 +145,20 @@ const PHRASE_UP = ['העלאת מחיר יעד', 'העלו את מחיר היע�
 const SAYS = /^\s*(?:מזהיר|מזהירה|מזהירים|צופה|צופים|מעריך|מעריכה|מעריכים|ממליץ|ממליצה|אמר|אמרה|אומר|טוען|טוענת|מפרסם|מפרסמת|חוזה|מודיע|מעדכן|העלה את|הוריד את|העלתה את|הורידה את)/;
 // "לפי X" / "על פי X" — the same role, marked in front instead.
 const CITED = /(?:לפי|על פי|מקור)\s*$/;
+
+// A DENIAL is not a forecast, and a denial headline is the worst line
+// there is to quote over a number. "SK Hynix מכחישה: אין הסכם סופי מול
+// אינטל" was filed as a bullish call on Intel, and when Intel then rose
+// 13% the proof film said we had called it — off a headline announcing
+// that the deal did not exist. The sentence is skipped and, like a
+// diary line, a denial in the HEADLINE disqualifies the whole message,
+// because the headline is what the card shows.
+const DENIAL = [
+  'מכחיש','מכחישה','מכחישים','הכחיש','הכחישה','מפריך','מפריכה',
+  'אין הסכם','אין עסקה','אין אישור','לא נסגר','לא נסגרה','לא סוכם',
+  'לא אושר','לא אושרה','טרם סוכם','טרם נחתם','נדחה','נדחתה',
+  'בוטל','בוטלה','שולל','שוללת',
+].map(w => he(flat(w)));
 
 // What a sentence calls the thing it already named: "אנבידיה צפויה
 // לפרסם דוחות … המניה תעלה". The direction is in the second sentence
@@ -175,6 +201,26 @@ function assetsIn(sentence) {
   return keep.map(x => x.a);
 }
 
+/**
+ * Which way the sentence says the instrument goes — or nothing.
+ *
+ * Two rules keep this honest, and both were learned the hard way.
+ *
+ * ONE WORD IS NOT A POLARITY. ביקוש used to mean "up" and סיכון used
+ * to mean "down", and neither survives contact with a real sentence:
+ * "הביקוש העולמי לנפט צונח" is demand COLLAPSING, and sanctions that
+ * raise a risk premium push a commodity UP. Both are gone. A word
+ * earns a place on these lists only if it points the same way in
+ * every sentence it can appear in.
+ *
+ * BOTH LISTS FIRING IS AN ANSWER. It returns nothing, and that is the
+ * point: "COIN עולה כ-9% … ביום שבו המדדים נסחרים בירידה" names a
+ * rise and a fall in one breath, and the fall belongs to the indices,
+ * not to COIN. Before the present tense was listed on both sides only
+ * בירידה matched, and the message was filed as a bearish call on a
+ * stock it had just said was up 9%. A reader that refuses is worth
+ * more than one that guesses.
+ */
 function directionOf(sentence) {
   const f = flat(sentence);
   if (hits(PHRASE_DN, f)) return 'dn';
@@ -280,6 +326,12 @@ export function subjectFrom(row) {
 
   const a = named[0];
   const dir = directionOf(headline) || directionOf(ss.slice(0, 3).join(' ')) || null;
+  // No direction, no follow-up. A watch card reads "the fall
+  // continued" or "the rise continued"; with nothing in that slot
+  // there is no sentence to write, and the claim still goes into the
+  // pool the proof film draws from. One such claim (CL.F, dir null)
+  // scored a 3.57% "hit" it could never have described.
+  if (!dir) return null;
   return {
     symbol: a.sym, asset: a.he, klass: a.klass, dir,
     kind: 'watch', horizon: HORIZON[a.klass] ?? 3,
@@ -309,10 +361,12 @@ export function claimsFrom(row) {
   // the forecast in the body may be perfectly real, but there is no
   // honest line to put on the card above the number.
   if (hits(DIARY, flat(head))) return [];
+  if (hits(DENIAL, flat(head))) return [];
   for (const s of sentences(text)) {
     const here = assetsIn(s);
     if (here.length === 1) carried = here[0];
     if (!hits(FORWARD, flat(s))) continue;
+    if (hits(DENIAL, flat(s))) continue;
     const dir = directionOf(s);
     if (!dir) continue;
 
