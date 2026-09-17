@@ -24,18 +24,19 @@ Description (111/120):
 > Posts our own short daily videos about the US stock market, in Hebrew, to
 > our own TikTok account on a schedule.
 
-## Still missing — all of it needs ONE verifiable domain
+## Still missing — one thing
 
-TikTok verifies a URL two ways: a **DNS record** on a domain you own, or a
-**signature file** served under a URL prefix you control. A page we do not
-control the host of can never be verified, so the policy pages have to move
-to whatever domain we pick.
+- [x] Terms of Service URL
+- [x] Privacy Policy URL
+- [x] Web/Desktop URL
+- [x] Login Kit → Redirect URI
+- [x] URL prefix verified (signature file, see below)
+- [ ] **Demo video of the end-to-end flow, recorded against the sandbox**
 
-- [ ] Terms of Service URL
-- [ ] Privacy Policy URL
-- [ ] Web/Desktop URL
-- [ ] Login Kit → Redirect URI
-- [ ] Demo video of the end-to-end flow, recorded against the sandbox
+The demo video is a REQUIRED field, and TikTok refuses to Save a form that
+has any error — so the draft still cannot be persisted, and every field has
+to be re-entered in one sitting once the video exists. This file remains the
+copy of record.
 
 Domain verification for `pull_by_url` is deliberately NOT needed: the
 publisher will use `FILE_UPLOAD` and push the mp4 straight from the runner,
@@ -85,3 +86,32 @@ DNS is out; the signature file is the route. TikTok hands over a file named
 
 Pages cannot be enabled on `market-agent` itself: *"Upgrade or make this repository public
 to enable Pages"*. Hence the separate public repo.
+
+
+## Site: live
+
+`malkaofir-code/marketalert-site` — public, GitHub Pages from `main` / root.
+Live and serving. The signature file
+`tiktokzBVQRkcdCXCU3GjeRocxpzei06p5FuRv.txt` sits in the repo root and TikTok
+reports the prefix **verified**, which covers all four URLs.
+
+## The form, re-entered and then lost
+
+Every field below was entered and accepted; only the demo video was missing,
+and Save was refused, so nothing persisted. Re-enter in this order:
+
+1. App icon → `src/assets/brand/app-icon.png`
+2. App name → `marketalert.il`
+3. Category → **Finance**
+4. Description → the 111-character line above
+5. Terms / Privacy URLs → as tabled above
+6. Platforms → **Web**, then Web/Desktop URL
+7. App review explanation → the 975-character text below
+8. Products → **Login Kit** first, then **Content Posting API**
+9. Login Kit → Redirect URI
+10. Content Posting API → **Direct Post** toggle on (this is what adds
+    `video.publish`)
+11. Demo video → upload, then Save, then Submit
+
+The app-review text had to be cut from 1114 to 975 characters — the limit is
+1000, and the portal does not say so until you paste.
