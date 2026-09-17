@@ -25,7 +25,7 @@ select cron.unschedule('market-agent-stories')
 select cron.unschedule('market-agent-digest')
   where exists (select 1 from cron.job where jobname = 'market-agent-digest');
 
-select cron.schedule('market-agent-stories', '16 4-21 * * *', $job$
+select cron.schedule('market-agent-stories', '16 6,8,10,12,15,18 * * *', $job$
   select net.http_post(
     url     := 'https://api.github.com/repos/malkaofir-code/market-agent/actions/workflows/agent.yml/dispatches',
     headers := jsonb_build_object(
@@ -57,3 +57,16 @@ $job$);
 --   select jobname, schedule, active from cron.job;
 --   select * from cron.job_run_details order by start_time desc limit 20;
 --   select status_code, created from net._http_response order by created desc limit 5;
+
+
+-- ── the six story slots ──────────────────────────────────────
+-- Six boards a day, not one an hour. The hours are UTC and chosen so
+-- they stay inside active hours on BOTH sides of the clock change:
+-- 06,08,10,12,15,18 UTC is 09,11,13,15,18,21 local in summer and
+-- 08,10,12,14,17,20 in winter. Every gap is at least two hours, well
+-- clear of MIN_MINUTES_BETWEEN_STORIES (75), so a slot that starts
+-- late still tells its hour instead of refusing itself.
+--
+-- The old 'market-agent-stories-b' second job is gone: two jobs for
+-- one track meant two places to change the cadence and one of them
+-- was always forgotten.

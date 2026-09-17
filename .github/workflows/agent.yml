@@ -197,10 +197,10 @@ jobs:
           # mode=stories on the hour and mode=digest three times a day;
           # a dispatch with no inputs is a digest.
           MODE: ${{ inputs.mode || 'digest' }}
-          # ONE board, every ninety minutes — eleven a day instead of
-          # fifty-one. Stories reach followers only, so volume there
-          # buys nothing until there is an audience to retain; the
-          # spacing is set by the cron, this is the belt.
+          # ONE board per tick. Six a day, on six cron slots two to
+          # three hours apart. Stories reach followers only, so volume
+          # there buys nothing until there is an audience to retain;
+          # the spacing is set by the cron, this is the belt.
           MAX_STORIES: '1'
           # The rail against a DOUBLE DISPATCH, not a second opinion on
           # the cadence. The cron owns the ninety minutes: its slots are
@@ -215,7 +215,7 @@ jobs:
           # into, and still blocks the duplicate firing it is for, which
           # arrives seconds apart rather than an hour.
           MIN_MINUTES_BETWEEN_STORIES: '75'
-          MAX_STORIES_PER_DAY: '8'
+          MAX_STORIES_PER_DAY: '6'
           # A story is about the hour it belongs to. More than two
           # windows behind and it is news, not "now".
           MAX_STORY_LAG_WINDOWS: '2'
@@ -242,21 +242,22 @@ jobs:
           # fallback. Set REEL_PROOF to '0' to go back.
           REEL_PROOF: '1'
           PROOF_REEL_DAYS: '7'
-          # Three films a day, not one.
+          # Four films a day.
           #
           # Stories reach followers; the reel is the only surface a
           # stranger is ever served. The account was publishing eleven
           # stories and one reel a day and reaching about a dozen
           # people — eleven units of work buying no audience at all.
-          # The stories dropped to four slots and the difference went
-          # here: two proof films and one day summary.
-          REEL_HOURS: '9,13,17'
-          MAX_REELS_PER_DAY: '3'
-          # One slot a day stays the news. Three proof films would be
-          # three arguments and no bulletin, and a viewer who only
+          # Stories now hold six slots and the reel four, three hours
+          # apart: three proof films and one day summary.
+          REEL_HOURS: '9,12,15,18'
+          MAX_REELS_PER_DAY: '4'
+          # One slot a day stays the news — the last one, so the day
+          # is finished before it is summarised. Four proof films would
+          # be four arguments and no bulletin, and a viewer who only
           # meets the account being right about last week never learns
           # it covers this morning.
-          REEL_SUMMARY_HOURS: '17'
+          REEL_SUMMARY_HOURS: '18'
           # And once a week, the record itself: Sunday noon, when the
           # US market is shut and there is no bulletin worth making.
           REEL_SCORE_HOURS: '12'
@@ -387,7 +388,7 @@ jobs:
           STALE_CHECK_HOUR: '14'
           ACTIVE_FROM_HOUR: '7'
           ACTIVE_TO_HOUR: '24'
-          MAX_POSTS_PER_DAY: '12'
+          MAX_POSTS_PER_DAY: '4'
           # Instagram's web composer starts refusing quietly when posts
           # come too fast. 35 minutes still clears a full backlog inside
           # a trading day and stays well under its patience.
