@@ -21,3 +21,26 @@ export async function alert(client, text) {
   try { await client.sendMessage(to, { message: text }); }
   catch (e) { console.error('alert failed:', e.message); }
 }
+
+/**
+ * The finished film, delivered to a human.
+ *
+ * Every platform worth cross-posting to gates automated PUBLIC posting
+ * behind an app audit — TikTok's and YouTube's both. Until one is
+ * granted, the fastest free route to a second audience is not a
+ * subscription and not a scraper: it is the file arriving on the
+ * phone with its caption, ready to upload by hand in half a minute.
+ *
+ * Sent to TG_ALERT_TARGET, which defaults to Saved Messages.
+ */
+export async function deliver(client, file, caption = '') {
+  const to = process.env.TG_ALERT_TARGET || 'me';
+  await client.sendFile(to, {
+    file,
+    caption: caption.slice(0, 1000),
+    // Telegram compresses a document; a reel handed back squashed is
+    // worse than no reel, so it goes as a video with its own bitrate.
+    forceDocument: false,
+    supportsStreaming: true,
+  });
+}

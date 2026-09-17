@@ -28,7 +28,7 @@ import { compose, composeStories, composeReel, composeCallback, composeCallbackP
   composeProofReel, composeScoreboardReel, windowOf, WIN } from './compose.js';
 import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
-import { connect, alert } from './tg.js';
+import { connect, alert, deliver } from './tg.js';
 
 const DRY = process.argv.includes('--dry') || process.env.DRY_RUN === '1';
 // Two tracks over the same channel. A digest summarises the hours
@@ -1035,6 +1035,7 @@ async function runReel() {
         voice: voices ? voices.filter(Boolean).length : 0 } });
     await recordClaims(rows, deck, { wkey: deck.key, media_id: r.id,
       permalink: r.permalink ?? null, posted_at: Math.floor(Date.now() / 1000) });
+    await handOff(mp4, deck.caption);
     await logRun(deck.key, 'reel', true, r.permalink ?? r.id);
     await notify(`🎬 ${deck.key} — reel live (${built.seconds}s)\n${r.permalink ?? ''}`);
   } catch (e) {
@@ -1339,6 +1340,31 @@ async function main() {
     permalink: result.permalink ?? null, posted_at: Math.floor(Date.now() / 1000) });
   await logRun(w.key, 'publish', true, result.permalink ?? result.id);
   await notify(`✅ ${w.key} — ${deck.slides.length} slides\n${result.permalink ?? ''}`);
+}
+
+/**
+ * Hand the finished film to a person, with its caption.
+ *
+ * TikTok and YouTube both gate automated PUBLIC posting behind an app
+ * audit, so until one is granted the second audience is reached by a
+ * human spending thirty seconds — and the only thing standing between
+ * them and that is having the file and the words on the phone. This
+ * costs nothing and needs nobody's approval.
+ *
+ * Soft in every direction: a failure here must never touch a reel
+ * that is already live.
+ */
+async function handOff(file, caption) {
+  if (process.env.REEL_HANDOFF === '0') return;
+  let c = null;
+  try {
+    c = await connect(); await c.connect();
+    await deliver(c, file, caption);
+    say('handed the mp4 to Telegram for cross-posting');
+  } catch (e) { say(`telegram hand-off failed — ${e.message}`); }
+  finally {
+    if (c) { try { await c.disconnect(); } catch {} try { await c.destroy(); } catch {} }
+  }
 }
 
 async function notify(text) {

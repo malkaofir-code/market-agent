@@ -263,6 +263,13 @@ jobs:
           REEL_SCORE_DAY: 'Sun'
           SCORE_REEL_MIN: '3'
           SCORE_REEL_DAYS: '30'
+          # Every platform worth cross-posting to gates automated
+          # PUBLIC posting behind an app audit — TikTok's and
+          # YouTube's both — and a paid scheduler's real product is
+          # that it has already passed one. Until we have our own, the
+          # film lands on the phone with its caption and a person
+          # spends thirty seconds. Set to '0' to stop.
+          REEL_HANDOFF: '1'
           # And "the day" means the last twenty-four hours, not since
           # midnight. At five in the afternoon the US session that
           # matters is last night's, and a window starting at midnight
