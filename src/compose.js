@@ -1382,7 +1382,7 @@ export function composeProofReel(claim, { now = null, score = null } = {}) {
 // It runs on a Sunday, when the US market is shut and there is no
 // news worth a bulletin — the emptiest slot in the week, given to the
 // piece with the longest shelf life.
-export function composeScoreboardReel(hits, { now = null, score = null, days = 30 } = {}) {
+export function composeScoreboardReel(hits, { now = null, score = null, days = 30, rows = 3 } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   if (!hits?.length) return { skip: 'nothing proven' };
   const n = score?.hit ?? hits.length;
@@ -1403,7 +1403,7 @@ export function composeScoreboardReel(hits, { now = null, score = null, days = 3
     { type: 'sceneProof', beat: 'hook', ground: 'verd',
       headline: `${n}\nקריאות.\nהשוק אישר.`,
       sub: `${days} הימים האחרונים` },
-    ...hits.slice(0, 3).map(row),
+    ...hits.slice(0, rows).map(row),
     { type: 'sceneProof', beat: 'record', ron: null, ground: 'sheet',
       eyebrow: 'איך זה נמדד', big: String(n),
       headline: 'קריאות שהשוק אישר',
@@ -1411,7 +1411,8 @@ export function composeScoreboardReel(hits, { now = null, score = null, days = 3
          + 'בלי בחירת תאריכים בדיעבד.' },
   ];
 
-  const lines = hits.slice(0, 3).map(h =>
+  // The film shows the strongest few; the caption is the whole record.
+  const lines = hits.map(h =>
     `▪ ${dmy(Number(h.posted_at))} · ${h.asset} ${Number(h.move_pct) > 0 ? '+' : ''}`
     + `${Number(h.move_pct).toFixed(1)}% — ${h.headline ?? ''}`).join('\n');
   const caption = `${n} קריאות שהשוק אישר ב-${days} הימים האחרונים\n\n${lines}\n\n`

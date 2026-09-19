@@ -215,7 +215,7 @@ jobs:
           # into, and still blocks the duplicate firing it is for, which
           # arrives seconds apart rather than an hour.
           MIN_MINUTES_BETWEEN_STORIES: '75'
-          MAX_STORIES_PER_DAY: '6'
+          MAX_STORIES_PER_DAY: '4'
           # A story is about the hour it belongs to. More than two
           # windows behind and it is news, not "now".
           MAX_STORY_LAG_WINDOWS: '2'
@@ -223,7 +223,7 @@ jobs:
           # hour before the US open, and the evening. The hour gate is
           # in run.js, not in the cron expression, because pg_cron
           # thinks in UTC and Israel changes its clocks twice a year.
-          DIGEST_HOURS: '8,15,21'
+          DIGEST_HOURS: '8,21'
           # ── the reel track ───────────────────────────────
           # One a day, at 17:00 local. Was two; one film that is worth
           # watching beats two that split the same audience, and the
@@ -240,7 +240,14 @@ jobs:
           # time, and closes that settled it. So on any day one is
           # waiting, that is the film; the day summary is the
           # fallback. Set REEL_PROOF to '0' to go back.
-          REEL_PROOF: '1'
+          #
+          # OFF. The single-call proof film said "we called this one"
+          # two or three times a week, which reads as an account
+          # arguing with the feed rather than reporting to it — and it
+          # spent a proven call per film, so the record was always
+          # being drained by the format that needed it most. The whole
+          # record now goes out once, on Monday, as one scoreboard.
+          REEL_PROOF: '0'
           PROOF_REEL_DAYS: '7'
           # Four films a day.
           #
@@ -250,20 +257,31 @@ jobs:
           # people — eleven units of work buying no audience at all.
           # Stories now hold six slots and the reel four, three hours
           # apart: three proof films and one day summary.
-          REEL_HOURS: '9,12,15,18'
-          MAX_REELS_PER_DAY: '4'
+          REEL_HOURS: '13,19'
+          MAX_REELS_PER_DAY: '2'
           # One slot a day stays the news — the last one, so the day
           # is finished before it is summarised. Four proof films would
           # be four arguments and no bulletin, and a viewer who only
           # meets the account being right about last week never learns
           # it covers this morning.
-          REEL_SUMMARY_HOURS: '18'
+          REEL_SUMMARY_HOURS: '19'
           # And once a week, the record itself: Sunday noon, when the
           # US market is shut and there is no bulletin worth making.
-          REEL_SCORE_HOURS: '12'
-          REEL_SCORE_DAY: 'Sun'
+          # ── the weekly claim reel ────────────────────────
+          # Monday morning, before the US opens: the quietest slot of
+          # the week, and the moment a record is worth reading. It has
+          # its own hour and its own day so it never takes a news slot
+          # — run.js adds one to the daily cap for it.
+          REEL_SCOREBOARD: '1'
+          REEL_SCORE_HOURS: '9'
+          REEL_SCORE_DAY: 'Mon'
           SCORE_REEL_MIN: '3'
           SCORE_REEL_DAYS: '30'
+          # Every proven call goes in the caption; the film shows the
+          # strongest five, because a reel with twelve rows in it is a
+          # spreadsheet nobody watches to the end.
+          SCORE_REEL_ROWS: '5'
+          SCORE_REEL_MAX: '12'
           # Every platform worth cross-posting to gates automated
           # PUBLIC posting behind an app audit — TikTok's and
           # YouTube's both — and a paid scheduler's real product is
@@ -302,6 +320,10 @@ jobs:
           MAX_CALLBACKS_PER_DAY: '2'
           # Nine in the morning, Israel. The number on the board is a
           # CLOSE, and last night's US session is settled by then.
+          # The claim STORY track is off — the record lives on the two
+          # surfaces a stranger reaches, not on the one only followers
+          # see. These hours stay for the day it comes back.
+          CALLBACK_STORY: '0'
           CALLBACK_HOURS: '9,17'
           # How often an off-hour dispatch bothers to re-score. The
           # cron fires every hour so the publishing slots land at the
@@ -312,10 +334,17 @@ jobs:
           # And one carousel at noon, on the days there is a record to
           # show. Two proven calls minimum: one is a story, a record
           # needs at least two.
-          CALLBACK_POST_HOURS: '12'
+          # ── the weekly claim post ────────────────────────
+          # Thursday afternoon, and everything that settled since last
+          # Thursday goes in it — PROOF_POST_DAYS is the seven days
+          # between editions, so nothing is shown twice and nothing is
+          # missed. Six cards plus the cover and the record board fits
+          # inside a carousel.
+          CALLBACK_POST_DAY: 'Thu'
+          CALLBACK_POST_HOURS: '15'
           MAX_CALLBACK_POSTS_PER_DAY: '1'
           PROOF_POST_MIN: '2'
-          PROOF_POST_MAX: '3'
+          PROOF_POST_MAX: '6'
           PROOF_POST_DAYS: '7'
           # How far back the first run reaches to find claims the
           # account already made. Costs nothing after that: the unique
@@ -388,7 +417,7 @@ jobs:
           STALE_CHECK_HOUR: '14'
           ACTIVE_FROM_HOUR: '7'
           ACTIVE_TO_HOUR: '24'
-          MAX_POSTS_PER_DAY: '4'
+          MAX_POSTS_PER_DAY: '3'
           # Instagram's web composer starts refusing quietly when posts
           # come too fast. 35 minutes still clears a full backlog inside
           # a trading day and stays well under its patience.

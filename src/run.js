@@ -472,8 +472,21 @@ async function runCallback() {
   const postHours = list('CALLBACK_POST_HOURS').length ? list('CALLBACK_POST_HOURS') : ['12'];
   const forced = process.env.IGNORE_SCHEDULE === '1' || DRY;
   const hour = String(localHour());
-  const doStory = forced || storyHours.includes(hour);
-  const doPost = forced || postHours.includes(hour);
+  // The claim STORY track is off.
+  //
+  // Stories reach followers, who already saw the call when it was
+  // made; being told again that we were right is the least useful
+  // thing that surface can carry. The record belongs on the two
+  // surfaces a stranger reaches — the weekly carousel and the weekly
+  // film — and nowhere else. '0' is off; unset keeps the old hours.
+  const storyOff = process.env.CALLBACK_STORY === '0';
+  // And the claim POST is weekly, not daily. A record published every
+  // day is not a record, it is a drumbeat; once a week it is a
+  // summary of everything that settled since the last one.
+  const postDay = (process.env.CALLBACK_POST_DAY || '').trim();
+  const postDayOk = !postDay || localDayName() === postDay;
+  const doStory = !storyOff && (forced || storyHours.includes(hour));
+  const doPost = forced || (postHours.includes(hour) && postDayOk);
   // The hour gates PUBLISHING, never CHECKING.
   //
   // It used to gate both, and that is why the first proof reel never
@@ -522,17 +535,21 @@ async function runCallback() {
   // The post first: it needs two proven calls, and a story published
   // seconds earlier has not consumed them — but a post is the bigger
   // surface, and on the one hour a day it runs it gets first refusal.
+  // This used to sit AFTER the two returns below, so the one line
+  // that tells you a dispatch scored and published nothing on purpose
+  // never printed once.
+  if (!doStory && !doPost) {
+    say(`checked only — ${hour}:xx is not a publishing hour `
+      + `(stories ${storyOff ? 'off' : storyHours.join(', ')} · `
+      + `post ${postHours.join(', ')}${postDay ? ` on ${postDay}` : ''})`);
+    return 'none';
+  }
+
   if (doPost) {
     const out = await runCallbackPost();
     if (out !== 'none' || !doStory) return out;
   }
   if (!doStory) return 'none';
-
-  if (!doStory && !doPost) {
-    say(`checked only — ${hour}:xx is not a publishing hour `
-      + `(stories ${storyHours.join(', ')} · post ${postHours.join(', ')})`);
-    return 'none';
-  }
 
   const cap = Number(process.env.MAX_CALLBACKS_PER_DAY || 2);
   const done = await callbacksToday();
@@ -758,7 +775,25 @@ async function runReel() {
   // forced reel is somebody deciding on purpose; the cron cannot
   // reach this branch.
   const forcedReel = process.env.IGNORE_SCHEDULE === '1';
-  const cap = Number(process.env.MAX_REELS_PER_DAY || 2);
+  const hourList = k => (process.env[k] || '').split(',').map(x => x.trim()).filter(Boolean);
+  const hourNow = String(localHour());
+  const scoreHours = hourList('REEL_SCORE_HOURS');
+  const scoreDay = (process.env.REEL_SCORE_DAY || 'Sun').trim();
+  const scoreToday = localDayName() === scoreDay;
+  const scoreSlot = scoreHours.includes(hourNow) && scoreToday;
+  // The weekly record does not come out of the daily budget.
+  //
+  // Two films a day is the rhythm; the scoreboard is a different
+  // thing that happens once a week, and making it compete with the
+  // day's news for the same two slots means the week the record is
+  // worth publishing is the week the news gets dropped.
+  //
+  // The bonus is for the whole DAY, not for the scoreboard's own
+  // hour. Spending it only at 09:00 would let the record through and
+  // then bounce the evening news off a cap that had already counted
+  // it — the scoreboard would have eaten a news slot anyway, one step
+  // further along, where it was harder to see.
+  const cap = Number(process.env.MAX_REELS_PER_DAY || 2) + (scoreToday ? 1 : 0);
   const made = await reelsToday();
   if (!DRY && !forcedReel && made >= cap) { say(`SKIP — reel cap reached (${made}/${cap})`); return; }
   if (forcedReel && made >= cap) say(`cap already spent today (${made}/${cap}) — forced, going anyway`);
@@ -817,29 +852,27 @@ async function runReel() {
   // So on any day one is available, that is the film. The day summary
   // is the fallback, not the format.
   let rows = [], tpl = null, tplRecent = null, deck = null, proofHit = null;
-  const hourList = k => (process.env[k] || '').split(',').map(x => x.trim()).filter(Boolean);
-  const hourNow = String(localHour());
   // One slot a day still belongs to the day summary. Three proof
   // films a day would be three arguments and no news, and a viewer
   // who only ever meets the account being right about last week
   // never finds out it covers this morning.
   const summaryHours = hourList('REEL_SUMMARY_HOURS').length
     ? hourList('REEL_SUMMARY_HOURS') : ['17'];
-  const scoreHours = hourList('REEL_SCORE_HOURS');
-  const scoreDay = (process.env.REEL_SCORE_DAY || 'Sun').trim();
-  const scoreSlot = scoreHours.includes(hourNow) && localDayName() === scoreDay;
-
   // ── the weekly scoreboard ────────────────────────────────
-  // Sunday, when the US market is shut and there is no bulletin worth
-  // making: the emptiest slot in the week, given to the piece with
-  // the longest shelf life.
-  if (scoreSlot && process.env.REEL_PROOF !== '0') {
-    const recent = await provenLately(Number(process.env.SCORE_REEL_DAYS || 30), 3);
+  // Monday morning, before the US opens: the quietest slot of the
+  // week, given to the piece with the longest shelf life.
+  if (scoreSlot && process.env.REEL_SCOREBOARD !== '0') {
+    // Its own switch, not REEL_PROOF's. The single-call proof film and
+    // the weekly record are two different formats and turning one off
+    // used to turn both off.
+    const days = Number(process.env.SCORE_REEL_DAYS || 30);
+    const rowsMax = Number(process.env.SCORE_REEL_ROWS || 5);
+    const recent = await provenLately(days, Number(process.env.SCORE_REEL_MAX || 12));
     const min = Number(process.env.SCORE_REEL_MIN || 3);
     if (recent.length >= min) {
       const score = (await claimScore(30)).reduce((a, r) => a + Number(r.hit || 0), 0);
-      deck = composeScoreboardReel(recent, { score: { hit: score } });
-      say(`scoreboard reel — ${score} confirmed in 30d, showing ${recent.length}`);
+      deck = composeScoreboardReel(recent, { score: { hit: score }, days, rows: rowsMax });
+      say(`scoreboard reel — ${score} confirmed in ${days}d, ${recent.length} on the card`);
     } else say(`scoreboard: only ${recent.length} proven call(s) (need ${min}) — skipping it`);
   }
 
@@ -1155,9 +1188,17 @@ async function main() {
     // August is an hour wrong in November. The cron dispatches every
     // hour; this is what makes only two of them do anything.
     const hours = (process.env.REEL_HOURS || '').split(',').map(x => x.trim()).filter(Boolean);
+    // The weekly scoreboard sits on an hour of its own, on one day of
+    // the week, precisely so it does not eat a news slot — which means
+    // this gate has to know about it, or the only run that could ever
+    // build it is turned away at the door.
+    const scoreHours = (process.env.REEL_SCORE_HOURS || '').split(',')
+      .map(x => x.trim()).filter(Boolean);
+    const scoreToday = localDayName() === (process.env.REEL_SCORE_DAY || 'Sun').trim();
+    const open = scoreToday ? [...hours, ...scoreHours] : hours;
     if (hours.length && process.env.IGNORE_SCHEDULE !== '1' && !DRY
-        && !hours.includes(String(localHour()))) {
-      say(`SKIP — ${localHour()}:xx is not a reel hour (${hours.join(', ')})`);
+        && !open.includes(String(localHour()))) {
+      say(`SKIP — ${localHour()}:xx is not a reel hour (${open.join(', ')})`);
       return;
     }
     return runReel();
