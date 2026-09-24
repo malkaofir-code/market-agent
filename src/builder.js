@@ -436,6 +436,28 @@ const ARCHETYPES = {
       r.meaning ? `<p class="row-m">${bidi(r.meaning)}</p>` : ''}</span></div>`).join('')
   }</div></div>`,
 
+  // 04e · the outlook — what the window points at, and how fast.
+  //
+  // Two short lists, up and down, never a price and never a date. The
+  // speed is a three-dot meter because "how fast" is a range: days,
+  // weeks, months. Every row says where it came from — the channel's
+  // own forecast, or our reading of a fixed mechanism (outlook.js).
+  outlook: s => {
+    const SP = { fast: ['תוך ימים', 3], mid: ['תוך שבועות', 2], slow: ['תוך חודשים', 1] };
+    const BASIS = { report: 'מהדיווח', ours: 'ההערכה שלנו' };
+    const row = r => { const [lbl, n] = SP[r.speed] ?? SP.fast; return `<div class="row">
+      <p class="nm">${bidi(r.name)}</p>
+      <span class="sp" aria-label="${lbl}"><i class="dots">${[1, 2, 3].map(k =>
+        `<b class="${k <= n ? 'on' : ''}"></b>`).join('')}</i>${bidi(lbl)}</span>
+      <p class="why">${bidi(r.why)}</p><span class="bs">${bidi(BASIS[r.basis] ?? '')}</span></div>`; };
+    const side = (k, title, rows) => rows.length ? `<section class="side ${k}">
+      <h3><span class="ar">${k === 'up' ? '▲' : '▼'}</span>${bidi(title)}</h3>${rows.map(row).join('')}</section>` : '';
+    return `<div class="a-ol"><p class="eyeb">${bidi(s.eyebrow || 'לאן זה יכול לזוז')}</p>
+    <h2>${bidi(s.title || 'מה עשוי לעלות, ומה עשוי לרדת')}</h2>
+    <div class="sides" data-protect="the outlook">${side('up', 'עשוי לעלות', s.up ?? [])}${side('dn', 'עשוי לרדת', s.dn ?? [])}</div>
+    <p class="dis">${bidi('הערכה לפי הדיווחים — לא המלצה ולא ייעוץ השקעות.')}</p></div>`;
+  },
+
   // 07 · what to watch — a single sentence, no furniture competing.
   watch: s => `<div class="a-wt"><p class="eyeb">${bidi(s.eyebrow || 'מה לעקוב')}</p>
     <p class="big">${bidi(s.text)}</p><div class="kick"></div></div>`,
@@ -589,6 +611,7 @@ const GROUND = {
   list:        'doc',     // several headlines, read as a record
   lesson:      'doc',     // a page from a notebook — the thing to keep
   brief:       'slate',
+  outlook:     'slate',
   chart:       'doc',     // levels on paper
   watch:       'flare',   // the one that shouts
   telegram:    'deep',    // the sign-off
@@ -631,7 +654,7 @@ const POSE = {
 const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed',
   // Text-first boards: the lesson needs the full measure for three
   // steps, and he has just presented the meaning on the board before.
-  'lesson', 'brief',
+  'lesson', 'brief', 'outlook',
   // The record is a table. He has nowhere to stand on it.
   'record']);
 

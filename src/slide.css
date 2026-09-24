@@ -1005,3 +1005,30 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 .a-br .row-h{font-size:42px;font-weight:800;line-height:1.24;margin:0}
 .a-br .row-m{font-size:32px;line-height:1.4;color:var(--dim2);margin:14px 0 0}
 .a-br .row-m::before{content:"💡 ";}
+
+/* ── the outlook ────────────────────────────────────────────
+   Up and down as two stacked lists, not two columns: at 1080px a
+   Hebrew reason line needs the full measure. Green and red are the
+   market's own convention and carry only the arrow and the heading;
+   the rows stay in ink so the colour never reads as a promise. */
+.a-ol{display:flex;flex-direction:column;justify-content:center;gap:26px}
+.a-ol .eyeb{margin:0}
+.a-ol h2{font-family:var(--f-disp);font-weight:800;font-size:60px;line-height:1.12;
+  letter-spacing:-.024em;margin:0;text-wrap:balance}
+.a-ol .sides{display:flex;flex-direction:column;gap:26px}
+.a-ol h3{display:flex;align-items:center;gap:16px;margin:0 0 4px;font-size:34px;font-weight:800;
+  letter-spacing:.02em}
+.a-ol .up h3{color:var(--pos)} .a-ol .dn h3{color:var(--neg)}
+.a-ol .ar{font-size:28px}
+.a-ol .row{display:grid;grid-template-columns:1fr auto;column-gap:24px;row-gap:8px;align-items:baseline;
+  padding:20px 0;border-top:1.5px solid var(--rule)}
+.a-ol .side .row:last-child{border-bottom:1.5px solid var(--rule)}
+.a-ol .nm{font-size:44px;font-weight:800;line-height:1.2;margin:0}
+.a-ol .sp{display:flex;align-items:center;gap:12px;font-size:27px;
+  font-weight:700;color:var(--dim2);white-space:nowrap}
+.a-ol .dots{display:flex;gap:6px;font-style:normal;direction:ltr}
+.a-ol .dots b{width:14px;height:14px;border-radius:50%;border:2px solid var(--dim);display:block}
+.a-ol .dots b.on{background:var(--acc);border-color:var(--acc)}
+.a-ol .why{grid-column:1/2;font-size:31px;line-height:1.36;color:var(--dim2);margin:0}
+.a-ol .bs{font-size:24px;font-weight:600;color:var(--dim);align-self:end;white-space:nowrap}
+.a-ol .dis{font-size:25px;color:var(--dim);margin:0}

@@ -7,6 +7,7 @@ import { parse, score, direction } from './parse.js';
 import { clean, stripLeadEmoji } from './rtl.js';
 import { byId } from './templates.js';
 import { lessonFor } from './lessons.js';
+import { outlookFor, outlookLine } from './outlook.js';
 import 'dotenv/config';
 
 const TZ = process.env.TZ || 'Asia/Jerusalem';
@@ -217,7 +218,7 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   // teaches — instead of seven stories and one sentence of meaning.
   // The old deck stays one variable away.
   if (process.env.DIGEST_FORMAT === 'lesson')
-    return composeLesson({ all, parsed, w, quotes, stamp, nextCarry, template, now });
+    return composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, template, now });
 
   // §04: "a story cannot appear on both the cover and a card" —
   // each message is consumed exactly once across the deck.
@@ -498,7 +499,7 @@ function briefLine(p) {
   return h.replace(/[^\p{L}\p{N}]/gu, '').length < 14 && p.stand ? p.stand : h;
 }
 
-function composeLesson({ all, parsed, w, quotes, stamp, nextCarry, template, now }) {
+function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, template, now }) {
   const at = now ?? Math.floor(Date.now() / 1000);
   const hour = Number(fmt(at, { hour: '2-digit' }));
   const slot = hour < 12 ? 'morning' : hour < 19 ? 'afternoon' : 'evening';
@@ -530,17 +531,25 @@ function composeLesson({ all, parsed, w, quotes, stamp, nextCarry, template, now
   let coverType = tpl?.cover ?? (lead.photo ? 'coverFramed' : 'cover');
   if (!lead.photo && coverType === 'coverFramed') coverType = 'coverRule';
 
+  // What the window points at. Read off the RAW rows, snapshots and
+  // all: the day's close ("תשואות ה-10 שנים בשיא") is a snapshot to the
+  // deck and the clearest driver there is to the outlook.
+  const outlook = process.env.DIGEST_OUTLOOK === '0' ? null : outlookFor(rows);
+
   const slides = [];
   slides.push({ type: coverType, index: hhmm(w.end).slice(0, 2), figure: fig,
     headline: lead.headline, stand: lead.stand, source: lead.source,
     photo: PHOTO_COVERS.has(coverType) ? lead.photo : null });
-  if (fig) slides.push({ type: 'hero', eyebrow: 'המספר', figure: fig,
+  // The cover already carries the figure; with an outlook to show, the
+  // number board is the one that gives way, so the deck stays at six.
+  if (fig && !outlook) slides.push({ type: 'hero', eyebrow: 'המספר', figure: fig,
     dir: direction(fig, `${lead.headline} ${lead.stand ?? ''}`), photo: null,
     quote: lead.stand || lead.headline, source: lead.source });
   if (lead.note) slides.push({ type: 'voice', eyebrow: 'מה זה אומר', about: lead.headline,
     text: lead.note, source: lead.source });
   if (lesson) slides.push({ type: 'lesson', eyebrow: 'השיעור', title: lesson.title,
     steps: lesson.steps, takeaway: lesson.takeaway });
+  if (outlook) slides.push({ type: 'outlook', up: outlook.up, dn: outlook.dn });
   if (others.length) slides.push({ type: 'brief',
     title: others.length === 1 ? 'עוד דבר אחד שכדאי לדעת' : 'עוד שני דברים שכדאי לדעת',
     rows: others.map((p, i) => ({ n: i + 1, headline: briefLine(p),
@@ -555,6 +564,11 @@ function composeLesson({ all, parsed, w, quotes, stamp, nextCarry, template, now
     const k = cap.lastIndexOf('\nעדכון ');
     cap = k >= 0 ? cap.slice(0, k) + line + cap.slice(k) : cap + line;
   }
+  if (outlook) {
+    const line = `${outlookLine(outlook)}\n`;
+    const k = cap.lastIndexOf('\nעדכון ');
+    cap = k >= 0 ? cap.slice(0, k + 1) + line + cap.slice(k + 1) : cap + '\n' + line;
+  }
 
   return {
     key: w.key, template, window: span(w), date: ddmmyy(w.end), stamp, quotes,
@@ -564,6 +578,8 @@ function composeLesson({ all, parsed, w, quotes, stamp, nextCarry, template, now
     // next deck would put yesterday's leftovers on top of today.
     consumed: all.map(p => p.tg_id), carry: nextCarry,
     format: 'lesson', lesson: lesson?.id ?? null,
+    outlook: outlook ? [...outlook.up, ...outlook.dn].map(({ name, dir, basis, speed, symbol }) =>
+      ({ name, dir, basis, speed, symbol: symbol ?? null })) : null,
   };
 }
 

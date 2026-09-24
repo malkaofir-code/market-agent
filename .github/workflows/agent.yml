@@ -230,6 +230,7 @@ jobs:
           # ten boards carrying seven stories, which readers found too
           # much to follow.
           DIGEST_FORMAT: 'lesson'
+          DIGEST_OUTLOOK: '1'
           # ── the reel track ───────────────────────────────
           # One a day, at 17:00 local. Was two; one film that is worth
           # watching beats two that split the same audience, and the

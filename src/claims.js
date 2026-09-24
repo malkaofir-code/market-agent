@@ -39,7 +39,9 @@ export const ASSETS = [
   { sym: 'ETHUSD', he: 'את’ריום', klass: 'crypto', pat: [he('אתריום'), he('איתריום'), /\bethereum\b/i, /\bETH\b/] },
   // ── commodities ──
   { sym: 'XAUUSD', he: 'זהב', klass: 'commodity', pat: [he('זהב'), /\bgold\b/i] },
-  { sym: 'XAGUSD', he: 'כסף', klass: 'commodity', pat: [he('הכסף'), /\bsilver\b/i] },
+  // Not he('הכסף'): in this channel that is MONEY far more often than
+  // the metal — "היצע הכסף M2 שובר שיא" was filed as a call on silver.
+  { sym: 'XAGUSD', he: 'כסף', klass: 'commodity', pat: [/\bsilver\b/i, /\bXAG/, he('מתכת הכסף'), he('זהב וכסף'), he('הזהב והכסף')] },
   { sym: 'CL.F', he: 'נפט', klass: 'commodity', pat: [he('נפט'), /\boil\b/i, /\bbrent\b/i] },
   // ── single names ──
   { sym: 'NVDA', he: 'אנבידיה', klass: 'stock', pat: [he('אנבידיה'), he('אנוידיה'), /\bnvidia\b/i, /\bNVDA\b/] },
@@ -89,11 +91,13 @@ const MARKET = [he('השוק'), he('שוקי המניות'), he('וול סטרי
 // Deliberately narrow: every word here has to be unambiguously
 // forward-looking on its own, because a report mistaken for a
 // forecast becomes a card claiming we predicted yesterday.
+// Not סיכון: "תיאבון סיכון" describes the market as it is, and a
+// sentence REPORTING risk appetite was filed as a bitcoin forecast.
 const FORWARD = [
   'צפוי', 'צפויה', 'צפויים', 'צפויות', 'עשוי', 'עשויה', 'עשויים',
   'עלול', 'עלולה', 'עלולים', 'אמור', 'אמורה', 'אמורים',
   'תחזית', 'תחזיות', 'מעריכים', 'הערכות', 'מזהיר', 'מזהירה', 'מזהירים',
-  'אזהרה', 'חשש', 'חוששים', 'סיכון', 'צופה', 'צופים', 'מצפים', 'ציפיות',
+  'אזהרה', 'חשש', 'חוששים', 'צופה', 'צופים', 'מצפים', 'ציפיות',
   'יוביל', 'תוביל', 'ישפיע', 'תשפיע', 'ילחץ', 'תלחץ', 'יתמוך', 'תתמוך',
   'יעד מחיר', 'מחיר יעד', 'המלצה', 'לקראת', 'ערב', 'בדרך ל', 'עלול להוביל',
   'אם ', 'ככל ש', 'עומד ל', 'עומדת ל', 'יכריז', 'תכריז', 'יפרסם', 'תפרסם',
@@ -101,19 +105,22 @@ const FORWARD = [
 
 // Direction, for forecast sentences. parse.js's lists are written for
 // what already moved ("ירד 2%"); these are the words a forecast uses.
+// Not שיא. "התשואות בשיא" is bad news for stocks, and "הפער … ממשיך
+// להתכווץ אחרי שהגיע לשיא" is a thing SHRINKING — both were filed as
+// bullish calls. A record says where a thing is, not which way it goes.
 const UP = [
-  'יעלה','תעלה','יעלו','לעלות','עלייה','זינוק','לזנק','ראלי','שיא','התאוששות',
+  'יעלה','תעלה','יעלו','לעלות','עלייה','זינוק','לזנק','ראלי','התאוששות',
   'יתמוך','תתמוך','חיובי','חיובית','אופטימי','שורי','יתחזק','תתחזק','להתחזק',
   'הקלה','הורדת ריבית',
   // Present tense. These are here so that a sentence REPORTING a rise
   // trips both lists and the reader refuses, not so that reporting is
   // read as forecasting — see the note on directionOf.
   'מזנק','מזנקת','מזנקים','זינק','זינקה','קופץ','קופצת','מרקיע','ממריא',
-  'עולה','עולות','מתחזק','מתחזקת',
+  'עולה','עולות','מתחזק','מתחזקת','קפיצה','קפיצת','מטפס','מטפסת','מטפסות','טיפס','טיפסה',
 ].map(w => he(flat(w)));
 const DOWN = [
   'ירידה','ירידות','ירד','תרד','ירדו','לרדת','צניחה','לצנוח','התרסקות','לקרוס',
-  'ילחץ','תלחץ','לחץ','שלילי','שלילית','פסימי','דובי','ייחלש','תיחלש','להיחלש',
+  'ילחץ','תלחץ','שלילי','שלילית','פסימי','דובי','ייחלש','תיחלש','להיחלש',
   'הפסד','הפסדים','חשש','חששות','מיתון','העלאת ריבית','מכסים','פיטורים',
   'תיקון','בועה','מכירות מסיביות','אינפלציה גבוהה',
   // The same present tense, on this side. Their absence is what let
@@ -122,7 +129,14 @@ const DOWN = [
   // ביקוש — which used to sit in UP.
   'צונח','צונחת','צונחים','צולל','צוללת','קורס','קורסת','מתרסק','מתרסקת',
   'נחתך','נחתכה','חתך','חתכה','מתכווץ','נחלש','נחלשת','נופל','נופלת',
-  'מאבד','מאבדת',
+  'מאבד','מאבדת','יורד','יורדת','יורדים','יורדות',
+  // Not the bare noun לחץ. "לחץ אינפלציוני" is prices pushed UP, "לחץ
+  // על המניה" is a price pushed down, and "טראמפ לחץ על ונצואלה" is
+  // neither: "נפט יקר עשוי … ללחץ אינפלציוני" was filed as a call that
+  // oil would FALL. The phrases that do carry it are in PHRASE_DN.
+  // "וול סטריט נסוגה" was read as bullish: נסוגה was on neither list,
+  // so the only word that matched was שיא — the YIELDS' record high.
+  'נסוג','נסוגה','נסוגים','נסוגו','מכביד','מכבידה','מכבידים',
 ].map(w => he(flat(w)));
 
 const hits = (pats, text) => pats.some(p => p.test(text));
@@ -131,7 +145,8 @@ const hits = (pats, text) => pats.some(p => p.test(text));
 // the individual words point the wrong way. "אזהרת רווח" is a profit
 // WARNING — the word רווח in it is the opposite of bullish, and a
 // word-level reader gets it backwards every time.
-const PHRASE_DN = ['אזהרת רווח', 'הורדת דירוג', 'הורידו את ההמלצה', 'המלצת מכירה',
+const PHRASE_DN = ['לרכך לחץ על מחירי', 'להקל על מחירי', 'לחץ על המניה', 'לחץ על המניות',
+  'לחץ מכירות', 'אזהרת רווח', 'הורדת דירוג', 'הורידו את ההמלצה', 'המלצת מכירה',
   'הורדת מחיר יעד', 'הורידו את מחיר היעד', 'מכירות מסיביות', 'גל מכירות']
   .map(w => he(flat(w)));
 const PHRASE_UP = ['העלאת מחיר יעד', 'העלו את מחיר היעד', 'המלצת קנייה', 'שדרוג הדירוג',
@@ -142,7 +157,7 @@ const PHRASE_UP = ['העלאת מחיר יעד', 'העלו את מחיר היע�
 // זאקס: הזהב עשוי לעלות" is a claim about gold; a reader that takes
 // every name in the sentence produced a second claim saying Goldman's
 // own stock would rise, which the message never said.
-const SAYS = /^\s*(?:מזהיר|מזהירה|מזהירים|צופה|צופים|מעריך|מעריכה|מעריכים|ממליץ|ממליצה|אמר|אמרה|אומר|טוען|טוענת|מפרסם|מפרסמת|חוזה|מודיע|מעדכן|העלה את|הוריד את|העלתה את|הורידה את)/;
+const SAYS = /^\s*(?:מזהיר|מזהירה|מזהירים|צופה|צופים|מעריך|מעריכה|מעריכים|ממליץ|ממליצה|אמר|אמרה|אומר|טוען|טוענת|מפרסם|מפרסמת|חוזה|מודיע|מעדכן|העלה את|הוריד את|העלתה את|הורידה את|כותב|כותבת|כותבים|מציין|מציינת|מדגיש|מדגישה|סבור|סבורה|רואה|רואים)/;
 // "לפי X" / "על פי X" — the same role, marked in front instead.
 const CITED = /(?:לפי|על פי|מקור)\s*$/;
 
@@ -221,7 +236,7 @@ function assetsIn(sentence) {
  * stock it had just said was up 9%. A reader that refuses is worth
  * more than one that guesses.
  */
-function directionOf(sentence) {
+export function directionOf(sentence) {
   const f = flat(sentence);
   if (hits(PHRASE_DN, f)) return 'dn';
   if (hits(PHRASE_UP, f)) return 'up';
@@ -280,7 +295,7 @@ function sentences(text) {
 // A snapshot post is the tape, not a story: "החוזים נצמדים לשפל",
 // "תמונה טכנית". Following one up two days later would produce a card
 // about a message that was never about anything.
-const SNAPSHOT = [he('החוזים'), he('תמונה טכנית'), he('סיכום מסחר'), he('פתיחת המסחר'),
+const SNAPSHOT = [he('החוזים'), he('תמונה טכנית'), he('סיכום מסחר'), he('סיכום המסחר'), he('אמצע היום'), he('פתיחת המסחר'),
   he('נעילה'), he('המסחר באסיה'), he('אסיה מעורבת'), he('סיכום שבועי')];
 
 /**
@@ -296,6 +311,17 @@ const SNAPSHOT = [he('החוזים'), he('תמונה טכנית'), he('סיכו�
 const DIARY = [he('מה על השולחן'), he('מה קורה היום'), he('היום בשוק'),
   he('לוח השבוע'), he('השבוע בשוק'), he('מה צפוי היום'), he('סדר היום'),
   /^יום (ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)[ ,]/];
+
+// Tickers and Latin company names in a headline that the table does not
+// know. Acronyms that are topics, not companies, do not count.
+const NOT_A_NAME = new Set(['AI', 'US', 'USA', 'EU', 'UK', 'CEO', 'CFO', 'IPO', 'ETF', 'GDP',
+  'CPI', 'PCE', 'PPI', 'FOMC', 'FED', 'OPEC', 'WTI', 'EPS', 'IMF', 'ECB', 'SEC']);
+function unlisted(headline) {
+  const f = flat(headline);
+  const known = s => ASSETS.some(a => a.pat.some(p => p.test(s)));
+  return (f.match(/\b[A-Z][A-Za-z&]{1,}\b/g) ?? [])
+    .some(t => !NOT_A_NAME.has(t.toUpperCase()) && !known(t));
+}
 
 /**
  * What the message is ABOUT, when it forecasts nothing.
@@ -314,6 +340,11 @@ export function subjectFrom(row) {
   if (!headline || hits(SNAPSHOT, flat(headline)) || hits(DIARY, flat(headline))) return null;
 
   let named = assetsIn(headline);
+  // A headline that names a company we do not list is still about
+  // THAT company. "FSLY קופצת 15.8%" has no asset from the table, and
+  // the body fallback below then found Bank of America — quoted in the
+  // third line as an analyst — and filed a watch claim that BAC was up.
+  if (!named.length && unlisted(headline)) return null;
   // A headline with no instrument, but a body that names exactly one,
   // is still about that one: "איגודי העובדים בטייוואן…" under an MU tag.
   if (!named.length) {
@@ -362,6 +393,10 @@ export function claimsFrom(row) {
   // honest line to put on the card above the number.
   if (hits(DIARY, flat(head))) return [];
   if (hits(DENIAL, flat(head))) return [];
+  // A tape message is the market describing itself: "📊 אמצע היום
+  // באירופה: תשואות עולות, מניות נסוגות … חוזי נאסד״ק שליליים לקראת
+  // הפגישה" is a price report with a calendar in it, not a forecast.
+  if (/^\s*📊/u.test(head) || hits(SNAPSHOT, flat(head))) return [];
   for (const s of sentences(text)) {
     const here = assetsIn(s);
     if (here.length === 1) carried = here[0];
