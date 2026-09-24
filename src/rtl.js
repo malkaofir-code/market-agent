@@ -52,7 +52,14 @@ const SINGLE = /(?<![\w.])((?:(?<![֐-׿])[+\-−])?[$€£₪]?\d+(?:[.,:\/]\d+
 // Latin runs need isolating too, or NVDA inside Hebrew drifts.
 // An ampersand pair is ONE run: isolating "NQ" and "ES" separately
 // let the & take the paragraph direction and broke the CTA line.
-const LATIN = /\b([A-Za-z][A-Za-z0-9.]{1,11}(?:\s*&\s*[A-Za-z][A-Za-z0-9.]{1,11})?)\b/gu;
+// A RUN of Latin words, not one word at a time.
+//
+// It used to isolate each English word on its own, and inside a Hebrew
+// line consecutive isolates are laid out right-to-left like everything
+// else — so "Stitch Fix" printed as "Fix Stitch" and a byline came out
+// ":Letter Kobeissi The". One isolate per run keeps the words in the
+// order they were written. "S&P" still counts as one word.
+const LATIN = /\b([A-Za-z][A-Za-z0-9.'’]{1,15}(?:(?:\s+|\s*&\s*)[A-Za-z][A-Za-z0-9.'’]{0,15}){0,5})\b/gu;
 
 // §07 — one leading decorative emoji is stripped from every slide
 // string. They stay in the caption.

@@ -6,6 +6,7 @@
 import { parse, score, direction } from './parse.js';
 import { clean, stripLeadEmoji } from './rtl.js';
 import { byId } from './templates.js';
+import { lessonFor } from './lessons.js';
 import 'dotenv/config';
 
 const TZ = process.env.TZ || 'Asia/Jerusalem';
@@ -212,6 +213,12 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   const w = endTs && endTs > w0m.end ? { ...w0m, end: endTs } : w0m;
   const { quotes, carry: nextCarry, stamp } = tape(all, carry);   // snapshots included
 
+  // The lesson format: one story, what it means, and the one thing it
+  // teaches — instead of seven stories and one sentence of meaning.
+  // The old deck stays one variable away.
+  if (process.env.DIGEST_FORMAT === 'lesson')
+    return composeLesson({ all, parsed, w, quotes, stamp, nextCarry, template, now });
+
   // §04: "a story cannot appear on both the cover and a card" —
   // each message is consumed exactly once across the deck.
   // A merged window can span half a day, and raw score then hands the
@@ -382,37 +389,11 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   // One board, last, after the news is delivered and the reader owes
   // nothing. Rotates so the same three lines are not repeated twice a
   // day for a month.
-  const ASKS = [
-    { big: 'שומרים את זה למחר', foot: 'הסקירה הבאה ב־15:00',
-      acts: [{ mark: '↓', label: 'שמרו — המספרים כאן כשתצטרכו אותם' },
-             { mark: '↗', label: 'שלחו למי שמחזיק את המניות האלה' },
-             { mark: '@', label: 'עוקבים — שלוש סקירות ביום, בעברית' }] },
-    { big: 'מה פספסנו היום?', foot: 'עונים לכל תגובה',
-      acts: [{ mark: '✎', label: 'כתבו בתגובות מה הכי הפתיע אתכם' },
-             { mark: '↓', label: 'שמרו — לחזור לזה לפני הפתיחה' },
-             { mark: '↗', label: 'שלחו לחבר שמסתכל על השוק האמריקאי' }] },
-    { big: 'הסקירה הזאת שווה שיתוף אחד', foot: 'תודה שאתם כאן',
-      acts: [{ mark: '↗', label: 'שלחו את זה הלאה — ככה החשבון גדל' },
-             { mark: '↓', label: 'שמרו לפני שזה נעלם בפיד' },
-             { mark: '@', label: 'עוקבים ל־@marketalert.il' }] },
-  ];
-  if (!isCta && slides.length < cap) {
-    const a = ASKS[Math.abs(seed) % ASKS.length];
-    slides.push({ type: 'ask', ...a });
-  }
-
-  // 06 · telegram CTA — 23:00 deck only
-  if (isCta) slides.push({ type: 'telegram', big: 'חמ״ל שוק ההון',
-    link: TG_LINK,
-    // The times the account actually keeps. This card was still
-    // advertising four digests at 08/15/18/23 — the rhythm from before
-    // the story track existed — so the one board whose entire job is
-    // to make a promise was making one the agent stopped keeping
-    // weeks ago.
-    schedule: [
-      { time: '08:00', label: 'סקירת בוקר' },
-      { time: '15:00', label: 'טרום־פתיחה' },
-      { time: '21:00', label: 'סיכום יום' }] });
+  // The closing board lives in closingBoard() now, shared with the
+  // lesson format — and it reads the schedule off DIGEST_HOURS instead
+  // of hard-coding it, because it had gone on promising a 15:00 post
+  // for days after the 15:00 post was switched off.
+  if (isCta || slides.length < cap) slides.push(closingBoard(slot, seed, hour));
 
   // Instagram needs >=2 images for a carousel, and a one-slide deck
   // is a window that had nothing to say. 7% of windows land here.
@@ -431,6 +412,158 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
     caption: caption(parsed, w),
     consumed: all.map(p => p.tg_id),   // dropped duplicates are consumed too, or they resurface next window
     carry: nextCarry,
+  };
+}
+
+// ── the account's real rhythm ────────────────────────────────
+//
+// Read from the SAME variable run.js gates the digest on. The closing
+// board and the Telegram card used to carry the schedule as literals
+// ("the next one is at 15:00", "three a day"), and when the cadence
+// changed to two posts a day the one board whose whole job is to make
+// a promise went on making one the agent no longer kept.
+function digestHours() {
+  const h = (process.env.DIGEST_HOURS || '8,21').split(',')
+    .map(x => Number(x.trim())).filter(Number.isFinite).sort((a, b) => a - b);
+  return h.length ? h : [8, 21];
+}
+const SLOT_LABEL = h => (h < 12 ? 'סקירת בוקר' : h < 19 ? 'טרום־פתיחה' : 'סיכום יום');
+const clock = h => `${String(h).padStart(2, '0')}:00`;
+const PER_DAY = { 1: 'סקירה אחת', 2: 'שתי סקירות', 3: 'שלוש סקירות', 4: 'ארבע סקירות' };
+
+/** The last board: the Telegram card in the evening, an ask otherwise. */
+function closingBoard(slot, seed, hour) {
+  const hs = digestHours();
+  if (slot === 'evening') return { type: 'telegram', big: 'חמ״ל שוק ההון', link: TG_LINK,
+    schedule: hs.map(h => ({ time: clock(h), label: SLOT_LABEL(h) })) };
+  const next = hs.find(h => h > hour) ?? hs[0];
+  const perDay = PER_DAY[hs.length] ?? `${hs.length} סקירות`;
+  // One board, last, after the news is delivered and the reader owes
+  // nothing. Specific about WHY — "save it, the numbers are here"
+  // beats "save this post", which reads as begging and is ignored.
+  const ASKS = [
+    { big: 'שומרים את זה למחר', foot: `הסקירה הבאה ב־${clock(next)}`,
+      acts: [{ mark: '↓', label: 'שמרו — ההסבר כאן כשתצטרכו אותו' },
+             { mark: '↗', label: 'שלחו למי שמתחיל להתעניין בשוק' },
+             { mark: '@', label: `עוקבים — ${perDay} ביום, בעברית פשוטה` }] },
+    { big: 'מה פספסנו היום?', foot: 'עונים לכל תגובה',
+      acts: [{ mark: '✎', label: 'כתבו בתגובות מה עוד לא ברור' },
+             { mark: '↓', label: 'שמרו — לחזור לזה לפני הפתיחה' },
+             { mark: '↗', label: 'שלחו לחבר שמסתכל על השוק האמריקאי' }] },
+    { big: 'הסקירה הזאת שווה שיתוף אחד', foot: 'תודה שאתם כאן',
+      acts: [{ mark: '↗', label: 'שלחו את זה הלאה — ככה החשבון גדל' },
+             { mark: '↓', label: 'שמרו לפני שזה נעלם בפיד' },
+             { mark: '@', label: 'עוקבים ל־@marketalert.il' }] },
+  ];
+  return { type: 'ask', ...ASKS[Math.abs(seed) % ASKS.length] };
+}
+
+/**
+ * The lesson deck: ONE story, told so a non-trader understands it.
+ *
+ *   cover   the story
+ *   number  its figure, if it has a clean one
+ *   meaning the channel's own 💡 line, presented by Ron
+ *   lesson  the mechanism behind it, as three steps (lessons.js)
+ *   brief   two other things worth knowing, one line of meaning each
+ *   close   the ask, or the Telegram card in the evening
+ *
+ * Six boards, three stories. The old deck was ten boards and seven
+ * stories, and only one of the seven ever said what it meant.
+ *
+ * The lead is chosen for what it can TEACH, not for size alone: a
+ * story carrying the channel's meaning line, and one that maps onto a
+ * lesson, outranks a slightly bigger headline that explains nothing.
+ * Freshness still counts, for the reason compose() gives.
+ */
+/**
+ * "The Kobeissi Letter: US and China agreed…" — the speaker is a
+ * credit, not a headline. It moves to the footer, where the source is
+ * already credited.
+ *
+ * Only a LATIN prefix is moved. Two reasons: an English name inside a
+ * Hebrew line is exactly what the bidi algorithm scrambles (the cover
+ * printed ":Letter Kobeissi The"), and a Hebrew prefix is usually the
+ * topic — "הפד: …" is not a byline and must stay.
+ */
+function unSpeak(p) {
+  const m = /^\s*([^:]{2,40}):\s+(.{12,})$/u.exec(p.headline ?? '');
+  if (!m || !/[A-Za-z]/.test(m[1]) || /[א-ת]/.test(m[1])) return p;
+  return { ...p, headline: m[2].trim(), source: p.source ?? m[1].trim() };
+}
+
+/** A one-line row for the brief: never a bare label like "מחר בשוק". */
+function briefLine(p) {
+  const h = p.headline ?? '';
+  return h.replace(/[^\p{L}\p{N}]/gu, '').length < 14 && p.stand ? p.stand : h;
+}
+
+function composeLesson({ all, parsed, w, quotes, stamp, nextCarry, template, now }) {
+  const at = now ?? Math.floor(Date.now() / 1000);
+  const hour = Number(fmt(at, { hour: '2-digit' }));
+  const slot = hour < 12 ? 'morning' : hour < 19 ? 'afternoon' : 'evening';
+  const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const decay = Number(process.env.SCORE_DECAY_HOURS || 4);
+  const fresh = p => p.score - (w.end - p.ts) / 3600 / decay;
+  const rank = p => fresh(p) + (p.note ? 3 : 0) + (lessonFor(p) ? 2 : 0);
+  const pool = [...parsed].sort((a, b) => rank(b) - rank(a) || b.ts - a.ts).map(unSpeak);
+
+  const lead = pool[0];
+  // The lead's own lesson if it has one; otherwise the first story in
+  // the window that does, so a deck is never without the takeaway on a
+  // day the lead happens to be a one-line flash.
+  const lesson = lessonFor(lead) ?? pool.map(lessonFor).find(Boolean) ?? null;
+  // Two more, and the ones that come with meaning first — "one more
+  // thing" is only worth a reader's time if it says why it matters.
+  const others = pool.slice(1)
+    .sort((a, b) => (b.note ? 1 : 0) - (a.note ? 1 : 0) || rank(b) - rank(a))
+    .slice(0, 2);
+
+  // A sentence with four figures in it is a table read aloud (§04), and
+  // a number with nothing attached to it is noise — the same rule the
+  // old hero used.
+  const fig = lead.figures?.length && lead.figureCount < 4
+    ? lead.figures[0].text.replace(/[−־]/g, '-') : null;
+
+  const tpl = template ? byId(template) : null;
+  const PHOTO_COVERS = new Set(['cover', 'coverFramed', 'coverBand']);
+  let coverType = tpl?.cover ?? (lead.photo ? 'coverFramed' : 'cover');
+  if (!lead.photo && coverType === 'coverFramed') coverType = 'coverRule';
+
+  const slides = [];
+  slides.push({ type: coverType, index: hhmm(w.end).slice(0, 2), figure: fig,
+    headline: lead.headline, stand: lead.stand, source: lead.source,
+    photo: PHOTO_COVERS.has(coverType) ? lead.photo : null });
+  if (fig) slides.push({ type: 'hero', eyebrow: 'המספר', figure: fig,
+    dir: direction(fig, `${lead.headline} ${lead.stand ?? ''}`), photo: null,
+    quote: lead.stand || lead.headline, source: lead.source });
+  if (lead.note) slides.push({ type: 'voice', eyebrow: 'מה זה אומר', about: lead.headline,
+    text: lead.note, source: lead.source });
+  if (lesson) slides.push({ type: 'lesson', eyebrow: 'השיעור', title: lesson.title,
+    steps: lesson.steps, takeaway: lesson.takeaway });
+  if (others.length) slides.push({ type: 'brief',
+    title: others.length === 1 ? 'עוד דבר אחד שכדאי לדעת' : 'עוד שני דברים שכדאי לדעת',
+    rows: others.map((p, i) => ({ n: i + 1, headline: briefLine(p),
+      meaning: p.note ?? p.stand ?? null, source: p.source })) });
+  slides.push(closingBoard(slot, seed, hour));
+
+  // The caption covers what the post SHOWS, and ends on the lesson —
+  // the line someone might actually save the post for.
+  let cap = caption([lead, ...others], w);
+  if (lesson) {
+    const line = `\n📘 השיעור: ${lesson.takeaway}\n`;
+    const k = cap.lastIndexOf('\nעדכון ');
+    cap = k >= 0 ? cap.slice(0, k) + line + cap.slice(k) : cap + line;
+  }
+
+  return {
+    key: w.key, template, window: span(w), date: ddmmyy(w.end), stamp, quotes,
+    slides, caption: cap,
+    // Everything in the window is spent, shown or not. Showing three
+    // stories is the point; letting the other four resurface in the
+    // next deck would put yesterday's leftovers on top of today.
+    consumed: all.map(p => p.tg_id), carry: nextCarry,
+    format: 'lesson', lesson: lesson?.id ?? null,
   };
 }
 

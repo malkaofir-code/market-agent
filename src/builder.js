@@ -390,7 +390,7 @@ const ARCHETYPES = {
   // disclaimer stays on the board: he PRESENTS the interpretation,
   // he is not being passed off as its author.
   voice: s => `<div class="a-vo">
-    <p class="eyeb">רון מסביר</p>
+    <p class="eyeb">${bidi(s.eyebrow || 'רון מסביר')}</p>
     <div class="say"><p class="txt">${bidi(s.text)}</p></div>
     ${s.about ? `<p class="abt">${bidi(s.about)}</p>` : ''}
     <p class="dis">${bidi(s.disclaimer || 'פרשנות, לא המלצה.')}</p></div>`,
@@ -411,6 +411,29 @@ const ARCHETYPES = {
     s.rows.map(r => `<div class="row"><span class="row-n">${pad2(r.n)}</span>
     <span><p class="row-h">${bidi(r.headline)}</p>${
       r.source ? `<span class="row-s">${bidi(r.source)}</span>` : ''}</span></div>`).join('')
+  }</div></div>`,
+
+  // 04c · the lesson — the mechanism behind the story, in three steps.
+  //
+  // Numbered because it IS a sequence: this, so this, so this. The
+  // takeaway sits under a rule at the foot as the one line to keep.
+  // No figures on this board by design — see lessons.js.
+  lesson: s => `<div class="a-le"><p class="eyeb">${bidi(s.eyebrow || 'השיעור')}</p>
+    <h2>${bidi(s.title)}</h2>
+    <ol class="steps" data-protect="the steps">${(s.steps ?? []).map((t, i) =>
+      `<li><span class="k">${i + 1}</span><span class="t">${bidi(t)}</span></li>`).join('')}</ol>
+    <p class="take">${bidi(s.takeaway)}</p>
+    <p class="dis">${bidi('הסבר כללי, לא המלצה.')}</p></div>`,
+
+  // 04d · the brief — two more stories, each WITH what it means.
+  //
+  // The list board it replaces carried headlines only, which is the
+  // exact thing a reader cannot use: a headline says what happened and
+  // never why it matters.
+  brief: s => `<div class="a-br"><h2>${bidi(s.title)}</h2><div class="rows" data-protect="the brief">${
+    s.rows.map(r => `<div class="row"><span class="row-n">${pad2(r.n)}</span>
+    <span><p class="row-h">${bidi(r.headline)}</p>${
+      r.meaning ? `<p class="row-m">${bidi(r.meaning)}</p>` : ''}</span></div>`).join('')
   }</div></div>`,
 
   // 07 · what to watch — a single sentence, no furniture competing.
@@ -564,6 +587,8 @@ const GROUND = {
   note:        'deep',    // interpretation — his board
   item:        'slate',   // a story with a screenshot as evidence
   list:        'doc',     // several headlines, read as a record
+  lesson:      'doc',     // a page from a notebook — the thing to keep
+  brief:       'slate',
   chart:       'doc',     // levels on paper
   watch:       'flare',   // the one that shouts
   telegram:    'deep',    // the sign-off
@@ -604,6 +629,9 @@ const POSE = {
 // edge to edge with nowhere for him to stand that is not on top of
 // it.
 const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed',
+  // Text-first boards: the lesson needs the full measure for three
+  // steps, and he has just presented the meaning on the board before.
+  'lesson', 'brief',
   // The record is a table. He has nowhere to stand on it.
   'record']);
 
