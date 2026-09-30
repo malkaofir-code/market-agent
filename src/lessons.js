@@ -20,6 +20,12 @@
 // and a wrong lesson is worse than none: it is what the reader
 // remembers.
 //
+// `event: true` marks a lesson that is about the EVENT itself — a
+// buyback, a report, a narrow market — so its takeaway can stand as
+// the cover's "what it means" line when the channel wrote none. A
+// topic lesson (oil, yields, the Fed) is true of the subject, not of
+// every story about it, and never goes on a cover.
+//
 // Rules every entry keeps:
 //   · a mechanism, never a prediction and never advice
 //   · no numbers — a lesson has to be true on any day
@@ -42,7 +48,7 @@ const W = (...words) => new RegExp(
 
 export const LESSONS = [
   {
-    id: 'breadth',
+    id: 'breadth', event: true,
     match: /רוחב|קו העלייה.?ירידה|מובילות צרה|מעט מניות|שבע המופלאות|Magnificent/i,
     title: 'כשרק כמה מניות מושכות את כל השוק',
     steps: [
@@ -53,7 +59,7 @@ export const LESSONS = [
     takeaway: 'מדד שעולה הוא לא תמיד שוק בריא. בודקים כמה מניות באמת משתתפות.',
   },
   {
-    id: 'earnings',
+    id: 'earnings', event: true,
     match: new RegExp(W('דוח','דוחות').source + '|רבעון|רווח למניה|EPS|guidance|הנחיה', 'i'),
     title: 'למה מניה יורדת גם אחרי דוח טוב',
     steps: [
@@ -117,6 +123,17 @@ export const LESSONS = [
       'VIX גבוה אומר שוק עצבני, עם תנודות חדות לשני הכיוונים',
     ],
     takeaway: 'ה־VIX לא אומר לאן השוק ילך — רק כמה חזק הוא צפוי לזוז.',
+  },
+  {
+    id: 'buyback', event: true,
+    match: /רכישה עצמית|רכישה חוזרת|buyback|לרכוש בחזרה|רוכשת בחזרה/i,
+    title: 'למה חברה קונה את המניות של עצמה',
+    steps: [
+      'לחברה יש יותר מזומן ממה שהיא צריכה לעסק',
+      'היא קונה מניות שלה מהשוק, ונשארות פחות מניות בחוץ',
+      'כל מניה שנשארה מקבלת חלק גדול יותר מהרווח',
+    ],
+    takeaway: 'רכישה עצמית אומרת שההנהלה מאמינה בחברה — אבל היא לא מבטיחה שהמניה תעלה.',
   },
   {
     id: 'ai',

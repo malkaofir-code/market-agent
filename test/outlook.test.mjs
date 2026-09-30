@@ -25,8 +25,8 @@ check('…yields at a record put growth stocks on the down side',
   o?.dn.some(x => x.name.includes('טכנולוגיה') && x.basis === 'ours'));
 check('…nothing about Bank of America or the S&P (the two misreads)',
   ![...(o?.up ?? []), ...(o?.dn ?? [])].some(x => /בנק|S&P/.test(x.name)));
-check('…at most two a side and four in all',
-  o && o.up.length <= 2 && o.dn.length <= 2 && o.up.length + o.dn.length <= 4);
+check('…at most two a side and three in all',
+  o && o.up.length <= 2 && o.dn.length <= 2 && o.up.length + o.dn.length <= 3);
 check('…every row has a speed and a basis',
   [...o.up, ...o.dn].every(x => ['fast', 'mid', 'slow'].includes(x.speed) && ['report', 'ours'].includes(x.basis)));
 check('…our own lines carry no figures',
@@ -46,7 +46,7 @@ check('mixed signals on a driver say nothing about it',
   outlookFor(R('תשואות האג"ח יורדות בבוקר', 'תשואות האג"ח עולות בערב')) === null);
 
 // ── speed ───────────────────────────────────────────────────
-const sp = outlookFor(R('אנליסטים: הזהב עשוי להמשיך לעלות בחודשים הקרובים'));
+const sp = outlookFor(R('אנליסטים: הזהב עשוי להמשיך לעלות בחודשים הקרובים\n💡 משמעות: הבנקים המרכזיים ממשיכים לקנות.'));
 check('"בחודשים הקרובים" is weeks, not days', sp?.up[0]?.speed === 'mid', sp?.up[0]?.speed);
 const sd = outlookFor(R('הדולר מתחזק מול כל המטבעות'));
 check('a strong dollar reaches earnings in months', sd?.dn[0]?.speed === 'slow', sd?.dn[0]?.speed);
@@ -56,8 +56,10 @@ const now = Math.floor(new Date('2026-09-24T05:34:00Z').getTime() / 1000);
 const deck = compose(rows, { now, endTs: rows.at(-1).ts + 60, template: 16 });
 const types = deck.slides.map(s => s.type);
 check('the deck carries the outlook, still six boards at most', types.includes('outlook') && types.length <= 6, types.join(','));
-check('…after the lesson, before the brief',
-  types.indexOf('outlook') > types.indexOf('lesson') && types.indexOf('outlook') < types.indexOf('brief'));
+check('…after the brief, before the deeper boards',
+  types.indexOf('outlook') > types.indexOf('brief') && types.indexOf('outlook') < types.indexOf('lesson'));
+check('a commentator\'s rhetorical question is not a call',
+  outlookFor(R('🗣️ Ryan Detrick: אם השורה לא הצליחה לעצור את השוק, מה כן?\nהשוק עשוי להמשיך לעלות.')) === null);
 check('…and the caption says it is an estimate', /🧭 .*\(הערכה, לא המלצה\)/.test(deck.caption));
 process.env.DIGEST_OUTLOOK = '0';
 const off = compose(rows, { now, endTs: rows.at(-1).ts + 60, template: 16 });

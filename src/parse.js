@@ -12,7 +12,9 @@
 import { clean, percents, figureCount } from './rtl.js';
 
 const NOTE = /^💡\s*משמעות\s*:\s*/;
-const SOURCE = /(?:לפי|על פי|מקור)\s+([^,.\n]{2,40})/;
+// "לפי שעון ניו יורק" is a clock, not a source — it was credited on
+// the board as "מקור: שעון ניו יורק".
+const SOURCE = /(?:לפי|על פי|מקור)\s+(?!שעון|הערכות|התחזית|הקצב|הנתונים)([^,.\n]{2,40})/;
 const TICKER = /\b(NQ|ES|YM|RTY|NDX|SPX)\b/g;
 
 // A figure's sign is often carried by the Hebrew verb, not by a

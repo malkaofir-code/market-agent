@@ -8,6 +8,7 @@ import { clean, stripLeadEmoji } from './rtl.js';
 import { byId } from './templates.js';
 import { lessonFor } from './lessons.js';
 import { outlookFor, outlookLine } from './outlook.js';
+import { glossFor } from './glossary.js';
 import 'dotenv/config';
 
 const TZ = process.env.TZ || 'Asia/Jerusalem';
@@ -499,30 +500,143 @@ function briefLine(p) {
   return h.replace(/[^\p{L}\p{N}]/gu, '').length < 14 && p.stand ? p.stand : h;
 }
 
+// ── what a beginner needs first ──────────────────────────────
+//
+// The deck is read in the order a newcomer needs it, not the order
+// the channel wrote it: the one thing that matters and what it means
+// for them, then the two other things worth knowing, then what it may
+// move. Everything after that is for whoever wants to go deeper — the
+// mechanism, and the story's own details — and says so on the board.
+// A reader who stops after the cover still leaves with the news AND
+// its meaning; the old deck made them swipe to slide two for that.
+
+// Agenda lines, commentators and the channel's own boards are useful,
+// but none of them is "the most important thing that happened".
+const AGENDA = /^(?:היום|מחר|הערב)(?:\s|[ -]?ב[- ]?\d)|צפוי(?:ים|ה|ות)? (?:להודיע|לפרסם|להופיע)|מה על השולחן|^יום (?:ראשון|שני|שלישי|רביעי|חמישי|שישי)[ ,]|לוח (?:ה)?(?:שבוע|אירועים)/;
+const BOARD = /^\s*(?:📋|📊|🗓|📅)|לוח (?:המניות|קריפטו)|^לוח /u;
+const VOICE = /^\s*🗣/u;
+// What makes a story matter to someone who is not watching the tape:
+// a name they know, the Fed, oil, or a record.
+const BIG = /אנבידיה|Nvidia|NVDA|אפל|Apple|מיקרוסופט|Microsoft|אמזון|Amazon|טסלה|Tesla|גוגל|Alphabet|מטא|Meta|הפד|ריבית|נפט|אינפלציה|מכסים|S&P ?500|נאסד"?ק|וול סטריט|ביטקוין/i;
+const RECORD = /השיא ההיסטורי|שיא (?:כל הזמנים|היסטורי)|הגדול(?:ה)? ביותר|לראשונה מאז|הנמוך ביותר מאז|הגבוה ביותר מאז/;
+
+// A US account: another economy's data is context, not the lead.
+const ABROAD = /אוסטרליה|יפן|סין|אירופ|בריטניה|גרמניה|קנדה|הודו|קוריאה|ברזיל/;
+
+/**
+ * How much a story matters to a reader who is NOT watching the tape.
+ *
+ * The digest's own score() rewards what makes a good trader's board —
+ * a 💡 line, a figure, a source — and on that scale "Australian CPI
+ * 4.0%" beat "Nvidia's record $150bn buyback", because the first came
+ * with a meaning line and the second did not. For a newcomer the
+ * second is the story. The meaning line still counts; it no longer
+ * decides.
+ */
+function importance(p) {
+  const h = stripLeadEmoji(p.headline ?? '');
+  let s = 0;
+  if (p.figures?.length) s += 1;
+  if (p.source) s += 0.5;
+  if (p.note) s += 2;
+  if (BIG.test(p.headline)) s += 4;
+  if (RECORD.test(`${p.headline} ${p.stand ?? ''}`)) s += 2.5;
+  if (ABROAD.test(h) && !/ארה"?ב|ארה״ב|וול סטריט|הפד/.test(h)) s -= 3;
+  if (AGENDA.test(h)) s -= 3;
+  if (VOICE.test(p.headline)) s -= 2.5;
+  return s;
+}
+
+// "ה-^NDX עולה 0.3% וה-^GSPC כמעט ללא שינוי" — wire symbols a beginner
+// cannot read. Only the caret and futures forms: a plain ticker like
+// NVDA is how the market names the company, and it stays.
+const SYMBOL = { '^NDX': 'נאסד״ק 100', '^GSPC': 'S&P 500', '^SPX': 'S&P 500', '^DJI': 'דאו ג׳ונס',
+  '^RUT': 'ראסל 2000', '^VIX': 'מדד הפחד', 'CL=F': 'חוזי הנפט', 'GC=F': 'חוזי הזהב', 'NQ=F': 'חוזי הנאסד״ק',
+  'ES=F': 'חוזי ה-S&P 500' };
+const plain = t => t == null ? t : stripLeadEmoji(String(t))
+  .replace(/(ה-)?(\^[A-Z]{2,5}|[A-Z]{2}=F)(?![A-Za-z])/g, (m, he, sym) => {
+    const name = SYMBOL[sym];
+    if (!name) return m;
+    if (!he) return name;
+    // "ה-^NDX" → "הנאסד״ק 100"; "ה-CL=F" → "חוזי הנפט"; "ה-^GSPC" → "ה-S&P 500"
+    return /^חוזי/.test(name) ? name : /^[A-Za-z]/.test(name) ? `ה-${name}` : `ה${name}`;
+  });
+
+/** One plain line under the headline: what it means, never the wire copy. */
+function whyLine(p) {
+  if (p.note) return plain(p.note);
+  // The standfirst, cut at its first sentence and with the channel's
+  // parenthetical glosses taken out — the glossary line explains the
+  // word, and the cover is not the place for a bracket inside a bracket.
+  const s = String(p.stand ?? '').replace(/\s*\([^)]{3,120}\)/g, '');
+  const first = s.split(/(?<=[.!?])\s+/)[0] ?? '';
+  const one = plain(first);
+  return one.length > 170 ? one.slice(0, one.lastIndexOf(' ', 165)) + '…' : one || null;
+}
+
+/**
+ * The story's own facts, for the drill-down board: one sentence per
+ * line of the message, never the paragraph. A board of three
+ * paragraphs is the wire copy again, set smaller.
+ */
+function factsOf(p, { cap = 190 } = {}) {
+  return (p.reporting ?? []).map(clean).map(l => stripLeadEmoji(l).trim())
+    .filter(l => l && !/^#/.test(l) && !/^💡/u.test(l))
+    .map(l => l.replace(/\s*#\S+/g, '').trim())
+    .map(l => plain(l.split(/(?<=[.!?])\s+(?=[^\d])/)[0]))
+    .map(l => l.length > cap ? l.slice(0, l.lastIndexOf(' ', cap - 4)) + '…' : l)
+    .filter(Boolean).slice(0, 3);
+}
+
+/** The deck's caption, in the same order as the boards. */
+function lessonCaption({ lead, why, others, outlook, lesson, w, parsed }) {
+  const LIMIT = 2120;
+  const topics = topicsIn(parsed);
+  const named = topics.slice(0, 4).map(t => t.word).join(' · ');
+  const tags = ['שוקההון', 'מסחר', ...topics.slice(0, 3).map(t => t.tag)]
+    .filter((t, i, a) => a.indexOf(t) === i).slice(0, 5).map(t => '#' + t).join(' ');
+  const head = [
+    `שוק ההון האמריקאי | ${named || 'עדכון מהמסחר'}`, '',
+    `🔑 הכי חשוב: ${plain(lead.headline)}`,
+    why ? `למה זה חשוב: ${why}` : null, '',
+    ...(others.length ? ['עוד שכדאי לדעת:', ...others.map(p =>
+      `▪ ${plain(briefLine(p))}${p.note ? `\n   💡 ${plain(p.note)}` : ''}`), ''] : []),
+    outlook ? outlookLine(outlook) : null,
+    lesson ? `📘 השיעור: ${lesson.takeaway}` : null,
+  ].filter(x => x !== null).join('\n');
+  const foot = `\nעדכון ${span(w)} · @marketalert.il\n${tags}`;
+  // The deep part goes last and is the part that gives way: a caption
+  // that runs long loses details, never the news or its meaning.
+  let deep = ['', '', '📖 לעומק:', ...factsOf(lead), lead.source ? `מקור: ${lead.source}` : null]
+    .filter(x => x !== null).join('\n');
+  while (deep && (head + deep + foot).length > LIMIT) {
+    const k = deep.lastIndexOf('\n');
+    deep = k > 12 ? deep.slice(0, k) : '';
+  }
+  return (head + deep + foot).slice(0, LIMIT);
+}
+
 function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, template, now }) {
   const at = now ?? Math.floor(Date.now() / 1000);
   const hour = Number(fmt(at, { hour: '2-digit' }));
   const slot = hour < 12 ? 'morning' : hour < 19 ? 'afternoon' : 'evening';
   const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
   const decay = Number(process.env.SCORE_DECAY_HOURS || 4);
-  const fresh = p => p.score - (w.end - p.ts) / 3600 / decay;
-  const rank = p => fresh(p) + (p.note ? 3 : 0) + (lessonFor(p) ? 2 : 0);
-  const pool = [...parsed].sort((a, b) => rank(b) - rank(a) || b.ts - a.ts).map(unSpeak);
+  const age = p => (w.end - p.ts) / 3600 / decay;
+  const rank = p => importance(p) + (lessonFor(p) ? 1 : 0) - age(p);
+  // The channel's own boards (hot-stocks table, crypto board) are
+  // lists, not stories; they feed the outlook through `rows` but never
+  // lead or fill the brief.
+  const stories = parsed.filter(p => !BOARD.test(p.headline ?? ''));
+  const pool = [...(stories.length ? stories : parsed)]
+    .sort((a, b) => rank(b) - rank(a) || b.ts - a.ts).map(unSpeak);
 
   const lead = pool[0];
-  // The lead's own lesson if it has one; otherwise the first story in
-  // the window that does, so a deck is never without the takeaway on a
-  // day the lead happens to be a one-line flash.
   const lesson = lessonFor(lead) ?? pool.map(lessonFor).find(Boolean) ?? null;
-  // Two more, and the ones that come with meaning first — "one more
-  // thing" is only worth a reader's time if it says why it matters.
-  const others = pool.slice(1)
-    .sort((a, b) => (b.note ? 1 : 0) - (a.note ? 1 : 0) || rank(b) - rank(a))
-    .slice(0, 2);
+  // Two more, meaning first, and never a second agenda line or a
+  // second commentator when a real story is available.
+  const others = pool.slice(1, 3);
 
-  // A sentence with four figures in it is a table read aloud (§04), and
-  // a number with nothing attached to it is noise — the same rule the
-  // old hero used.
   const fig = lead.figures?.length && lead.figureCount < 4
     ? lead.figures[0].text.replace(/[−־]/g, '-') : null;
 
@@ -531,51 +645,56 @@ function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, templat
   let coverType = tpl?.cover ?? (lead.photo ? 'coverFramed' : 'cover');
   if (!lead.photo && coverType === 'coverFramed') coverType = 'coverRule';
 
-  // What the window points at. Read off the RAW rows, snapshots and
-  // all: the day's close ("תשואות ה-10 שנים בשיא") is a snapshot to the
-  // deck and the clearest driver there is to the outlook.
   const outlook = process.env.DIGEST_OUTLOOK === '0' ? null : outlookFor(rows);
+  const seen = new Set();                    // each word explained once per deck
+  // The cover's second line is what the story MEANS. The channel's 💡
+  // line when it wrote one; otherwise the lesson's takeaway when the
+  // lesson is about this very story (a record buyback came with no 💡,
+  // and its standfirst only restated the headline); only then the
+  // standfirst itself.
+  // Only a lesson about the event itself (see lessons.js), and only
+  // one the HEADLINE names: "מלאי הנפט האסטרטגי בשפל" matched the oil
+  // lesson, and its takeaway ("נפט יקר … מגיע לריבית") was about a
+  // different story.
+  const own = lessonFor({ headline: lead.headline });
+  const why = lead.note ? whyLine(lead) : own?.event ? own.takeaway : whyLine(lead);
 
   const slides = [];
+  // 1 · the one thing, and what it means for you
   slides.push({ type: coverType, index: hhmm(w.end).slice(0, 2), figure: fig,
-    headline: lead.headline, stand: lead.stand, source: lead.source,
+    eyebrow: 'הכי חשוב עכשיו', headline: plain(lead.headline), stand: why, source: lead.source,
+    gloss: glossFor(`${lead.headline} ${why ?? ''}`, { max: 1, seen }),
+    swipe: 'החליקו — עוד מה שחשוב, ומה זה אומר',
     photo: PHOTO_COVERS.has(coverType) ? lead.photo : null });
-  // The cover already carries the figure; with an outlook to show, the
-  // number board is the one that gives way, so the deck stays at six.
-  if (fig && !outlook) slides.push({ type: 'hero', eyebrow: 'המספר', figure: fig,
-    dir: direction(fig, `${lead.headline} ${lead.stand ?? ''}`), photo: null,
-    quote: lead.stand || lead.headline, source: lead.source });
-  if (lead.note) slides.push({ type: 'voice', eyebrow: 'מה זה אומר', about: lead.headline,
-    text: lead.note, source: lead.source });
-  if (lesson) slides.push({ type: 'lesson', eyebrow: 'השיעור', title: lesson.title,
+  // 2 · the two other things worth knowing
+  if (others.length) {
+    const brows = others.map((p, i) => ({ n: i + 1, headline: plain(briefLine(p)),
+      // A meaning, or nothing. The standfirst under a headline only
+      // restates it, and it was being shown under the 💡 as if it
+      // explained something.
+      meaning: p.note ? whyLine(p) : lessonFor({ headline: p.headline })?.event ? lessonFor({ headline: p.headline }).takeaway : null, source: p.source }));
+    slides.push({ type: 'brief', eyebrow: 'בקצרה',
+      title: others.length === 1 ? 'עוד דבר אחד שכדאי לדעת' : 'עוד שני דברים שכדאי לדעת',
+      rows: brows, swipe: 'החליקו — לאן זה יכול להזיז את השוק',
+      gloss: glossFor(brows.map(r => `${r.headline} ${r.meaning ?? ''}`).join(' '), { max: 1, seen }) });
+  }
+  // 3 · what it may move, and how fast
+  if (outlook) slides.push({ type: 'outlook', up: outlook.up, dn: outlook.dn,
+    swipe: 'להמשך — למה זה קורה' });
+  // 4 · deeper: the mechanism
+  if (lesson) slides.push({ type: 'lesson', eyebrow: 'לעומק · למה זה קורה', title: lesson.title,
     steps: lesson.steps, takeaway: lesson.takeaway });
-  if (outlook) slides.push({ type: 'outlook', up: outlook.up, dn: outlook.dn });
-  if (others.length) slides.push({ type: 'brief',
-    title: others.length === 1 ? 'עוד דבר אחד שכדאי לדעת' : 'עוד שני דברים שכדאי לדעת',
-    rows: others.map((p, i) => ({ n: i + 1, headline: briefLine(p),
-      meaning: p.note ?? p.stand ?? null, source: p.source })) });
+  // 5 · deeper: the story's own details
+  const facts = factsOf(lead);
+  if (facts.length) slides.push({ type: 'detail', eyebrow: 'לעומק · הפרטים',
+    title: plain(lead.headline), facts, figure: fig, source: lead.source,
+    gloss: glossFor(facts.join(' '), { max: 2, seen }) });
   slides.push(closingBoard(slot, seed, hour));
-
-  // The caption covers what the post SHOWS, and ends on the lesson —
-  // the line someone might actually save the post for.
-  let cap = caption([lead, ...others], w);
-  if (lesson) {
-    const line = `\n📘 השיעור: ${lesson.takeaway}\n`;
-    const k = cap.lastIndexOf('\nעדכון ');
-    cap = k >= 0 ? cap.slice(0, k) + line + cap.slice(k) : cap + line;
-  }
-  if (outlook) {
-    const line = `${outlookLine(outlook)}\n`;
-    const k = cap.lastIndexOf('\nעדכון ');
-    cap = k >= 0 ? cap.slice(0, k + 1) + line + cap.slice(k + 1) : cap + '\n' + line;
-  }
 
   return {
     key: w.key, template, window: span(w), date: ddmmyy(w.end), stamp, quotes,
-    slides, caption: cap,
-    // Everything in the window is spent, shown or not. Showing three
-    // stories is the point; letting the other four resurface in the
-    // next deck would put yesterday's leftovers on top of today.
+    slides, caption: lessonCaption({ lead, why, others, outlook, lesson, w, parsed }),
+    // Everything in the window is spent, shown or not.
     consumed: all.map(p => p.tg_id), carry: nextCarry,
     format: 'lesson', lesson: lesson?.id ?? null,
     outlook: outlook ? [...outlook.up, ...outlook.dn].map(({ name, dir, basis, speed, symbol }) =>

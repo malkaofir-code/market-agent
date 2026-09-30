@@ -84,8 +84,15 @@ export const ASSETS = [
 // "The market", named without naming an instrument. Only these words
 // promote a sentence with no ticker in it to a claim, and only ever
 // onto the S&P — the index everyone means by "the market".
-const MARKET = [he('השוק'), he('שוקי המניות'), he('וול סטריט'), he('המדדים'),
-                he('הבורסה'), he('המניות'), /\bwall street\b/i];
+// Not "הוול סטריט ג'ורנל" — a newspaper. "…כך דיווח הוול סטריט
+// ג'ורנל" turned a story about OpenAI delaying a model into a bearish
+// call on the S&P.
+const MARKET = [he('השוק'), he('שוקי המניות'), /(?:^|[^א-ת\w])[והלבמשכ]{0,2}וול סטריט(?! ?גורנל)/, he('המדדים'),
+                he('הבורסה'), he('המניות'), /\bwall street\b(?! journal)/i];
+// A sentence about one of these is about THAT, even when it also says
+// "the market": "קפיצה חדה בתשואות … עלול להזיז את השוק" is yields
+// jumping, and the jump was read as a bullish call on the S&P.
+const DRIVER = [he('תשואות'), he('תשואת'), he('תשואה'), he('ריבית'), he('אינפלציה'), he('נפט'), he('הדולר')];
 
 // A sentence that is about something that has not happened yet.
 // Deliberately narrow: every word here has to be unambiguously
@@ -236,8 +243,16 @@ function assetsIn(sentence) {
  * stock it had just said was up 9%. A reader that refuses is worth
  * more than one that guesses.
  */
+// "…שדוחפות את מחיר הנפט מעלה" — the direction is the last word, and
+// neither list had it: the only word that matched was חשש, and oil was
+// filed as a call to FALL in a sentence about it being pushed up.
+const PUSH_UP = /(?:דוחף|דוחפת|דוחפים|דוחפות|דחף|דחפה|דחפו|מושך|מושכת|מושכים)\s+(?:את\s+)?\S+(?:\s+\S+){0,3}\s+(?:מעלה|למעלה)(?=[^א-ת]|$)/;
+const PUSH_DN = /(?:דוחף|דוחפת|דוחפים|דוחפות|דחף|דחפה|דחפו|מושך|מושכת|מושכים)\s+(?:את\s+)?\S+(?:\s+\S+){0,3}\s+(?:מטה|למטה)(?=[^א-ת]|$)/;
+
 export function directionOf(sentence) {
   const f = flat(sentence);
+  if (PUSH_UP.test(f) && !PUSH_DN.test(f)) return 'up';
+  if (PUSH_DN.test(f) && !PUSH_UP.test(f)) return 'dn';
   if (hits(PHRASE_DN, f)) return 'dn';
   if (hits(PHRASE_UP, f)) return 'up';
   const up = hits(UP, f), dn = hits(DOWN, f);
@@ -351,7 +366,7 @@ export function subjectFrom(row) {
     const body = assetsIn(ss.slice(1, 3).join(' '));
     if (body.length === 1) named = body;
   }
-  if (!named.length && hits(MARKET, flat(headline)))
+  if (!named.length && hits(MARKET, flat(headline)) && !hits(DRIVER, flat(headline)))
     named = [ASSETS.find(a => a.sym === '^SPX')];
   if (named.length !== 1) return null;      // two subjects is no subject
 
@@ -411,7 +426,7 @@ export function claimsFrom(row) {
     // A forecast about "the market" with no instrument named is a
     // forecast about the S&P. A forecast with neither is not a claim
     // this file knows how to check, and is dropped.
-    if (!named.length && hits(MARKET, flat(s)))
+    if (!named.length && hits(MARKET, flat(s)) && !hits(DRIVER, flat(s)))
       named = [ASSETS.find(a => a.sym === '^SPX')];
     if (!named.length) continue;
     // Six assets in one sentence is a list, not a claim about each.

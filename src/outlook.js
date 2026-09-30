@@ -151,7 +151,7 @@ function whyOf(c) {
  */
 export const _readDriver = (text, id) => readDriver(text, DRIVERS.find(d => d.id === id));
 
-export function outlookFor(rows, { perSide = 2, total = 4 } = {}) {
+export function outlookFor(rows, { perSide = 2, total = 3 } = {}) {
   const out = [];
   const add = r => {
     // The same thing called both ways in one window is no call at all.
@@ -161,7 +161,14 @@ export function outlookFor(rows, { perSide = 2, total = 4 } = {}) {
   };
 
   // 1 · what the channel itself forecast
-  const calls = rows.flatMap(row => claimsFrom(row)).filter(c => c.kind === 'forecast');
+  // Only forecasts the channel stood behind with its own 💡 line. A
+  // commentator's rhetorical question ("אם אפילו התחזית השורית לא עצרה
+  // את השוק, מה כן?") parses as a call on the S&P, and on a board read
+  // by beginners it is noise wearing the channel's name.
+  const own = new Set(rows.filter(r => /💡/u.test(String(r.text ?? '')) &&
+    !/^\s*\u200f?\s*🗣/u.test(String(r.text ?? ''))).map(r => Number(r.tg_id)));
+  const calls = rows.flatMap(row => claimsFrom(row))
+    .filter(c => c.kind === 'forecast' && own.has(c.tg_id));
   for (const c of calls) {
     const name = NAME[c.symbol] ?? c.asset;
     add({ name, dir: c.dir, why: whyOf(c), speed: speedOf(c.quote),

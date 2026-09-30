@@ -1032,3 +1032,27 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 .a-ol .why{grid-column:1/2;font-size:31px;line-height:1.36;color:var(--dim2);margin:0}
 .a-ol .bs{font-size:24px;font-weight:600;color:var(--dim);align-self:end;white-space:nowrap}
 .a-ol .dis{font-size:25px;color:var(--dim);margin:0}
+
+/* ── beginner-first ─────────────────────────────────────────
+   The glossary line: one word a newcomer would stop at, and what it
+   means. Quiet on purpose — it is a footnote to the board, not a
+   second headline — but in full-size text, because it is read. */
+.gls{display:flex;flex-direction:column;gap:10px;margin-top:4px;padding:18px 22px;
+  border-inline-start:6px solid var(--acc);background:color-mix(in srgb,var(--fg) 6%,transparent);
+  position:relative;z-index:3;max-width:100%}
+.gls p{margin:0;font-size:29px;line-height:1.38;color:var(--dim2)}
+.gls b{color:var(--fg);font-weight:800;margin-inline-end:12px}
+.gls b::after{content:" —";font-weight:400;color:var(--dim)}
+/* The swipe cue takes the footer's middle slot. */
+.ft-swipe{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--f-text);font-size:24px;
+  font-weight:700;color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ft-swipe i{font-style:normal;font-size:28px;line-height:1}
+/* The drill-down board. */
+.a-dt{display:flex;flex-direction:column;justify-content:center;gap:26px}
+.a-dt .eyeb{margin:0}
+.a-dt h2{font-family:var(--f-disp);font-weight:800;font-size:52px;line-height:1.16;
+  letter-spacing:-.02em;margin:0;text-wrap:balance}
+.a-dt .facts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.a-dt .facts li{font-size:34px;line-height:1.42;padding:22px 0;border-top:1.5px solid var(--rule)}
+.a-dt .facts li:last-child{border-bottom:1.5px solid var(--rule)}
+.a-br .eyeb{margin:0 0 6px}

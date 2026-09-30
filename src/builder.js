@@ -54,9 +54,12 @@ function tgStrip(link) {
 }
 
 // ── band D: footnote ─────────────────────────────────────────
-function foot(i, n, src) {
+function foot(i, n, src, swipe = null) {
+  // The first boards tell a newcomer there is more, and what: the
+  // footer's middle slot is the one place on every board that is
+  // always free, so the cue never fights the content for room.
   return `<footer class="sl-ft"><span class="ft-ix">${pad2(i)}/${pad2(n)}</span>
-<span class="ft-src">${src ? bidi(src) : ''}</span>
+${swipe ? `<span class="ft-swipe">${bidi(swipe)}<i aria-hidden="true">←</i></span>` : `<span class="ft-src">${src ? bidi(src) : ''}</span>`}
 <span class="ft-hd">${HANDLE}</span></footer>`;
 }
 
@@ -334,7 +337,7 @@ const ARCHETYPES = {
     <img class="bl-img" src="${esc(s.photo.src)}" alt="">
     <div class="bl-scrim"></div>
     <div class="bl-txt"><p class="eyeb">${bidi(s.eyebrow || 'עכשיו')}</p>
-      <h1>${bidi(s.headline)}</h1></div></div>` : ARCHETYPES.coverRule(s),
+      <h1>${bidi(s.headline)}</h1>${s.stand ? `<p class="stand">${bidi(s.stand)}</p>` : ''}</div></div>` : ARCHETYPES.coverRule(s),
 
   // 01m · cover, figure — the number at the size of the board, the
   // headline reduced to a caption. For a market account this is the
@@ -344,7 +347,7 @@ const ARCHETYPES = {
   coverFigure: s => s.figure ? `<div class="a-fg">
     <p class="eyeb">${bidi(s.eyebrow || 'עכשיו')}</p>
     <p class="fg-n">${esc(s.figure)}</p>
-    <h1>${bidi(s.headline)}</h1></div>` : ARCHETYPES.coverPoster(s),
+    <h1>${bidi(s.headline)}</h1>${s.stand ? `<p class="stand">${bidi(s.stand)}</p>` : ''}</div>` : ARCHETYPES.coverPoster(s),
 
   // 02 · hero figure — sized to its measure, not to a constant.
   hero: s => {
@@ -430,11 +433,21 @@ const ARCHETYPES = {
   // The list board it replaces carried headlines only, which is the
   // exact thing a reader cannot use: a headline says what happened and
   // never why it matters.
-  brief: s => `<div class="a-br"><h2>${bidi(s.title)}</h2><div class="rows" data-protect="the brief">${
+  brief: s => `<div class="a-br">${s.eyebrow ? `<p class="eyeb">${bidi(s.eyebrow)}</p>` : ''}<h2>${bidi(s.title)}</h2><div class="rows" data-protect="the brief">${
     s.rows.map(r => `<div class="row"><span class="row-n">${pad2(r.n)}</span>
     <span><p class="row-h">${bidi(r.headline)}</p>${
       r.meaning ? `<p class="row-m">${bidi(r.meaning)}</p>` : ''}</span></div>`).join('')
   }</div></div>`,
+
+  // 04f · the details — the drill-down, for whoever swiped this far.
+  //
+  // The lead story's own facts, as the channel wrote them, one per
+  // row. Nothing here is new to the deck's argument; it is the
+  // evidence under the cover, for the reader who wants it.
+  detail: s => `<div class="a-dt"><p class="eyeb">${bidi(s.eyebrow || 'לעומק · הפרטים')}</p>
+    <h2>${bidi(s.title)}</h2>
+    <ul class="facts" data-protect="the facts">${(s.facts ?? []).map(f =>
+      `<li>${bidi(f)}</li>`).join('')}</ul></div>`,
 
   // 04e · the outlook — what the window points at, and how fast.
   //
@@ -612,6 +625,7 @@ const GROUND = {
   lesson:      'doc',     // a page from a notebook — the thing to keep
   brief:       'slate',
   outlook:     'slate',
+  detail:      'doc',
   chart:       'doc',     // levels on paper
   watch:       'flare',   // the one that shouts
   telegram:    'deep',    // the sign-off
@@ -654,7 +668,7 @@ const POSE = {
 const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed',
   // Text-first boards: the lesson needs the full measure for three
   // steps, and he has just presented the meaning on the board before.
-  'lesson', 'brief', 'outlook',
+  'lesson', 'brief', 'outlook', 'detail',
   // The record is a table. He has nowhere to stand on it.
   'record']);
 
@@ -731,6 +745,14 @@ const coverLayer = slide => {
   return `<div class="cv-bleed"><img src="${esc(slide.photo.src)}" alt=""></div>`;
 };
 
+// "מה זה PCE?" — one plain line under the board, for the word a
+// newcomer would otherwise stop at. See glossary.js.
+function glossStrip(g) {
+  if (!g?.length) return '';
+  return `<div class="gls" data-protect="the glossary">${g.map(x =>
+    `<p><b>${bidi(x.term)}</b><span>${bidi(x.says)}</span></p>`).join('')}</div>`;
+}
+
 export function buildSlide(slide, ctx, i, n, { story = false, layer = null } = {}) {
   const body = ARCHETYPES[slide.type];
   if (!body) throw new Error(`unknown archetype: ${slide.type}`);
@@ -791,9 +813,9 @@ export function buildSlide(slide, ctx, i, n, { story = false, layer = null } = {
   // of counting slides.
   const isProof = PROOF.has(slide.type);
   const head = isProof ? proofHead(ctx, slide) : masthead(ctx);
-  const tail = isProof ? proofFoot(slide) : foot(i + 1, n, slide.source);
+  const tail = isProof ? proofFoot(slide) : foot(i + 1, n, slide.source, i + 1 < n ? slide.swipe : null);
   return `<div class="slide${lay}${story && !reel ? ' slide--story' + alt : ''}${reel ? ' slide--reel' : ''}${cover ? ' slide--cover' : ''}${isProof ? ' slide--proof' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
-${head}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
+${head}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${glossStrip(slide.gloss)}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${tail}</div>`;
 }
 

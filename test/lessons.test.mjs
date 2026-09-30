@@ -32,9 +32,10 @@ const deck = compose(rows, { now, endTs: rows.at(-1).ts + 60, template: 16 });
 const types = deck.slides.map(s => s.type);
 check('six boards at most (the old deck was ten)', deck.slides.length <= 6, `(${deck.slides.length}: ${types})`);
 check('it teaches exactly one lesson', types.filter(t => t === 'lesson').length === 1);
-check('the lead says what it means', types.includes('voice'));
-check('the brief carries a meaning on every row',
-  (deck.slides.find(s => s.type === 'brief')?.rows ?? []).every(r => r.meaning));
+check('the cover says what the lead means', !!deck.slides[0].stand);
+check('a brief row shows a meaning or nothing — never its own standfirst again',
+  (deck.slides.find(s => s.type === 'brief')?.rows ?? []).every(r =>
+    r.meaning == null || !r.headline.includes(r.meaning.slice(0, 20))));
 check('no byline left in a headline (":Letter Kobeissi The")',
   !deck.slides.some(s => /Kobeissi/.test(s.headline ?? '')));
 check('the caption ends on the lesson', /📘 השיעור:/.test(deck.caption));
