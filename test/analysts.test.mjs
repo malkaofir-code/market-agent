@@ -23,7 +23,8 @@ check('"raised to" reads the NEW target', analystCall(rows[1]).target, '$884');
 check('firm on a later line still counts', analystCall(rows[3]).firm, 'Barclays');
 check('downgrade is red', analystCall(rows[3]).dir, 'dn');
 const d = composeAnalysts(rows, { now: 1790100000 });
-check('deck is a cover and one board', d.slides.map(x => x.type).join(), 'cover,analysts');
+check('deck is a cover and boards of three', d.slides.map(x => x.type).join(), 'cover,analysts,analysts');
+check('no board has more than three rows', d.slides.filter(x => x.type === 'analysts').every(x => x.rows.length <= 3), true);
 check('every board disclaims', d.slides.filter(x => x.type === 'analysts').every(x => x.note === ANALYST_DISCLAIMER), true);
 check('caption says it is not investment advice', d.caption.includes('אינו יועץ השקעות'), true);
 check('cover says it is not our recommendation', d.slides[0].stand.includes('לא ההמלצה שלנו'), true);
@@ -42,13 +43,17 @@ check('a story never cites itself', noteFor('Zeta Global', pool, { skip: 1 }).ab
 check('empty pool is no note, not an invented one', noteFor('Zeta Global', []), null);
 const fx = JSON.parse(readFileSync(new URL('./fixture-simple.json', import.meta.url)));
 const st = composeStories(fx, { analysts: pool });
-check('every story board carries a note', st.slides.every(x => x.analystNote), true);
+check('a story gets a separate analyst board only when a bank covered it', st.slides.filter(x => x.type === 'analystNote').every(x => x.note.about === 'story'), true);
+const zs = composeStories([A(77, '‏Zeta Global מזנקת 12% אחרי השדרוג\n\n‏המניה קפצה.')], { analysts: pool });
+check('…and it follows the news board', zs.slides.map(x => x.type).join().endsWith('analystNote'), true);
+check('the news board carries no analyst text', zs.slides[0].analystNote ?? null, null);
 process.env.DIGEST_FORMAT = 'lesson';
 const dg = compose(fx, { analysts: pool, endTs: fx.at(-1).ts + 60 });
-check('digest cover carries a note', !!dg.slides[0].analystNote, true);
+check('digest has the analyst note on its own slide', dg.slides.some(x => x.type === 'analystNote'), true);
+check('…not on the cover', dg.slides[0].analystNote ?? null, null);
 check('digest caption has the attributed line', dg.caption.includes('לא ההמלצה שלנו'), true);
 const off = compose(fx, { endTs: fx.at(-1).ts + 60 });
-check('no pool, no note', off.slides[0].analystNote ?? null, null);
+check('no pool, no analyst slide', off.slides.some(x => x.type === 'analystNote'), false);
 
 // ── the ranked record ──
 const mkc = (i, st2, mv, dir = 'up') => ({ id: i, symbol: 'S' + i, dir, status: st2, move_pct: String(mv),

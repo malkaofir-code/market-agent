@@ -70,7 +70,7 @@ const strip = s => s.replace(/^[\s\p{Extended_Pictographic}️]+/u, '').trim();
 const firstSentence = s => (s.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? s);
 
 // Cut at a clause, not mid-phrase: a row ending "…, עם" reads as broken.
-function shorten(t, max = 120) {
+function shorten(t, max = 80) {
   if (t.length <= max) return t;
   const comma = t.lastIndexOf(',', max);
   if (comma > 50) return t.slice(0, comma).replace(/[,\s]+$/, '') + '.';
@@ -197,6 +197,21 @@ export function plainNote(n) {
     init: `${who} התחיל לעקוב${n.subject ? ` אחרי ${n.subject}` : ' אחרי מניה'}${n.target ? `, והמחיר שהוא רואה: ${n.target}` : ''}`,
     same: `${who} נשאר בדעתו${on}${n.target ? `, עם מחיר יעד של ${n.target}` : ''}`,
   }[n.act] ?? `${who} ${n.label}${on}`;
+  // The board's version: a third of the words, the meaning in the line below.
+  const sj = n.subject ?? 'מניה';
+  const t = n.target ?? '';
+  const short = {
+    up: `${n.firm} שדרג את ${sj}`, dn: `${n.firm} הוריד את ${sj}`,
+    ptup: `${n.firm} העלה יעד מחיר ל-${sj}${t ? `: ${t}` : ''}`,
+    ptdn: `${n.firm} הוריד יעד מחיר ל-${sj}${t ? `: ${t}` : ''}`,
+    init: `${n.firm} התחיל לעקוב אחרי ${sj}`, same: `${n.firm} נשאר בדעתו על ${sj}`,
+  }[n.act] ?? `${n.firm} ${n.label}`;
+  const mean = {
+    up: 'הוא חושב עליה יותר טוב מקודם', dn: 'הוא חושב עליה פחות טוב מקודם',
+    ptup: 'יעד = המחיר שהוא חושב שהמניה יכולה להגיע אליו', ptdn: 'יעד = המחיר שהוא חושב שהמניה יכולה להגיע אליו',
+    init: 'הוא התחיל לנתח את החברה', same: 'דעתו לא השתנתה',
+  }[n.act] ?? '';
   return { line: n.about === 'week' ? `השבוע בוול סטריט: ${line}` : line,
-    hint: 'דעת הבנק, לא ההמלצה שלנו' };
+    short: n.about === 'week' ? `השבוע בוול סטריט: ${short}` : short,
+    mean, hint: 'דעת הבנק, לא ההמלצה שלנו' };
 }

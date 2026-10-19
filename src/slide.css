@@ -456,17 +456,15 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide--story .tg-strip{padding:18px 26px;margin-top:18px}
 .slide--story .tg-strip .tg-a{font-size:36px}
 
-/* ── the analyst strip ────────────────────────────────────────────
-   One attributed line under a movement: which bank said what. Quiet
-   by design: it is context, not the headline. */
-.an-strip{display:flex;flex-direction:column;gap:6px;margin-top:14px;
-  padding:14px 4px 0;border-top:2px solid var(--rule);position:relative;z-index:4;color:var(--fg)}
-.an-strip .an-l{font-family:var(--f-mono);font-size:20px;font-weight:700;letter-spacing:.1em;color:var(--acc)}
-.an-strip .an-s{font-size:30px;font-weight:700;line-height:1.28;margin:0}
-.an-strip .an-h{font-size:22px;line-height:1.3;margin:0;opacity:.7}
-.slide--story .an-strip{margin-top:22px;padding-top:18px}
-.slide--story .an-strip .an-s{font-size:38px} .slide--story .an-strip .an-h{font-size:26px}
-.slide--story .an-strip .an-l{font-size:24px}
+/* ── the analysts' board: one sentence, large ── */
+.a-nt{display:flex;flex-direction:column;justify-content:center;gap:28px;min-height:60%}
+.a-nt .eyeb{margin:0}
+.a-nt .nt-s{font-family:var(--f-disp);font-weight:800;font-size:68px;line-height:1.16;margin:0;
+  text-wrap:balance}
+.a-nt .nt-m{font-size:38px;line-height:1.3;margin:0;font-weight:700;color:var(--acc)}
+.a-nt .nt-h{font-size:30px;line-height:1.3;margin:0;opacity:.72;border-top:2px solid var(--rule);
+  padding-top:20px}
+.slide--story .a-nt .nt-s{font-size:76px}
 
 /* ── Ron's board ────────────────────────────────────────────────
    The interpretation, with him presenting it. The tail on the block

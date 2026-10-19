@@ -495,6 +495,22 @@ function unSpeak(p) {
   return { ...p, headline: m[2].trim(), source: p.source ?? m[1].trim() };
 }
 
+/**
+ * Less text on a board: cut at the end of a sentence, else a comma or
+ * dash, else a word, and never past `max`. A board is read at arm's
+ * length; the caption and the drill-down keep the full line.
+ */
+export function brevity(t, max = 80) {
+  const x = String(t ?? '').replace(/\s+/g, ' ').trim();
+  if (x.length <= max) return x;
+  const head = x.slice(0, max);
+  const stop = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '));
+  if (stop > max * 0.5) return head.slice(0, stop + 1);
+  const soft = Math.max(head.lastIndexOf(', '), head.lastIndexOf(' — '), head.lastIndexOf(': '));
+  if (soft > max * 0.55) return head.slice(0, soft).replace(/[,:—\s]+$/, '');
+  return head.slice(0, head.lastIndexOf(' ')).replace(/[,:—\s]+$/, '') + '…';
+}
+
 /** A one-line row for the brief: never a bare label like "מחר בשוק". */
 function briefLine(p) {
   const h = p.headline ?? '';
@@ -674,32 +690,35 @@ function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, templat
   const slides = [];
   // 1 · the one thing, and what it means for you
   slides.push({ type: coverType, index: hhmm(w.end).slice(0, 2), figure: fig,
-    eyebrow: 'הכי חשוב עכשיו', headline: plain(lead.headline), stand: why, source: lead.source,
+    eyebrow: 'הכי חשוב עכשיו', headline: brevity(plain(lead.headline), 90), stand: brevity(why, 90), source: lead.source,
     gloss: glossFor(`${lead.headline} ${why ?? ''}`, { max: 1, seen }),
-    swipe: 'החליקו — עוד מה שחשוב, ומה זה אומר', analystNote,
+    swipe: 'החליקו — עוד מה שחשוב, ומה זה אומר',
     photo: PHOTO_COVERS.has(coverType) ? lead.photo : null });
   // 2 · the two other things worth knowing
   if (others.length) {
-    const brows = others.map((p, i) => ({ n: i + 1, headline: plain(briefLine(p)),
+    const brows = others.map((p, i) => ({ n: i + 1, headline: brevity(plain(briefLine(p)), 70),
       // A meaning, or nothing. The standfirst under a headline only
       // restates it, and it was being shown under the 💡 as if it
       // explained something.
-      meaning: p.note ? whyLine(p) : lessonFor({ headline: p.headline })?.event ? lessonFor({ headline: p.headline }).takeaway : null, source: p.source }));
+      meaning: brevity(p.note ? whyLine(p) : lessonFor({ headline: p.headline })?.event ? lessonFor({ headline: p.headline }).takeaway : null, 80) || null, source: p.source }));
     slides.push({ type: 'brief', eyebrow: 'בקצרה',
       title: others.length === 1 ? 'עוד דבר אחד שכדאי לדעת' : 'עוד שני דברים שכדאי לדעת',
       rows: brows, swipe: 'החליקו — לאן זה יכול להזיז את השוק',
       gloss: glossFor(brows.map(r => `${r.headline} ${r.meaning ?? ''}`).join(' '), { max: 1, seen }) });
   }
   // 3 · what it may move, and how fast
-  if (outlook) slides.push({ type: 'outlook', up: outlook.up, dn: outlook.dn,
+  const short = rs => rs.map(r => ({ ...r, why: brevity(r.why, 55) }));
+  if (outlook) slides.push({ type: 'outlook', up: short(outlook.up), dn: short(outlook.dn),
     swipe: 'להמשך — למה זה קורה' });
+  // 3b · the analysts' word, on a board of its own
+  if (analystNote) slides.push({ type: 'analystNote', note: analystNote, swipe: 'להמשך — למה זה קורה' });
   // 4 · deeper: the mechanism
   if (lesson) slides.push({ type: 'lesson', eyebrow: 'לעומק · למה זה קורה', title: lesson.title,
     steps: lesson.steps, takeaway: lesson.takeaway });
   // 5 · deeper: the story's own details
-  const facts = factsOf(lead);
+  const facts = factsOf(lead, { cap: 95 });
   if (facts.length) slides.push({ type: 'detail', eyebrow: 'לעומק · הפרטים',
-    title: plain(lead.headline), facts, figure: fig, source: lead.source,
+    title: brevity(plain(lead.headline), 70), facts, figure: fig, source: lead.source,
     gloss: glossFor(facts.join(' '), { max: 2, seen }) });
   slides.push(closingBoard(slot, seed, hour));
 
@@ -1205,7 +1224,7 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
     // that still says "now" is the one thing that would make the
     // track dishonest rather than merely late.
     const news = { type: 'cover', eyebrow: catchup ? hhmm(p.ts) : 'עכשיו',
-      headline: p.headline, stand: p.stand, source: p.source, photo: p.photo };
+      headline: brevity(p.headline, 100), stand: brevity(p.stand, 100), source: p.source, photo: p.photo };
     if (!seasoned) out.push(news);
     const hero = fig && p.figureCount < 4
       ? { type: 'hero', figure: fig.text.replace(/[−־]/g, '-'),
@@ -1266,9 +1285,13 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
     const pal = pick.photo
       ? DARK[(seed + i) % DARK.length]
       : (palette ?? (tpl ? (i % 2 ? tpl.b : tpl.a) : DARK[(seed + i) % DARK.length]));
-    const analystNote = analysts?.length && process.env.ANALYST_NOTE !== '0'
+    slides.push({ ...pick, palette: pal, story });
+    // The analysts' word gets a board of its own, and only when a bank
+    // actually covered THIS company: a story set is one board an hour
+    // and a second one that is not about the story is filler.
+    const an = analysts?.length && process.env.ANALYST_NOTE !== '0' && process.env.STORY_ANALYST !== '0'
       ? noteFor(`${p.headline} ${p.stand ?? ''}`, analysts, { skip: p.tg_id, seed: seed + i }) : null;
-    slides.push({ ...pick, palette: pal, story, analystNote });
+    if (an?.about === 'story') slides.push({ type: 'analystNote', note: an, palette: pal, story });
     prev = pick.type;
   }
 
@@ -1469,7 +1492,7 @@ export function proofSlide(claim, { palette = null, variant = null } = {}) {
   const dir = move >= 0 ? 'up' : 'dn';
   const forecast = claim.kind === 'forecast';
   const figure = `${move > 0 ? '+' : ''}${move.toFixed(1)}%`;
-  const said = cut(claim.headline);
+  const said = cut(claim.headline, 72);
   const sub = `${claim.asset} · ${sessions(Number(claim.days_after) || 1)} אחרי`;
   const type = variant ?? PROOF_VARIANTS[Number(claim.id ?? 0) % PROOF_VARIANTS.length];
   const path = Array.isArray(claim.path) ? claim.path : null;
@@ -1478,7 +1501,7 @@ export function proofSlide(claim, { palette = null, variant = null } = {}) {
   // stops, which is a coincidence told loudly; with it the board says
   // why we thought so, which is the only version worth publishing.
   // It is the channel's own interpretation line, never ours.
-  const why = cut(claim.reason ?? '', 150) || null;
+  const why = cut(claim.reason ?? '', 100) || null;
 
   const base = { palette, dir, figure, said, sub, type, path, why,
     fromPx: px(claim.base_px, claim.klass), toPx: px(claim.out_px, claim.klass),
@@ -1547,7 +1570,7 @@ export function originalSlide(claim) {
   return { type: 'proofOrig', palette: null, tag: 'המקור',
     eyebrow: `הפוסט המקורי · ${dmy(Number(claim.posted_at))}`,
     src: claim.src_url,
-    caption: `${claim.asset}: ככה זה פורסם, לפני התנועה. בשקף הבא, מה קרה בשוק.` };
+    caption: 'ככה זה פורסם, לפני התנועה.' };
 }
 
 /** One call per instrument, direction and market day. */
@@ -1594,7 +1617,7 @@ export function composeCallbackPost(hits, { now = null, score = null, recent = n
         asset: h.asset, when: dmy(Number(h.posted_at)),
         move: `${Number(h.move_pct) > 0 ? '+' : ''}${Number(h.move_pct).toFixed(1)}%`,
         dir: Number(h.move_pct) >= 0 ? 'up' : 'dn', ok,
-        said: cut(h.headline, 70) })),
+        said: cut(h.headline, 48) })),
       note: ok ? 'מדורגות לפי גודל התנועה לכיוון שאמרנו.'
                : 'מדורגים לפי גודל התנועה נגד מה שאמרנו. אלה הפספוסים הגדולים, לא נבחרו.',
     });
@@ -1804,7 +1827,7 @@ export function composeScoreboardReel(hits, { now = null, score = null, days = 3
 // words "לא המלצה שלנו" are on the cover, every board and the caption.
 export const ANALYST_DISCLAIMER = 'דעות של בתי השקעות כפי שדווחו בערוץ. לא המלצה שלנו ולא ייעוץ השקעות.';
 
-export function composeAnalysts(rows, { now = null, perBoard = 4, boards = 2, min = 4 } = {}) {
+export function composeAnalysts(rows, { now = null, perBoard = 3, boards = 3, min = 4 } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   const calls = analystsFrom(rows, { max: perBoard * boards });
   if (calls.length < min) return { skip: `only ${calls.length} attributed analyst move(s) (need ${min})` };
@@ -1813,8 +1836,7 @@ export function composeAnalysts(rows, { now = null, perBoard = 4, boards = 2, mi
     type: 'cover', palette: null,
     eyebrow: 'המלצות האנליסטים',
     headline: 'מה בתי ההשקעות אומרים השבוע',
-    stand: `${calls.length} שינויי דירוג ויעדי מחיר, כל אחד עם שם הבנק שאמר אותו. `
-         + 'אלה הדעות שלהם, לא ההמלצה שלנו.',
+    stand: `${calls.length} דעות, כל אחת עם שם הבית שאמר אותה. לא ההמלצה שלנו.`,
   };
   const slides = [cover];
   for (let i = 0; i < calls.length; i += perBoard) {

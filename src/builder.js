@@ -54,13 +54,6 @@ function tgStrip(link) {
 <span class="tg-a">${esc(link)}</span></div>`;
 }
 
-/** The analysts' word, printed on the board that tells the move. */
-function analystStrip(n) {
-  const p = plainNote(n);
-  return `<div class="an-strip"><span class="an-l">${bidi(n.about === 'story' ? 'מה אומר אנליסט' : 'מה אומרים האנליסטים')}</span>
-<p class="an-s">${bidi(p.line)}</p><p class="an-h">${bidi(p.hint)}</p></div>`;
-}
-
 // ── band D: footnote ─────────────────────────────────────────
 function foot(i, n, src, swipe = null) {
   // The first boards tell a newcomer there is more, and what: the
@@ -237,6 +230,14 @@ const ARCHETYPES = {
       <p class="an-tx">${bidi(r.text)}</p></li>`).join('')}</ul>
     ${s.hint ? `<p class="an-hint">${bidi(s.hint)}</p>` : ''}
     <p class="an-note">${bidi(s.note)}</p></div>`,
+
+  // 16d · the analysts' word, alone on a board: who, what they did, nothing else.
+  analystNote: s => { const p = plainNote(s.note);
+    return `<div class="a-nt">
+    <p class="eyeb">${bidi(s.note.about === 'story' ? 'מה אומר אנליסט' : 'מה אומרים האנליסטים')}</p>
+    <p class="nt-s">${bidi(p.short)}</p>
+    <p class="nt-m">${bidi(p.mean)}</p>
+    <p class="nt-h">${bidi(p.hint)}</p></div>`; },
 
   // 17 · the proof post's opening.
   coverProof: s => `<div class="a-pv">
@@ -676,6 +677,7 @@ const GROUND = {
   proofOrig:    'sheet',
   recordRows:   'sheet',
   analysts:     'doc',
+  analystNote:  'deep',
 };
 
 // Which pose suits which board. The wardrobe rotates on top of this —
@@ -707,7 +709,7 @@ const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed'
   // steps, and he has just presented the meaning on the board before.
   'lesson', 'brief', 'outlook', 'detail',
   // The record is a table. He has nowhere to stand on it.
-  'record', 'proofOrig', 'recordRows', 'analysts']);
+  'record', 'proofOrig', 'recordRows', 'analysts', 'analystNote']);
 
 /**
  * The mascot layer. `ctx.poses` is filled by render.js, which owns the
@@ -852,7 +854,7 @@ export function buildSlide(slide, ctx, i, n, { story = false, layer = null } = {
   const head = isProof ? proofHead(ctx, slide) : masthead(ctx);
   const tail = isProof ? proofFoot(slide) : foot(i + 1, n, slide.source, i + 1 < n ? slide.swipe : null);
   return `<div class="slide${lay}${story && !reel ? ' slide--story' + alt : ''}${reel ? ' slide--reel' : ''}${cover ? ' slide--cover' : ''}${isProof ? ' slide--proof' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
-${head}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${glossStrip(slide.gloss)}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${slide.analystNote ? analystStrip(slide.analystNote) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
+${head}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${glossStrip(slide.gloss)}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${tail}</div>`;
 }
 
