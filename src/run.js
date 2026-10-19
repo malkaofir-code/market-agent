@@ -19,15 +19,16 @@ import {
   setPublished, publishedSince, putInsight, performanceBy,
   lastStoryAt, reelsToday, lastReelAt,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
-  putClaims, bestHit, markClaimShown, claimScore, claimRecord, settledForecasts, analystPostsSince, callbacksToday, publishedMessages,
+  putClaims, bestHit, markClaimShown, claimScore, claimRecord, settledForecasts, settledForecastsAll, analystPostsSince, callbacksToday, publishedMessages,
   provenSince, markClaimsPosted, callbackPostsToday, provenForReel, markClaimReeled,
   provenLately,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
 import { compose, composeStories, composeReel, composeCallback, composeCallbackPost,
-  composeProofReel, composeScoreboardReel, composeAnalysts, windowOf, WIN } from './compose.js';
+  composeProofReel, composeScoreboardReel, composeAnalysts, rankRecord, analystLine, windowOf, WIN } from './compose.js';
 import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
+import { analystPool, noteFor } from './analysts.js';
 import { connect, alert, deliver } from './tg.js';
 
 const DRY = process.argv.includes('--dry') || process.env.DRY_RUN === '1';
@@ -221,6 +222,14 @@ async function pickWindow() {
  * to, so an hour that went by unstoried is not worth telling later —
  * it is skipped, and the digest will still summarise it.
  */
+/** The week's analyst moves, for the note on every movement post. Never fatal. */
+async function analystsNow() {
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    return analystPool(await messagesInAll(now - 7 * 86400, now));
+  } catch (e) { say('analyst notes off —', e.message); return []; }
+}
+
 async function runStories() {
   const nowWindow = windowOf(Math.floor(Date.now() / 1000)).start;
   const maxBehind = Number(process.env.MAX_STORY_LAG_WINDOWS ?? 2);
@@ -281,7 +290,7 @@ async function runStories() {
   const tally = Number((await getState(TALLY_KEY)) ?? 0);
   const deck = composeStories(rows, {
     carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end, template: null, tally,
-    catchup: CATCHUP, story: tpl.layout, palette: tpl.pal });
+    catchup: CATCHUP, story: tpl.layout, palette: tpl.pal, analysts: await analystsNow() });
   const consumed = deck.consumed.map(Number);
   if (deck.skip) {
     say('SKIP —', w.key, `(${deck.skip})`);
@@ -653,14 +662,14 @@ async function runCallbackPost() {
   }
 
   const score = await claimRecord(30);
-  const recent = await settledForecasts(30, 40);
+  const board = rankRecord(await settledForecastsAll(30, 500), { hits: 10, misses: 5 });
   // The post that made each call, inlined so the render needs no
   // network. A call with no archived post stays a text-only card.
   if (process.env.PROOF_ORIGINALS !== '0') {
     const { archiveData } = await import('./host/supabase.js');
     for (const h of hits) if (h.src_img) h.src_url = await archiveData(h.src_img);
   }
-  const deck = composeCallbackPost(hits, { score, recent });
+  const deck = composeCallbackPost(hits, { score, board });
   if (deck.skip) { say(`SKIP — ${deck.skip}`); return 'none'; }
   say(`${deck.key} — ${hits.length} proven call(s) -> ${deck.slides.length} slides `
     + `[${deck.slides.map(x => x.type)}]`);
@@ -997,6 +1006,19 @@ async function runReel() {
   // with it and leaving the cap above convinced only one had gone out.
   // The key carries the hour it was published in instead.
   deck.key = `R:${stampKey(now)}`;
+
+  // Every post about a move carries the analysts' word, reels in the
+  // caption. A proof reel is about its own claim; a day reel is about
+  // the most recent message in the window.
+  if (process.env.ANALYST_NOTE !== '0' && deck.caption) {
+    const about = proofHit ? `${proofHit.headline ?? ''} ${proofHit.asset ?? ''}`
+      : String(rows?.at(-1)?.text ?? '').split('\n')[0];
+    const n = noteFor(about, await analystsNow(), { skip: proofHit ? proofHit.tg_id : rows?.at(-1)?.tg_id });
+    if (n) {
+      const [first, ...rest] = deck.caption.split('\n\n');
+      deck.caption = [first, analystLine(n), ...rest].join('\n\n');
+    }
+  }
 
   say(`${deck.key} — ${rows.length} msgs -> ${deck.slides.length} frames `
     + `[${deck.slides.map(x => x.beat ?? x.type)}]`
@@ -1388,7 +1410,7 @@ async function main() {
 
   const carry = (await getState(CARRY_KEY)) ?? {};
   const { t: tpl, recent: tplRecent } = await nextTemplate(w.key);
-  const deck = compose(w.rows, { carry, endTs: w.end, template: tpl.id });
+  const deck = compose(w.rows, { carry, endTs: w.end, template: tpl.id, analysts: await analystsNow() });
   if (deck.carry) await setState(CARRY_KEY, deck.carry);
 
   const consumed = deck.consumed.map(Number);

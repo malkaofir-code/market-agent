@@ -456,6 +456,20 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide--story .tg-strip{padding:18px 26px;margin-top:18px}
 .slide--story .tg-strip .tg-a{font-size:36px}
 
+/* ── the analyst strip ────────────────────────────────────────────
+   One attributed line under a movement: which bank said what. Quiet
+   by design: it is context, not the headline. */
+.an-strip{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-top:14px;
+  padding:12px 4px 0;border-top:2px solid var(--rule);position:relative;z-index:4;color:var(--fg)}
+.an-strip .an-l{font-family:var(--f-mono);font-size:19px;font-weight:700;letter-spacing:.14em;
+  color:var(--acc)}
+.an-strip .an-f{font-family:var(--f-mono);font-size:26px;font-weight:700;direction:ltr;unicode-bidi:isolate}
+.an-strip .an-w{font-size:24px;opacity:.85}
+.an-strip .an-t{font-family:var(--f-mono);font-size:24px;margin-inline-start:auto}
+.slide--story .an-strip{margin-top:22px;padding-top:16px}
+.slide--story .an-strip .an-f{font-size:34px} .slide--story .an-strip .an-w,.slide--story .an-strip .an-t{font-size:30px}
+.slide--story .an-strip .an-l{font-size:22px}
+
 /* ── Ron's board ────────────────────────────────────────────────
    The interpretation, with him presenting it. The tail on the block
    points at him — that is the whole trick, and without it the words
@@ -942,8 +956,11 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 .a-rc .rc-m{font-family:var(--f-mono);font-size:40px;font-weight:600;direction:ltr;
   unicode-bidi:isolate;font-variant-numeric:tabular-nums;min-width:4.6ch;text-align:end}
 .a-rc .rc-m.up{color:var(--pos)} .a-rc .rc-m.dn{color:var(--neg)}
-.a-rc .rc-k{font-style:normal;font-family:var(--f-mono);font-size:34px;font-weight:700;width:1.1em;color:var(--pos)}
-.a-rc li.no .rc-k{color:var(--neg)} .a-rc li.no .rc-a,.a-rc li.no .rc-d{opacity:.7}
+.a-rc .rc-k{font-style:normal;font-family:var(--f-mono);font-size:34px;font-weight:700;width:1.1em;color:#12a150}
+.a-rc li.no .rc-k{color:#d6322c} .a-rc li.no .rc-a,.a-rc li.no .rc-d{opacity:.7}
+.a-rr .rr-t{font-family:var(--f-disp);font-weight:900;font-size:64px;line-height:1.04;margin:0}
+.a-rr .rc-list li{flex-wrap:wrap;padding:16px 0;row-gap:4px}
+.a-rr .rc-s{flex:0 0 100%;font-size:25px;line-height:1.3;color:var(--dim2)}
 .a-rc .rc-note{font-size:27px;line-height:1.45;color:var(--dim2);margin:0;max-width:34ch}
 
 /* ── 19 · the proof reel ── */

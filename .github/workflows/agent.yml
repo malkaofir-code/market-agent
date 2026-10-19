@@ -345,7 +345,7 @@ jobs:
           # Thursday afternoon, and everything that settled since last
           # Thursday goes in it — PROOF_POST_DAYS is the seven days
           # between editions, so nothing is shown twice and nothing is
-          # missed. Four calls, each with its original post, plus the cover and the record board fill
+          # missed. Three featured calls with their original posts, the record, and the ten strongest hits and five worst misses
           # inside a carousel.
           CALLBACK_POST_DAY: 'Thu'
           CALLBACK_POST_HOURS: '15'
@@ -353,7 +353,7 @@ jobs:
           ANALYSTS_HOURS: '18'
           MAX_CALLBACK_POSTS_PER_DAY: '1'
           PROOF_POST_MIN: '2'
-          PROOF_POST_MAX: '4'
+          PROOF_POST_MAX: '3'
           PROOF_POST_DAYS: '7'
           # How far back the first run reaches to find claims the
           # account already made. Costs nothing after that: the unique

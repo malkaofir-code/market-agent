@@ -7,7 +7,7 @@ import { parse, score, direction } from './parse.js';
 import { clean, stripLeadEmoji } from './rtl.js';
 import { byId } from './templates.js';
 import { lessonFor } from './lessons.js';
-import { analystsFrom } from './analysts.js';
+import { analystsFrom, noteFor } from './analysts.js';
 import { outlookFor, outlookLine } from './outlook.js';
 import { glossFor } from './glossary.js';
 import 'dotenv/config';
@@ -197,7 +197,7 @@ function askCover(lead, seed) {
   return bank[Math.abs(seed) % bank.length];
 }
 
-export function compose(rows, { now = null, carry = {}, endTs = null, template = null } = {}) {
+export function compose(rows, { now = null, carry = {}, endTs = null, template = null, analysts = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
   const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
@@ -220,7 +220,7 @@ export function compose(rows, { now = null, carry = {}, endTs = null, template =
   // teaches — instead of seven stories and one sentence of meaning.
   // The old deck stays one variable away.
   if (process.env.DIGEST_FORMAT === 'lesson')
-    return composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, template, now });
+    return composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, template, now, analysts });
 
   // §04: "a story cannot appear on both the cover and a card" —
   // each message is consumed exactly once across the deck.
@@ -590,7 +590,14 @@ function factsOf(p, { cap = 190 } = {}) {
 }
 
 /** The deck's caption, in the same order as the boards. */
-function lessonCaption({ lead, why, others, outlook, lesson, w, parsed }) {
+/** One caption line for the analyst note. Attributed, never ours. */
+export function analystLine(n) {
+  if (!n) return '';
+  const what = [n.firm, n.label, n.subject, n.target ? `יעד ${n.target}` : null].filter(Boolean).join(' · ');
+  return `🏦 ${n.about === 'story' ? 'אנליסט' : 'האנליסטים השבוע'}: ${what} (דעתם, לא המלצה שלנו)`;
+}
+
+function lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystNote = null }) {
   const LIMIT = 2120;
   const topics = topicsIn(parsed);
   const named = topics.slice(0, 4).map(t => t.word).join(' · ');
@@ -603,6 +610,7 @@ function lessonCaption({ lead, why, others, outlook, lesson, w, parsed }) {
     ...(others.length ? ['עוד שכדאי לדעת:', ...others.map(p =>
       `▪ ${plain(briefLine(p))}${p.note ? `\n   💡 ${plain(p.note)}` : ''}`), ''] : []),
     outlook ? outlookLine(outlook) : null,
+    analystNote ? analystLine(analystNote) : null,
     lesson ? `📘 השיעור: ${lesson.takeaway}` : null,
   ].filter(x => x !== null).join('\n');
   const foot = `\nעדכון ${span(w)} · @marketalert.il\n${tags}`;
@@ -617,7 +625,7 @@ function lessonCaption({ lead, why, others, outlook, lesson, w, parsed }) {
   return (head + deep + foot).slice(0, LIMIT);
 }
 
-function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, template, now }) {
+function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, template, now, analysts = null }) {
   const at = now ?? Math.floor(Date.now() / 1000);
   const hour = Number(fmt(at, { hour: '2-digit' }));
   const slot = hour < 12 ? 'morning' : hour < 19 ? 'afternoon' : 'evening';
@@ -660,12 +668,16 @@ function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, templat
   const own = lessonFor({ headline: lead.headline });
   const why = lead.note ? whyLine(lead) : own?.event ? own.takeaway : whyLine(lead);
 
+  // The analysts' word on the lead story, or the week's, labelled as such.
+  const analystNote = analysts?.length && process.env.ANALYST_NOTE !== '0'
+    ? noteFor(`${lead.headline} ${lead.stand ?? ''}`, analysts, { skip: lead.tg_id, seed }) : null;
+
   const slides = [];
   // 1 · the one thing, and what it means for you
   slides.push({ type: coverType, index: hhmm(w.end).slice(0, 2), figure: fig,
     eyebrow: 'הכי חשוב עכשיו', headline: plain(lead.headline), stand: why, source: lead.source,
     gloss: glossFor(`${lead.headline} ${why ?? ''}`, { max: 1, seen }),
-    swipe: 'החליקו — עוד מה שחשוב, ומה זה אומר',
+    swipe: 'החליקו — עוד מה שחשוב, ומה זה אומר', analystNote,
     photo: PHOTO_COVERS.has(coverType) ? lead.photo : null });
   // 2 · the two other things worth knowing
   if (others.length) {
@@ -694,7 +706,7 @@ function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, templat
 
   return {
     key: w.key, template, window: span(w), date: ddmmyy(w.end), stamp, quotes,
-    slides, caption: lessonCaption({ lead, why, others, outlook, lesson, w, parsed }),
+    slides, caption: lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystNote }),
     // Everything in the window is spent, shown or not.
     consumed: all.map(p => p.tg_id), carry: nextCarry,
     format: 'lesson', lesson: lesson?.id ?? null,
@@ -1143,7 +1155,7 @@ export const TG_LINK = 't.me/hamal_shukhahon';
  * separate cursor, so telling an hour as stories never costs the
  * digest that will later summarise it.
  */
-export function composeStories(rows, { carry = {}, endTs = null, template = null, tally = 0, catchup = false, story = null, palette = null } = {}) {
+export function composeStories(rows, { carry = {}, endTs = null, template = null, tally = 0, catchup = false, story = null, palette = null, analysts = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
   const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
@@ -1255,7 +1267,9 @@ export function composeStories(rows, { carry = {}, endTs = null, template = null
     const pal = pick.photo
       ? DARK[(seed + i) % DARK.length]
       : (palette ?? (tpl ? (i % 2 ? tpl.b : tpl.a) : DARK[(seed + i) % DARK.length]));
-    slides.push({ ...pick, palette: pal, story });
+    const analystNote = analysts?.length && process.env.ANALYST_NOTE !== '0'
+      ? noteFor(`${p.headline} ${p.stand ?? ''}`, analysts, { skip: p.tg_id, seed: seed + i }) : null;
+    slides.push({ ...pick, palette: pal, story, analystNote });
     prev = pick.type;
   }
 
@@ -1511,6 +1525,24 @@ export function composeCallback(claim, { palette = null, now = null, variant = n
 
 const PROOF_GROUNDS = ['deep', 'ink', 'slate'];
 
+/**
+ * The record board's rows: the strongest hits and the worst misses.
+ *
+ * Ten hits and half as many misses, both ranked by size and neither
+ * chosen by us: a hit by how far the market went our way, a miss by how
+ * far it went against us. A board of only the best would be the same
+ * lie as a count with no denominator.
+ */
+export function rankRecord(rows, { hits = 10, misses = 5 } = {}) {
+  const isHit = r => ['hit', 'shown'].includes(r.status);
+  const move = r => Number(r.move_pct) || 0;
+  const wrong = r => (r.dir === 'up' ? -move(r) : move(r));   // how far against the call
+  return {
+    hits: dedupeCalls((rows ?? []).filter(isHit).sort((a, b) => Math.abs(move(b)) - Math.abs(move(a)))).slice(0, hits),
+    misses: dedupeCalls((rows ?? []).filter(r => r.status === 'miss').sort((a, b) => wrong(b) - wrong(a))).slice(0, misses),
+  };
+}
+
 /** The post that made a call, as it ran. */
 export function originalSlide(claim) {
   return { type: 'proofOrig', palette: null, tag: 'המקור',
@@ -1540,7 +1572,7 @@ function ratio(score) {
   return tot ? { hit, tot, pct: Math.round(hit / tot * 100) } : null;
 }
 
-export function composeCallbackPost(hits, { now = null, score = null, recent = null } = {}) {
+export function composeCallbackPost(hits, { now = null, score = null, recent = null, board = null } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   if (!hits?.length) return { skip: 'nothing proven' };
 
@@ -1553,7 +1585,25 @@ export function composeCallbackPost(hits, { now = null, score = null, recent = n
   // An Instagram carousel holds ten, so the originals stop when the
   // cover, the record and the verdicts no longer leave room for them.
   const LIMIT = 10;
-  let spare = LIMIT - 2 - hits.length;
+  const rowsOf = (list, title, ok) => {
+    const out = [];
+    for (let i = 0; i < list.length; i += 5) out.push({
+      type: 'recordRows', palette: null, tag: 'השיא',
+      eyebrow: list.length > 5 ? `${title} · ${i / 5 + 1} מתוך ${Math.ceil(list.length / 5)}` : title,
+      title,
+      items: list.slice(i, i + 5).map(h => ({
+        asset: h.asset, when: dmy(Number(h.posted_at)),
+        move: `${Number(h.move_pct) > 0 ? '+' : ''}${Number(h.move_pct).toFixed(1)}%`,
+        dir: Number(h.move_pct) >= 0 ? 'up' : 'dn', ok,
+        said: cut(h.headline, 70) })),
+      note: ok ? 'מדורגות לפי גודל התנועה לכיוון שאמרנו.'
+               : 'מדורגים לפי גודל התנועה נגד מה שאמרנו. אלה הפספוסים הגדולים, לא נבחרו.',
+    });
+    return out;
+  };
+  const extra = board ? [...rowsOf(board.hits, `${board.hits.length} הקריאות החזקות ביותר`, true),
+    ...rowsOf(board.misses, `${board.misses.length} הפספוסים הגדולים`, false)] : [];
+  let spare = LIMIT - 2 - extra.length - hits.length;
   const cards = hits.flatMap((h, i) => {
     const card = proofSlide(h, { palette: null, variant: PROOF_VARIANTS[i % PROOF_VARIANTS.length] });
     if (h.src_url && spare > 0) { spare--; return [originalSlide(h), card]; }
@@ -1576,7 +1626,7 @@ export function composeCallbackPost(hits, { now = null, score = null, recent = n
   // with the part that matters taken out. So the board says "N of M",
   // and its rows are the latest settled forecasts, misses included.
   const rt = ratio(score);
-  const shown = dedupeCalls(recent?.length ? recent : hits).slice(0, 5);
+  const shown = board ? [] : dedupeCalls(recent?.length ? recent : hits).slice(0, 5);
   const items = shown.map(h => ({
     asset: h.asset,
     when: dmy(Number(h.posted_at)),
@@ -1604,6 +1654,7 @@ export function composeCallbackPost(hits, { now = null, score = null, recent = n
     + `${lines}\n\n`
     + (rt ? `הרשומה המלאה: ${rt.hit} מתוך ${rt.tot} תחזיות התממשו ב-30 הימים האחרונים (${rt.pct}%). `
           + 'השאר לא התממשו, והן נספרות.\n' : '')
+    + (board ? `בשקפים האחרונים: ${board.hits.length} הקריאות החזקות ביותר, ו-${board.misses.length} הפספוסים הגדולים.\n` : '')
     + 'כל מספר כאן נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
     + 'עד שלושה ימי מסחר, בלי לבחור תאריכים בדיעבד.\n'
     + `עדכונים שוטפים · @marketalert.il\n`
@@ -1614,7 +1665,7 @@ export function composeCallbackPost(hits, { now = null, score = null, recent = n
     window: `${dmy(Number(hits[hits.length - 1].posted_at))}\u2013${dmy(at)}`,
     date: ddmmyy(at),
     stamp: '', quotes: [],
-    slides: [cover, ...cards, rec],
+    slides: [cover, ...cards, rec, ...extra],
     caption,
     claimIds: hits.map(h => h.id),
   };

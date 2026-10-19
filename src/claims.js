@@ -191,7 +191,7 @@ const DENIAL = [
 const PRONOUN = [he('המניה'), he('המדד'), he('החברה'), he('הנייר'), he('המטבע'), he('הסחורה')];
 
 /** Every asset named in a sentence, minus the ones doing the talking. */
-function assetsIn(sentence) {
+export function assetsIn(sentence) {
   const f = flat(sentence);
   const colon = f.indexOf(':');
   const found = [];

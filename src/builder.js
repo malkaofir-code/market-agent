@@ -53,6 +53,13 @@ function tgStrip(link) {
 <span class="tg-a">${esc(link)}</span></div>`;
 }
 
+/** The analysts' word, printed on the board that tells the move. */
+function analystStrip(n) {
+  const what = [n.label, n.subject].filter(Boolean).map(x => bidi(x)).join(' · ');
+  return `<div class="an-strip"><span class="an-l">${bidi(n.about === 'story' ? 'אנליסט' : 'אנליסטים השבוע')}</span>
+<b class="an-f">${esc(n.firm)}</b><span class="an-w">${what}</span>${n.target ? `<span class="an-t"><bdi dir="ltr">${esc(n.target)}</bdi> ${bidi('יעד')}</span>` : ''}</div>`;
+}
+
 // ── band D: footnote ─────────────────────────────────────────
 function foot(i, n, src, swipe = null) {
   // The first boards tell a newcomer there is more, and what: the
@@ -72,7 +79,7 @@ ${swipe ? `<span class="ft-swipe">${bidi(swipe)}<i aria-hidden="true">←</i></s
 // that it stops someone — so it gets its own world: a printed receipt
 // rather than a news board, its own header band, no tape, and a
 // price line no other archetype has.
-const PROOF = new Set(['proofCert', 'proofVerdict', 'coverProof', 'record', 'proofOrig']);
+const PROOF = new Set(['proofCert', 'proofVerdict', 'coverProof', 'record', 'proofOrig', 'recordRows']);
 
 function proofHead({ date }, slide) {
   return `<header class="pf-hd"><span class="pf-check"></span>
@@ -241,9 +248,18 @@ const ARCHETYPES = {
     <p class="eyeb">${bidi(s.eyebrow || '30 הימים האחרונים')}</p>
     <div class="rc-head"><b class="rc-n">${esc(s.count)}</b>
       <span class="rc-of">${bidi(s.of)}</span></div>
-    <ul class="rc-list">${(s.items ?? []).map(i =>
+    ${(s.items ?? []).length ? `<ul class="rc-list">${(s.items ?? []).map(i =>
       `<li${i.ok === false ? ' class="no"' : ''}>${i.ok === undefined ? '' : `<i class="rc-k">${i.ok ? '✓' : '✗'}</i>`}<span class="rc-a">${bidi(i.asset)}</span><span class="rc-d">${bidi(i.when)}</span>
-       <b class="rc-m ${i.dir ?? ''}">${esc(i.move)}</b></li>`).join('')}</ul>
+       <b class="rc-m ${i.dir ?? ''}">${esc(i.move)}</b></li>`).join('')}</ul>` : ''}
+    <p class="rc-note">${bidi(s.note)}</p></div>`,
+
+  // 18b · the record, ranked — strongest hits, worst misses, five a board.
+  recordRows: s => `<div class="a-rc a-rr">
+    <p class="eyeb">${bidi(s.eyebrow)}</p>
+    <h2 class="rr-t">${bidi(s.title)}</h2>
+    <ul class="rc-list">${(s.items ?? []).map(i =>
+      `<li${i.ok === false ? ' class="no"' : ''}><i class="rc-k">${i.ok ? '✓' : '✗'}</i><span class="rc-a">${bidi(i.asset)}</span><span class="rc-d">${bidi(i.when)}</span>
+       <b class="rc-m ${i.dir ?? ''}">${esc(i.move)}</b><span class="rc-s">${bidi(i.said)}</span></li>`).join('')}</ul>
     <p class="rc-note">${bidi(s.note)}</p></div>`,
 
   // 01 · cover — the photo bleeds off the top and dissolves into the
@@ -656,6 +672,7 @@ const GROUND = {
   coverProof:   'verd',
   record:       'sheet',
   proofOrig:    'sheet',
+  recordRows:   'sheet',
   analysts:     'doc',
 };
 
@@ -688,7 +705,7 @@ const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed'
   // steps, and he has just presented the meaning on the board before.
   'lesson', 'brief', 'outlook', 'detail',
   // The record is a table. He has nowhere to stand on it.
-  'record', 'proofOrig', 'analysts']);
+  'record', 'proofOrig', 'recordRows', 'analysts']);
 
 /**
  * The mascot layer. `ctx.poses` is filled by render.js, which owns the
@@ -746,7 +763,7 @@ function ronLayer(slide, ctx, i = 0) {
 const SECONDARY = new Set(['item', 'list', 'chart', 'watch', 'telegram', 'record']);
 
 // The tape is the news board's signature row. A receipt has no tape.
-const NO_TAPE = new Set(['telegram', 'proofCert', 'proofVerdict', 'coverProof', 'record', 'proofOrig',
+const NO_TAPE = new Set(['telegram', 'proofCert', 'proofVerdict', 'coverProof', 'record', 'proofOrig', 'recordRows',
   'sceneProof']);
 const COVERS = new Set(['cover', 'coverFramed']);   // overlay grid
 const BLEED = new Set(['cover']);                  // photo escapes the band
@@ -833,7 +850,7 @@ export function buildSlide(slide, ctx, i, n, { story = false, layer = null } = {
   const head = isProof ? proofHead(ctx, slide) : masthead(ctx);
   const tail = isProof ? proofFoot(slide) : foot(i + 1, n, slide.source, i + 1 < n ? slide.swipe : null);
   return `<div class="slide${lay}${story && !reel ? ' slide--story' + alt : ''}${reel ? ' slide--reel' : ''}${cover ? ' slide--cover' : ''}${isProof ? ' slide--proof' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
-${head}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${glossStrip(slide.gloss)}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
+${head}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${glossStrip(slide.gloss)}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${slide.analystNote ? analystStrip(slide.analystNote) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${tail}</div>`;
 }
 

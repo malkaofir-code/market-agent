@@ -18,6 +18,8 @@
 //   · nothing is ranked by whether we agree.
 // ─────────────────────────────────────────────────────────────
 
+import { assetsIn } from './claims.js';
+
 const flat = s => String(s ?? '').replace(/["'׳״’“”]/g, '').replace(/[‎‏]/g, '');
 
 export const FIRMS = [
@@ -98,6 +100,7 @@ export function analystCall(row) {
     target: targetOf(flat(lines.join(' '))),
     rating: (flat(lines.join(' ')).match(RATING) ?? [])[1] ?? null,
     text: shorten(text),
+    blob: flat(lines.join(' ')),
   };
 }
 
@@ -117,4 +120,57 @@ export function analystsFrom(rows, { max = 8 } = {}) {
     if (out.length >= max) break;
   }
   return out;
+}
+
+// ── the note on a movement post ───────────────────────────────
+//
+// Every post about a move carries one line from the analysts: what a
+// named bank said about THIS company when the channel reported it, or,
+// when it reported nothing about it, the week's strongest bank move,
+// labelled as the week's and not as being about this story. Nothing is
+// written by us: the firm, the label and the target are the ones
+// analystCall read off the channel's own sentence.
+
+const GENERIC = new Set(['THE', 'INC', 'CORP', 'LTD', 'PLC', 'USA', 'ETF', 'CEO', 'CFO', 'IPO', 'GDP',
+  'CPI', 'PCE', 'FED', 'FOMC', 'EPS', 'SEC', 'OPEC', 'AI', 'US', 'EU', 'UK', 'GLOBAL', 'TECHNOLOGIES',
+  'TECHNOLOGY', 'HOLDINGS', 'GROUP', 'SYSTEMS', 'PLATFORMS', 'INTERNATIONAL', 'CAPITAL', 'FINANCIAL',
+  'BANK', 'AMERICA', 'EQUAL', 'WEIGHT', 'OVERWEIGHT', 'OUTPERFORM', 'NEUTRAL', 'BUY', 'SELL', 'HOLD',
+  'NYSE', 'NASDAQ', 'DOW', 'WALL', 'STREET', 'AIStockSavvy'.toUpperCase()]);
+const firmWords = new Set(FIRMS.flatMap(([n]) => n.toUpperCase().split(/[^A-Z]+/)).filter(Boolean));
+
+/** Latin names and tickers in a text, in order, minus firms and filler. */
+export function subjectsOf(text) {
+  const out = [];
+  for (const t of flat(text).match(/\b[A-Za-z][A-Za-z&.]{2,}\b/g) ?? []) {
+    const u = t.toUpperCase().replace(/\.$/, '');
+    if (GENERIC.has(u) || firmWords.has(u) || out.some(x => x.toUpperCase() === u)) continue;
+    out.push(t);
+  }
+  return out;
+}
+
+/** The week's analyst moves, newest first, rating changes ahead of targets. */
+export function analystPool(rows) {
+  return (rows ?? []).map(analystCall).filter(Boolean)
+    .sort((a, b) => RANK[a.act] - RANK[b.act] || b.ts - a.ts);
+}
+
+/**
+ * The note for one story, or null when the pool is empty.
+ * { firm, label, target, subject, about: 'story' | 'week' }
+ */
+export function noteFor(story, pool, { skip = null, seed = 0 } = {}) {
+  const calls = (pool ?? []).filter(c => c.tg_id !== skip);
+  if (!calls.length) return null;
+  const mine = subjectsOf(`${story ?? ''}`).map(x => x.toUpperCase());
+  const syms = new Set(assetsIn(String(story ?? '')).map(a => a.sym));
+  const hit = calls.find(c => {
+    const theirs = subjectsOf(c.blob).map(x => x.toUpperCase());
+    return mine.some(m => theirs.includes(m)) ||
+      assetsIn(c.blob).some(a => syms.has(a.sym));
+  });
+  const c = hit ?? calls[Math.abs(seed) % Math.min(calls.length, 4)];
+  const shared = hit ? subjectsOf(hit.blob).find(x => mine.includes(x.toUpperCase())) : null;
+  return { firm: c.firm, label: c.label, target: c.target, dir: c.dir,
+    subject: shared ?? subjectsOf(c.blob)[0] ?? null, about: hit ? 'story' : 'week' };
 }

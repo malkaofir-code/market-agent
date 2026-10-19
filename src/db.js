@@ -518,4 +518,12 @@ export const settledForecasts = (days = 30, limit = 40) =>
        and length(coalesce(headline,'')) >= 20
      order by checked_at desc limit $2`, [days, limit]).then(r => r.rows);
 
+/** Every settled forecast in the window, for ranking the record board. */
+export const settledForecastsAll = (days = 30, limit = 500) =>
+  q(`select * from agent.claims
+     where kind = 'forecast' and status in ('hit','shown','miss')
+       and checked_at > extract(epoch from now())::bigint - $1 * 86400
+       and length(coalesce(headline,'')) >= 20
+     order by checked_at desc limit $2`, [days, limit]).then(r => r.rows);
+
 export const close = () => pool.end();
