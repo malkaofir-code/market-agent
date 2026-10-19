@@ -11,7 +11,7 @@
 //   node src/run.js --dry --window=2026-08-26T08:00
 // ─────────────────────────────────────────────────────────────
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 import 'dotenv/config';
 import {
   putMessages, messagesIn, messagesInAll, oldestUnconsumedBefore, markConsumed,
@@ -19,13 +19,13 @@ import {
   setPublished, publishedSince, putInsight, performanceBy,
   lastStoryAt, reelsToday, lastReelAt,
   upsertWindow, setWindow, getWindow, postsToday, lastPostAt, recentOutcomes, clearFailed,
-  putClaims, bestHit, markClaimShown, claimScore, callbacksToday, publishedMessages,
+  putClaims, bestHit, markClaimShown, claimScore, claimRecord, settledForecasts, analystPostsSince, callbacksToday, publishedMessages,
   provenSince, markClaimsPosted, callbackPostsToday, provenForReel, markClaimReeled,
   provenLately,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
 import { compose, composeStories, composeReel, composeCallback, composeCallbackPost,
-  composeProofReel, composeScoreboardReel, windowOf, WIN } from './compose.js';
+  composeProofReel, composeScoreboardReel, composeAnalysts, windowOf, WIN } from './compose.js';
 import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
 import { connect, alert, deliver } from './tg.js';
@@ -41,6 +41,9 @@ const REEL = process.argv.includes('--reel') || process.env.MODE === 'reel';
 // The fourth track. Not a news track at all: it reads what the account
 // already published and asks the market whether it was right.
 const CALLBACK = process.argv.includes('--callback') || process.env.MODE === 'callback';
+// The fifth: once a week, what the investment banks said, with their
+// names on it. Attributed third-party views, never our recommendation.
+const ANALYSTS = process.argv.includes('--analysts') || process.env.MODE === 'analysts';
 // Scheduled ticks render for review only; publishing needs a person.
 const REVIEW = process.env.REVIEW === '1';
 // Telling an hour late, on purpose.
@@ -362,7 +365,7 @@ async function runStories() {
       choices: { template: String(tpl.id), name: tpl.name, cover: deck.slides[0]?.type,
         types: deck.slides.map(x => x.type) } });
     await recordClaims(rows, deck, { wkey: deck.key, media_id: firstId,
-      posted_at: Math.floor(Date.now() / 1000) });
+      posted_at: Math.floor(Date.now() / 1000) }, files);
     await logRun(deck.key, 'stories', true, `${posted}/${urls.length}`);
     say(`POSTED ${posted} story(ies)`);
     // Stories used to report only their failures, which made "three
@@ -408,11 +411,13 @@ async function runStories() {
  * ever shown. The deck as published is the evidence, so that is what
  * is searched — slides and caption together.
  */
-async function recordClaims(rows, deck, meta) {
+async function recordClaims(rows, deck, meta, files = []) {
   if (process.env.CLAIMS === '0') return 0;
   try {
     const { claimsFrom } = await import('./claims.js');
     const shown = JSON.stringify(deck);
+    const slideJson = deck.slides.map(x => JSON.stringify(x));
+    const kept = new Map();
     const out = [];
     for (const r of rows) {
       const head = String(r.text ?? '').split('\n')[0].replace(/[\u200e\u200f]/g, '').trim();
@@ -420,7 +425,20 @@ async function recordClaims(rows, deck, meta) {
       // nine words and a story board can squeeze, so an exact match
       // would file nothing at all from the two tracks that publish most.
       if (head.length < 12 || !shown.includes(head.slice(0, 24))) continue;
-      out.push(...claimsFrom(r));
+      // The slide that carried the headline is kept, so the proof card
+      // can later show the post that made the call. Best effort: no
+      // slide, no file, or no storage means a text-only card, never a
+      // lost claim.
+      let src = null;
+      const at = slideJson.findIndex(j => j.includes(head.slice(0, 24)));
+      if (at >= 0 && files[at] && process.env.CLAIM_ARCHIVE !== '0' && !/\.mp4$/i.test(files[at])) {
+        const dest = `archive/${String(meta.wkey).replace(/[:]/g, '')}/${basename(files[at])}`;
+        try {
+          if (!kept.has(dest)) kept.set(dest, await (await import('./host/supabase.js')).archive(files[at], dest));
+          src = kept.get(dest);
+        } catch (e) { say('  archive skipped —', e.message); }
+      }
+      out.push(...claimsFrom(r).map(c => ({ ...c, src_img: src })));
     }
     const n = await putClaims(out, meta);
     if (n) say(`filed ${n} claim(s) from ${meta.wkey}`);
@@ -634,8 +652,15 @@ async function runCallbackPost() {
     return 'none';
   }
 
-  const score = (await claimScore(30)).reduce((a, r) => a + Number(r.hit || 0), 0);
-  const deck = composeCallbackPost(hits, { score: { hit: score } });
+  const score = await claimRecord(30);
+  const recent = await settledForecasts(30, 40);
+  // The post that made each call, inlined so the render needs no
+  // network. A call with no archived post stays a text-only card.
+  if (process.env.PROOF_ORIGINALS !== '0') {
+    const { archiveData } = await import('./host/supabase.js');
+    for (const h of hits) if (h.src_img) h.src_url = await archiveData(h.src_img);
+  }
+  const deck = composeCallbackPost(hits, { score, recent });
   if (deck.skip) { say(`SKIP — ${deck.skip}`); return 'none'; }
   say(`${deck.key} — ${hits.length} proven call(s) -> ${deck.slides.length} slides `
     + `[${deck.slides.map(x => x.type)}]`);
@@ -666,7 +691,7 @@ async function runCallbackPost() {
     await setWindow({ key: deck.key, status: 'posted', slides: files.length,
       posted_at: Math.floor(Date.now() / 1000) });
     await setPublished(deck.key, { media_id: r.id ?? null, permalink: r.permalink ?? null,
-      choices: { kind: 'proof', calls: hits.length, record: score,
+      choices: { kind: 'proof', calls: hits.length, record: `${score.hit}/${score.hit + score.miss}`,
         types: deck.slides.map(x => x.type) } });
     await logRun(deck.key, 'proof-post', true, `${hits.length} calls`);
     say(`POSTED proof carousel ${r.id}`);
@@ -676,6 +701,71 @@ async function runCallbackPost() {
   await setWindow({ key: deck.key, status: 'failed', slides: 0, error: failure?.message });
   await logRun(deck.key, 'proof-post', false, failure?.message ?? 'nothing posted');
   await notify(`❌ proof post ${deck.key}\n${failure?.message ?? 'nothing posted'}`);
+  return 'done';
+}
+
+/**
+ * The weekly analysts post: what the banks said, each row with the
+ * name of the bank that said it. One a week, on its own day and hour,
+ * and it never runs thin: under four attributed moves there is no post.
+ */
+async function runAnalysts() {
+  if (!DRY && process.env.IGNORE_SCHEDULE !== '1') {
+    const day = (process.env.ANALYSTS_DAY || 'Wed').trim();
+    const hours = (process.env.ANALYSTS_HOURS || '18').split(',').map(x => x.trim());
+    if (localDayName() !== day || !hours.includes(String(localHour()))) {
+      say(`SKIP — ${localDayName()} ${localHour()}:xx is not the analysts slot (${day} ${hours.join(',')})`);
+      return 'none';
+    }
+  }
+  const spacing = Number(process.env.ANALYSTS_MIN_DAYS || 5);
+  if (!DRY && await analystPostsSince(spacing)) {
+    say(`SKIP — an analysts post already went out in the last ${spacing} days`);
+    return 'none';
+  }
+  const gap = Number(process.env.MIN_MINUTES_BETWEEN_POSTS || 12);
+  const last = await lastPostAt();
+  if (!DRY && last && (Date.now() / 1000 - last) < gap * 60) {
+    say(`SKIP — only ${Math.round((Date.now() / 1000 - last) / 60)}min since the last post`);
+    return 'none';
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const days = Number(process.env.ANALYSTS_DAYS || 7);
+  const rows = await messagesInAll(now - days * 86400, now);
+  const deck = composeAnalysts(rows, { now });
+  if (deck.skip) { say(`SKIP — ${deck.skip}`); return 'none'; }
+  say(`${deck.key} — ${deck.callIds.length} analyst move(s) -> ${deck.slides.length} slides`);
+
+  const dir = join('./out', deck.key.replace(/[:]/g, ''));
+  const { files } = await renderDeck(deck, dir, { format: 'jpeg' });
+  if (!files.length) { say('SKIP — nothing rendered'); return 'none'; }
+  if (DRY || REVIEW) {
+    say(`${DRY ? 'DRY' : 'REVIEW'} — ${files.length} analyst slides rendered, NOT published`);
+    return 'done';
+  }
+
+  const { upload, remove, publish } = await import('./publish/api.js');
+  const prefix = deck.key.replace(/[:]/g, '');
+  const urls = await upload(files, prefix);
+  await upsertWindow(deck.key, now - days * 86400, now);
+  let r = null, failure = null;
+  try { r = await publish(urls, deck.caption); }
+  catch (e) { failure = e; }
+  finally { await remove(files, prefix); }
+
+  if (r) {
+    await setWindow({ key: deck.key, status: 'posted', slides: files.length, posted_at: now });
+    await setPublished(deck.key, { media_id: r.id ?? null, permalink: r.permalink ?? null,
+      choices: { kind: 'analysts', moves: deck.callIds.length, types: deck.slides.map(x => x.type) } });
+    await logRun(deck.key, 'analysts', true, `${deck.callIds.length} moves`);
+    say(`POSTED analysts carousel ${r.id}`);
+    await notify(`🏦 המלצות האנליסטים — ${deck.callIds.length} שינויים\n${r.permalink ?? ''}`);
+    return 'done';
+  }
+  await setWindow({ key: deck.key, status: 'failed', slides: 0, error: failure?.message });
+  await logRun(deck.key, 'analysts', false, failure?.message ?? 'nothing posted');
+  await notify(`❌ analysts post ${deck.key}\n${failure?.message ?? 'nothing posted'}`);
   return 'done';
 }
 
@@ -867,20 +957,20 @@ async function runReel() {
     // used to turn both off.
     const days = Number(process.env.SCORE_REEL_DAYS || 30);
     const rowsMax = Number(process.env.SCORE_REEL_ROWS || 5);
-    const recent = await provenLately(days, Number(process.env.SCORE_REEL_MAX || 12));
+    const recent = await provenLately(days, Number(process.env.SCORE_REEL_MAX || 12), 'forecast');
     const min = Number(process.env.SCORE_REEL_MIN || 3);
     if (recent.length >= min) {
-      const score = (await claimScore(30)).reduce((a, r) => a + Number(r.hit || 0), 0);
-      deck = composeScoreboardReel(recent, { score: { hit: score }, days, rows: rowsMax });
-      say(`scoreboard reel — ${score} confirmed in ${days}d, ${recent.length} on the card`);
+      const score = await claimRecord(30);
+      deck = composeScoreboardReel(recent, { score, days, rows: rowsMax });
+      say(`scoreboard reel — ${score.hit}/${score.hit + score.miss} forecasts confirmed in ${days}d, ${recent.length} on the card`);
     } else say(`scoreboard: only ${recent.length} proven call(s) (need ${min}) — skipping it`);
   }
 
   if (!deck && process.env.REEL_PROOF !== '0' && !summaryHours.includes(hourNow)) {
     proofHit = await provenForReel(Number(process.env.PROOF_REEL_DAYS || 7));
     if (proofHit) {
-      const score = (await claimScore(30)).reduce((a, r) => a + Number(r.hit || 0), 0);
-      deck = composeProofReel(proofHit, { score: { hit: score } });
+      const score = await claimRecord(30);
+      deck = composeProofReel(proofHit, { score });
       say(`proof reel — ${proofHit.kind} on ${proofHit.symbol}: `
         + `${proofHit.move_pct}% in ${proofHit.days_after} session(s)`);
     } else say('no proven call waiting — falling back to the day summary');
@@ -1173,13 +1263,14 @@ async function main() {
 
   // A review run publishes nothing, so the post-rate guards have no
   // opinion about it — let it render even at the daily cap.
-  const stop = (DRY || REVIEW) ? null : await blocked({ stories: STORIES || CALLBACK, reel: REEL });
+  const stop = (DRY || REVIEW) ? null : await blocked({ stories: STORIES || CALLBACK || ANALYSTS, reel: REEL });
   if (stop) { say('SKIP —', stop); return; }
 
   // A reel publishes, so unlike insights it sits BEHIND the kill
   // switch, the active hours and the failure latch — not in front of
   // them with the read-only mode.
   if (CALLBACK) return runCallback();
+  if (ANALYSTS) return runAnalysts();
 
   if (REEL) {
     // Two slots a day, gated on the LOCAL hour for the same reason the
@@ -1378,7 +1469,7 @@ async function main() {
     choices: { template: String(tpl.id), name: tpl.name, cover: deck.slides[0]?.type,
       types: deck.slides.map(x => x.type), slot: deck.slot ?? null } });
   await recordClaims(w.rows ?? [], deck, { wkey: w.key, media_id: result.id,
-    permalink: result.permalink ?? null, posted_at: Math.floor(Date.now() / 1000) });
+    permalink: result.permalink ?? null, posted_at: Math.floor(Date.now() / 1000) }, files);
   await logRun(w.key, 'publish', true, result.permalink ?? result.id);
   await notify(`✅ ${w.key} — ${deck.slides.length} slides\n${result.permalink ?? ''}`);
 }

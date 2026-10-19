@@ -298,12 +298,12 @@ export async function provenForReel(days = 7) {
  * the ones you have already seen is not a record. Newest first,
  * because "this week" is the claim the film is making.
  */
-export const provenLately = (days = 30, limit = 3) =>
+export const provenLately = (days = 30, limit = 3, kind = null) =>
   q(`select * from agent.claims
-     where status in ('hit','shown')
+     where status in ('hit','shown') and ($3::text is null or kind = $3)
        and checked_at > extract(epoch from now())::bigint - $1 * 86400
        and length(coalesce(headline,'')) >= 20
-     order by checked_at desc limit $2`, [days, limit]).then(r => r.rows);
+     order by checked_at desc limit $2`, [days, limit, kind]).then(r => r.rows);
 
 export const markClaimReeled = id =>
   q(`update agent.claims set in_reel_at = extract(epoch from now())::bigint
@@ -318,6 +318,13 @@ export const callbackPostsToday = () =>
   q(`select count(*)::int n from agent.windows
      where status='posted' and key like 'CP:%'
        and posted_at >= ${DAY_START}`).then(r => r.rows[0].n);
+
+/** Has the weekly analysts post gone out in the last N days? */
+export const analystPostsSince = (days = 5) =>
+  q(`select count(*)::int n from agent.windows
+     where status='posted' and key like 'AN:%'
+       and posted_at > extract(epoch from now())::bigint - $1 * 86400`, [days])
+    .then(r => r.rows[0].n > 0);
 
 /** A callback is a story too — its own rail, on the same ceiling. */
 export const callbacksToday = () =>
@@ -381,18 +388,19 @@ export async function putClaims(claims, { wkey, media_id = null, permalink = nul
   if (!claims.length) return 0;
   const vals = [], params = [];
   claims.forEach((c, i) => {
-    const b = i * 15;
-    vals.push(`(${Array.from({ length: 15 }, (_, k) => `$${b + k + 1}`).join(',')})`);
+    const b = i * 16;
+    vals.push(`(${Array.from({ length: 16 }, (_, k) => `$${b + k + 1}`).join(',')})`);
     params.push(c.tg_id, wkey, media_id, permalink, posted_at, c.msg_ts,
       c.symbol, c.asset, c.klass, c.dir ?? null, c.kind, c.horizon,
       `${c.headline ?? ''}`.slice(0, 300),
       `${c.quote ?? ''}`.slice(0, 300) || null,
-      `${c.reason ?? ''}`.slice(0, 300) || null);
+      `${c.reason ?? ''}`.slice(0, 300) || null,
+      c.src_img ?? null);
   });
   const { rows } = await q(
     `insert into agent.claims
        (tg_id, wkey, media_id, permalink, posted_at, msg_ts,
-        symbol, asset, klass, dir, kind, horizon, headline, quote, reason)
+        symbol, asset, klass, dir, kind, horizon, headline, quote, reason, src_img)
      values ${vals.join(',')}
      on conflict (tg_id, symbol, kind) do nothing
      returning id`, params);
@@ -482,5 +490,32 @@ export const claimScore = (days = 30) =>
      from agent.claims
      where posted_at > extract(epoch from now())::bigint - $1 * 86400
      group by kind order by kind`, [days]).then(r => r.rows);
+
+/**
+ * The honest record: FORECASTS only, settled only, with the misses.
+ *
+ * A follow-up ("we covered it, it kept going") never predicted anything,
+ * so it does not belong in a hit rate. The same call made twice in one
+ * market day (same instrument, same direction, same New York date) is
+ * one call, not two. `hit` out of `hit + miss` is what the account says
+ * about itself, and it is allowed to be unflattering.
+ */
+export const claimRecord = (days = 30) =>
+  q(`select count(distinct (symbol, dir, d)) filter (where status in ('hit','shown'))::int hit,
+            count(distinct (symbol, dir, d)) filter (where status = 'miss')::int miss,
+            count(*) filter (where status = 'open')::int open
+     from (select *, to_char(to_timestamp(posted_at) at time zone 'America/New_York','YYYY-MM-DD') d
+           from agent.claims
+           where kind = 'forecast'
+             and posted_at > extract(epoch from now())::bigint - $1 * 86400) c`, [days])
+    .then(r => r.rows[0] ?? { hit: 0, miss: 0, open: 0 });
+
+/** The latest settled forecasts, hits AND misses, for the record board. */
+export const settledForecasts = (days = 30, limit = 40) =>
+  q(`select * from agent.claims
+     where kind = 'forecast' and status in ('hit','shown','miss')
+       and checked_at > extract(epoch from now())::bigint - $1 * 86400
+       and length(coalesce(headline,'')) >= 20
+     order by checked_at desc limit $2`, [days, limit]).then(r => r.rows);
 
 export const close = () => pool.end();

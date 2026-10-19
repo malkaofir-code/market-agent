@@ -81,3 +81,5 @@ select cron.schedule('market-agent-callback-post', '41 12,13 * * 4',      $$sele
 --   select id, status_code from net._http_response order by id desc limit 5;
 -- A 204 with no publishing means the dispatch left cleanly and the
 -- failure is on GitHub's side — check the run's job for zero steps.
+
+-- Weekly analysts post: see cron-analysts.sql

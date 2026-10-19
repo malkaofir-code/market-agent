@@ -129,6 +129,32 @@ export async function remove(files, prefix) {
   }
 }
 
+/**
+ * Keep one slide. Unlike upload(), nothing deletes it afterwards: the
+ * proof card for a call has to be able to show the post that made it,
+ * and by then the slide has long since been taken down from the bucket's
+ * temporary prefix. Returns the object path, not a URL.
+ */
+export async function archive(file, path) {
+  const body = await readFile(file);
+  const bad = whole(body, 'image/jpeg');
+  if (bad) throw new Error(`${basename(file)} is ${bad} — not archived`);
+  const res = await fetch(`${base()}/storage/v1/object/${bucket()}/${path}`, {
+    method: 'POST', headers: { ...auth(), 'content-type': 'image/jpeg', 'x-upsert': 'true' }, body });
+  if (!res.ok) throw new Error(`archive ${path} -> ${res.status} ${await res.text()}`);
+  return path;
+}
+
+/** An archived slide as a data: URI, so rendering needs no network. */
+export async function archiveData(path) {
+  try {
+    const r = await fetch(`${base()}/storage/v1/object/public/${bucket()}/${path}`);
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    return whole(buf, 'image/jpeg') ? null : `data:image/jpeg;base64,${buf.toString('base64')}`;
+  } catch { return null; }
+}
+
 /** Read-only probe: confirms the key works and the bucket is public. */
 export async function check() {
   const r = await fetch(`${base()}/storage/v1/bucket/${bucket()}`, { headers: auth() });

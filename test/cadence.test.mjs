@@ -37,4 +37,24 @@ check('claim post: cover + 6 cards + record', post.slides.length, 8);
 check('claim post caption lists all six',
   post.caption.split('\n').filter(l => l.startsWith('▪')).length, 6);
 
+
+// ── the honest record: N of M, misses included, no double counting ──
+import { dedupeCalls } from '../src/compose.js';
+const settled = [
+  { ...hit(1, 4), status: 'hit', kind: 'forecast' },
+  { ...hit(2, -2), status: 'miss', kind: 'forecast' },
+];
+const honest = composeCallbackPost(hits.slice(0, 3), { score: { hit: 49, miss: 70 }, recent: settled });
+const rc = honest.slides.find(x => x.type === 'record');
+check('record says the denominator', rc.of.includes('119'), true);
+check('record counts hits', rc.count, '49');
+check('record rows include the miss', rc.items.some(i => i.ok === false), true);
+check('record rows include the hit', rc.items.some(i => i.ok === true), true);
+check('caption states the full record', honest.caption.includes('49 מתוך 119'), true);
+const sbh = composeScoreboardReel(hits, { score: { hit: 49, miss: 70 }, rows: 3 });
+check('scoreboard hook has the denominator', sbh.slides[0].headline.includes('119'), true);
+check('scoreboard caption has the denominator', sbh.caption.includes('49 מתוך 119'), true);
+const twice = dedupeCalls([hit(1, 4), { ...hit(1, 4), id: 99 }]);
+check('same call twice in a day is one call', twice.length, 1);
+
 process.exit(bad ? 1 : 0);

@@ -72,7 +72,7 @@ ${swipe ? `<span class="ft-swipe">${bidi(swipe)}<i aria-hidden="true">←</i></s
 // that it stops someone — so it gets its own world: a printed receipt
 // rather than a news board, its own header band, no tape, and a
 // price line no other archetype has.
-const PROOF = new Set(['proofCert', 'proofVerdict', 'coverProof', 'record']);
+const PROOF = new Set(['proofCert', 'proofVerdict', 'coverProof', 'record', 'proofOrig']);
 
 function proofHead({ date }, slide) {
   return `<header class="pf-hd"><span class="pf-check"></span>
@@ -213,6 +213,22 @@ const ARCHETYPES = {
     </div>
     <p class="pd-sub">${bidi(s.sub)}</p></div>`,
 
+  // 16b · the original post — the call as it ran, before the move.
+  proofOrig: s => `<div class="a-po">
+    <p class="eyeb">${bidi(s.eyebrow || 'הפוסט המקורי')}</p>
+    <figure class="po-fr"><img src="${esc(s.src)}" alt=""></figure>
+    <p class="po-cap">${bidi(s.caption)}</p></div>`,
+
+  // 16c · analysts — other people's calls, with their names on them.
+  analysts: s => `<div class="a-an">
+    <p class="eyeb">${bidi(s.eyebrow || 'דעות בתי ההשקעות')}</p>
+    <ul class="an-list">${(s.rows ?? []).map(r => `<li class="${esc(r.dir)}">
+      <div class="an-top"><b class="an-firm">${esc(r.firm)}</b>
+        <span class="an-act">${bidi(r.label)}</span>
+        ${r.target ? `<span class="an-pt">${bidi('יעד')} <bdi dir="ltr">${esc(r.target)}</bdi></span>` : ''}</div>
+      <p class="an-tx">${bidi(r.text)}</p></li>`).join('')}</ul>
+    <p class="an-note">${bidi(s.note)}</p></div>`,
+
   // 17 · the proof post's opening.
   coverProof: s => `<div class="a-pv">
     <p class="eyeb">${bidi(s.eyebrow || 'הקריאות שלנו')}</p>
@@ -226,8 +242,8 @@ const ARCHETYPES = {
     <div class="rc-head"><b class="rc-n">${esc(s.count)}</b>
       <span class="rc-of">${bidi(s.of)}</span></div>
     <ul class="rc-list">${(s.items ?? []).map(i =>
-      `<li><span class="rc-a">${bidi(i.asset)}</span><span class="rc-d">${bidi(i.when)}</span>
-       <b class="rc-m">${esc(i.move)}</b></li>`).join('')}</ul>
+      `<li${i.ok === false ? ' class="no"' : ''}>${i.ok === undefined ? '' : `<i class="rc-k">${i.ok ? '✓' : '✗'}</i>`}<span class="rc-a">${bidi(i.asset)}</span><span class="rc-d">${bidi(i.when)}</span>
+       <b class="rc-m ${i.dir ?? ''}">${esc(i.move)}</b></li>`).join('')}</ul>
     <p class="rc-note">${bidi(s.note)}</p></div>`,
 
   // 01 · cover — the photo bleeds off the top and dissolves into the
@@ -639,6 +655,8 @@ const GROUND = {
   proofVerdict: 'verd',   // the green field
   coverProof:   'verd',
   record:       'sheet',
+  proofOrig:    'sheet',
+  analysts:     'doc',
 };
 
 // Which pose suits which board. The wardrobe rotates on top of this —
@@ -670,7 +688,7 @@ const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed'
   // steps, and he has just presented the meaning on the board before.
   'lesson', 'brief', 'outlook', 'detail',
   // The record is a table. He has nowhere to stand on it.
-  'record']);
+  'record', 'proofOrig', 'analysts']);
 
 /**
  * The mascot layer. `ctx.poses` is filled by render.js, which owns the
@@ -728,7 +746,7 @@ function ronLayer(slide, ctx, i = 0) {
 const SECONDARY = new Set(['item', 'list', 'chart', 'watch', 'telegram', 'record']);
 
 // The tape is the news board's signature row. A receipt has no tape.
-const NO_TAPE = new Set(['telegram', 'proofCert', 'proofVerdict', 'coverProof', 'record',
+const NO_TAPE = new Set(['telegram', 'proofCert', 'proofVerdict', 'coverProof', 'record', 'proofOrig',
   'sceneProof']);
 const COVERS = new Set(['cover', 'coverFramed']);   // overlay grid
 const BLEED = new Set(['cover']);                  // photo escapes the band

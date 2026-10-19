@@ -7,6 +7,7 @@ import { parse, score, direction } from './parse.js';
 import { clean, stripLeadEmoji } from './rtl.js';
 import { byId } from './templates.js';
 import { lessonFor } from './lessons.js';
+import { analystsFrom } from './analysts.js';
 import { outlookFor, outlookLine } from './outlook.js';
 import { glossFor } from './glossary.js';
 import 'dotenv/config';
@@ -1510,15 +1511,54 @@ export function composeCallback(claim, { palette = null, now = null, variant = n
 
 const PROOF_GROUNDS = ['deep', 'ink', 'slate'];
 
-export function composeCallbackPost(hits, { now = null, score = null } = {}) {
+/** The post that made a call, as it ran. */
+export function originalSlide(claim) {
+  return { type: 'proofOrig', palette: null, tag: 'המקור',
+    eyebrow: `הפוסט המקורי · ${dmy(Number(claim.posted_at))}`,
+    src: claim.src_url,
+    caption: `${claim.asset}: ככה זה פורסם, לפני התנועה. בשקף הבא, מה קרה בשוק.` };
+}
+
+/** One call per instrument, direction and market day. */
+export function dedupeCalls(rows) {
+  const seen = new Set();
+  return (rows ?? []).filter(c => {
+    const k = `${c.symbol}|${c.dir ?? ''}|${localDay(Number(c.posted_at))}`;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+}
+
+/**
+ * "49 out of 119", said plainly. `score` is { hit, miss }; a record
+ * that only knows its hits cannot be written, so without `miss` the
+ * caller gets null and falls back to wording that claims no rate.
+ */
+function ratio(score) {
+  if (!score || typeof score.miss !== 'number') return null;
+  const hit = Number(score.hit) || 0, tot = hit + score.miss;
+  return tot ? { hit, tot, pct: Math.round(hit / tot * 100) } : null;
+}
+
+export function composeCallbackPost(hits, { now = null, score = null, recent = null } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   if (!hits?.length) return { skip: 'nothing proven' };
 
   // The grounds come from the archetype now — paper for the
   // receipts, the accent field for the verdict — so the cards only
   // have to alternate SHAPE, which they do by variant.
-  const cards = hits.map((h, i) =>
-    proofSlide(h, { palette: null, variant: PROOF_VARIANTS[i % PROOF_VARIANTS.length] }));
+  // A call with its original post gets two boards: the post as it ran,
+  // then what the market did. A claim is only as good as the proof that
+  // it was made before the move, and that proof is the post itself.
+  // An Instagram carousel holds ten, so the originals stop when the
+  // cover, the record and the verdicts no longer leave room for them.
+  const LIMIT = 10;
+  let spare = LIMIT - 2 - hits.length;
+  const cards = hits.flatMap((h, i) => {
+    const card = proofSlide(h, { palette: null, variant: PROOF_VARIANTS[i % PROOF_VARIANTS.length] });
+    if (h.src_url && spare > 0) { spare--; return [originalSlide(h), card]; }
+    return [card];
+  });
 
   const n = hits.length;
   const cover = {
@@ -1531,21 +1571,28 @@ export function composeCallbackPost(hits, { now = null, score = null } = {}) {
   };
 
   // The record board, and the only place the method is written down.
-  // A hit rate with nothing under it is a number anybody can print.
-  const items = hits.slice(0, 5).map(h => ({
+  // A hit rate with nothing under it is a number anybody can print, and
+  // a hit COUNT with no denominator is worse: it is the same number
+  // with the part that matters taken out. So the board says "N of M",
+  // and its rows are the latest settled forecasts, misses included.
+  const rt = ratio(score);
+  const shown = dedupeCalls(recent?.length ? recent : hits).slice(0, 5);
+  const items = shown.map(h => ({
     asset: h.asset,
     when: dmy(Number(h.posted_at)),
     move: `${Number(h.move_pct) > 0 ? '+' : ''}${Number(h.move_pct).toFixed(1)}%`,
     dir: Number(h.move_pct) >= 0 ? 'up' : 'dn',
+    ok: rt ? ['hit', 'shown'].includes(h.status) : undefined,
   }));
-  const hit30 = score?.hit ?? n;
+  const hit30 = rt ? rt.hit : (score?.hit ?? n);
   const rec = {
     type: 'record', palette: null, tag: 'השיא', method: 'ללא בחירת תאריכים בדיעבד',
-    eyebrow: '30 הימים האחרונים',
+    eyebrow: rt ? 'תחזיות · 30 הימים האחרונים' : '30 הימים האחרונים',
     count: String(hit30),
-    of: hit30 === 1 ? 'עדכון שהשוק אישר' : 'עדכונים שהשוק אישר',
+    of: rt ? `מתוך ${rt.tot} תחזיות התממשו` : (hit30 === 1 ? 'עדכון שהשוק אישר' : 'עדכונים שהשוק אישר'),
     items,
-    note: 'נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
+    note: (rt ? 'כולל מה שלא התממש. ' : '')
+        + 'נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
         + 'עד שלושה ימי מסחר. בלי בחירת תאריכים בדיעבד.',
   };
 
@@ -1555,6 +1602,8 @@ export function composeCallbackPost(hits, { now = null, score = null } = {}) {
     + `תוך ${sessions(Number(h.days_after) || 1)}`).join('\n');
   const caption = 'שוק ההון האמריקאי | מה שאמרנו · ומה שקרה\n\n'
     + `${lines}\n\n`
+    + (rt ? `הרשומה המלאה: ${rt.hit} מתוך ${rt.tot} תחזיות התממשו ב-30 הימים האחרונים (${rt.pct}%). `
+          + 'השאר לא התממשו, והן נספרות.\n' : '')
     + 'כל מספר כאן נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
     + 'עד שלושה ימי מסחר, בלי לבחור תאריכים בדיעבד.\n'
     + `עדכונים שוטפים · @marketalert.il\n`
@@ -1625,7 +1674,8 @@ export function composeProofReel(claim, { now = null, score = null } = {}) {
     S('number', { ground: 'verd', eyebrow: claim.asset, big: figure,
       sub: `${days} אחרי הפוסט` }),
     S('record', { ground: 'sheet', eyebrow: '30 הימים האחרונים',
-      big: String(score?.hit ?? 1), headline: 'קריאות שהשוק אישר',
+      big: String(ratio(score)?.hit ?? score?.hit ?? 1),
+      headline: ratio(score) ? `מתוך ${ratio(score).tot} תחזיות התממשו` : 'קריאות שהשוק אישר',
       sub: 'נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו. בלי בחירת תאריכים בדיעבד.' }),
   ];
 
@@ -1653,7 +1703,8 @@ export function composeProofReel(claim, { now = null, score = null } = {}) {
 export function composeScoreboardReel(hits, { now = null, score = null, days = 30, rows = 3 } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   if (!hits?.length) return { skip: 'nothing proven' };
-  const n = score?.hit ?? hits.length;
+  const rt = ratio(score);
+  const n = rt ? rt.hit : (score?.hit ?? hits.length);
 
   const row = h => {
     const move = Number(h.move_pct);
@@ -1669,12 +1720,12 @@ export function composeScoreboardReel(hits, { now = null, score = null, days = 3
 
   const slides = [
     { type: 'sceneProof', beat: 'hook', ground: 'verd',
-      headline: `${n}\nקריאות.\nהשוק אישר.`,
+      headline: rt ? `${n} מתוך\n${rt.tot}\nתחזיות התממשו.` : `${n}\nקריאות.\nהשוק אישר.`,
       sub: `${days} הימים האחרונים` },
     ...hits.slice(0, rows).map(row),
     { type: 'sceneProof', beat: 'record', ron: null, ground: 'sheet',
       eyebrow: 'איך זה נמדד', big: String(n),
-      headline: 'קריאות שהשוק אישר',
+      headline: rt ? `מתוך ${rt.tot} תחזיות. גם הפספוסים נספרים` : 'קריאות שהשוק אישר',
       sub: 'ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, עד שלושה ימי מסחר. '
          + 'בלי בחירת תאריכים בדיעבד.' },
   ];
@@ -1683,11 +1734,49 @@ export function composeScoreboardReel(hits, { now = null, score = null, days = 3
   const lines = hits.map(h =>
     `▪ ${dmy(Number(h.posted_at))} · ${h.asset} ${Number(h.move_pct) > 0 ? '+' : ''}`
     + `${Number(h.move_pct).toFixed(1)}% — ${h.headline ?? ''}`).join('\n');
-  const caption = `${n} קריאות שהשוק אישר ב-${days} הימים האחרונים\n\n${lines}\n\n`
+  const caption = (rt ? `${n} מתוך ${rt.tot} תחזיות התממשו ב-${days} הימים האחרונים (${rt.pct}%). השאר לא התממשו, והן נספרות.\n\nהקריאות שהתממשו:\n`
+    : `${n} קריאות שהשוק אישר ב-${days} הימים האחרונים\n\n`) + `${lines}\n\n`
     + 'כל מספר נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
     + 'עד שלושה ימי מסחר, בלי לבחור תאריכים בדיעבד.\n'
     + `${searchLine()}\n@marketalert.il`;
 
   return { key: `R:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
     stamp: '', quotes: [], slides, caption, scoreboard: true, claimIds: hits.map(h => h.id) };
+}
+
+
+// ── the analysts post ────────────────────────────────────────
+//
+// Once a week, what the investment banks said, with their names on it.
+// It is the account's answer to "what do you recommend", and the answer
+// is: here is what the firms that are licensed to recommend said, and
+// here is what we are not saying. Nothing on it is our view, and the
+// words "לא המלצה שלנו" are on the cover, every board and the caption.
+export const ANALYST_DISCLAIMER = 'דעות של בתי השקעות כפי שדווחו בערוץ. לא המלצה שלנו ולא ייעוץ השקעות.';
+
+export function composeAnalysts(rows, { now = null, perBoard = 4, boards = 2, min = 4 } = {}) {
+  const at = now ?? Math.floor(Date.now() / 1000);
+  const calls = analystsFrom(rows, { max: perBoard * boards });
+  if (calls.length < min) return { skip: `only ${calls.length} attributed analyst move(s) (need ${min})` };
+
+  const cover = {
+    type: 'cover', palette: null,
+    eyebrow: 'המלצות האנליסטים',
+    headline: 'מה בתי ההשקעות אומרים השבוע',
+    stand: `${calls.length} שינויי דירוג ויעדי מחיר, כל אחד עם שם הבנק שאמר אותו. `
+         + 'אלה הדעות שלהם, לא ההמלצה שלנו.',
+  };
+  const slides = [cover];
+  for (let i = 0; i < calls.length; i += perBoard) {
+    slides.push({ type: 'analysts', palette: null, eyebrow: 'דעות בתי ההשקעות · לא המלצה שלנו',
+      rows: calls.slice(i, i + perBoard), note: ANALYST_DISCLAIMER });
+  }
+  const lines = calls.map(c =>
+    `▪ ${c.firm} · ${c.label}${c.target ? ` · יעד ${c.target}` : ''}\n   ${c.text}`).join('\n');
+  const caption = 'המלצות האנליסטים | מה בתי ההשקעות אמרו השבוע\n\n'
+    + `${lines}\n\n${ANALYST_DISCLAIMER}\n`
+    + 'החשבון הזה אינו יועץ השקעות מורשה. המידע לצורכי עניין בלבד.\n'
+    + `${searchLine()}\n@marketalert.il`;
+  return { key: `AN:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
+    stamp: '', quotes: [], slides, caption, analysts: true, callIds: calls.map(c => c.tg_id) };
 }

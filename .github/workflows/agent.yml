@@ -51,9 +51,9 @@ on:
         type: boolean
         default: false
       mode:
-        description: 'digest = the carousel; stories = the hour as story boards; insights = read the account back, publish nothing; reel = one MP4 to the only surface strangers see; callback = check what we claimed against what the market did'
+        description: 'digest = the carousel; stories = the hour as story boards; insights = read the account back, publish nothing; reel = one MP4 to the only surface strangers see; callback = check what we claimed against what the market did; analysts = weekly attributed analyst ratings and price targets'
         type: choice
-        options: [digest, stories, insights, reel, callback]
+        options: [digest, stories, insights, reel, callback, analysts]
         default: digest
       now:
         description: 'Ignore the digest schedule and post this one now'
@@ -345,13 +345,15 @@ jobs:
           # Thursday afternoon, and everything that settled since last
           # Thursday goes in it — PROOF_POST_DAYS is the seven days
           # between editions, so nothing is shown twice and nothing is
-          # missed. Six cards plus the cover and the record board fits
+          # missed. Four calls, each with its original post, plus the cover and the record board fill
           # inside a carousel.
           CALLBACK_POST_DAY: 'Thu'
           CALLBACK_POST_HOURS: '15'
+          ANALYSTS_DAY: 'Wed'
+          ANALYSTS_HOURS: '18'
           MAX_CALLBACK_POSTS_PER_DAY: '1'
           PROOF_POST_MIN: '2'
-          PROOF_POST_MAX: '6'
+          PROOF_POST_MAX: '4'
           PROOF_POST_DAYS: '7'
           # How far back the first run reaches to find claims the
           # account already made. Costs nothing after that: the unique

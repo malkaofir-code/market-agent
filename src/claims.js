@@ -98,6 +98,8 @@ const DRIVER = [he('תשואות'), he('תשואת'), he('תשואה'), he('רי
 // Deliberately narrow: every word here has to be unambiguously
 // forward-looking on its own, because a report mistaken for a
 // forecast becomes a card claiming we predicted yesterday.
+// Not לקראת / ערב: "החוזים שליליים לקראת הפגישה" puts a calendar next to
+// a price report. 29 of 192 stored forecasts rested on those two words alone.
 // Not סיכון: "תיאבון סיכון" describes the market as it is, and a
 // sentence REPORTING risk appetite was filed as a bitcoin forecast.
 const FORWARD = [
@@ -106,7 +108,7 @@ const FORWARD = [
   'תחזית', 'תחזיות', 'מעריכים', 'הערכות', 'מזהיר', 'מזהירה', 'מזהירים',
   'אזהרה', 'חשש', 'חוששים', 'צופה', 'צופים', 'מצפים', 'ציפיות',
   'יוביל', 'תוביל', 'ישפיע', 'תשפיע', 'ילחץ', 'תלחץ', 'יתמוך', 'תתמוך',
-  'יעד מחיר', 'מחיר יעד', 'המלצה', 'לקראת', 'ערב', 'בדרך ל', 'עלול להוביל',
+  'יעד מחיר', 'מחיר יעד', 'המלצה', 'בדרך ל', 'עלול להוביל',
   'אם ', 'ככל ש', 'עומד ל', 'עומדת ל', 'יכריז', 'תכריז', 'יפרסם', 'תפרסם',
 ].map(w => he(flat(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
