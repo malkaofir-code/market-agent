@@ -18,7 +18,7 @@ const rows = [
 check('a roundup naming no firm is not a call', analystCall(rows[4]), null);
 check('a product launch is not a call', analystCall(rows[5]), null);
 check('upgrade reads the target', analystCall(rows[0]).target, '$45');
-check('upgrade is labelled as one', analystCall(rows[0]).label, 'שדרוג');
+check('upgrade is labelled in plain words', analystCall(rows[0]).label, 'שדרג את דעתו');
 check('"raised to" reads the NEW target', analystCall(rows[1]).target, '$884');
 check('firm on a later line still counts', analystCall(rows[3]).firm, 'Barclays');
 check('downgrade is red', analystCall(rows[3]).dir, 'dn');
@@ -46,7 +46,7 @@ check('every story board carries a note', st.slides.every(x => x.analystNote), t
 process.env.DIGEST_FORMAT = 'lesson';
 const dg = compose(fx, { analysts: pool, endTs: fx.at(-1).ts + 60 });
 check('digest cover carries a note', !!dg.slides[0].analystNote, true);
-check('digest caption has the attributed line', dg.caption.includes('לא המלצה שלנו'), true);
+check('digest caption has the attributed line', dg.caption.includes('לא ההמלצה שלנו'), true);
 const off = compose(fx, { endTs: fx.at(-1).ts + 60 });
 check('no pool, no note', off.slides[0].analystNote ?? null, null);
 
@@ -59,5 +59,15 @@ check('ten strongest hits', rr.hits.length, 10);
 check('strongest hit first', rr.hits[0].move_pct, '14');
 check('five worst misses', rr.misses.length, 5);
 check('worst miss first', rr.misses[0].move_pct, '-7.5');
+
+
+import { plainNote } from '../src/analysts.js';
+const pn = plainNote(noteFor('Meta Platforms קופצת', analystPool([rows[1]])));
+check('plain note names the house and the number', pn.line.includes('בית ההשקעות UBS') && pn.line.includes('$884'), true);
+check('plain note says what a price target is for', pn.line.includes('יכולה להגיע אליו'), true);
+check('plain note is not advice', pn.hint, 'דעת הבנק, לא ההמלצה שלנו');
+const up = plainNote({ firm: 'Goldman Sachs', act: 'up', subject: 'Zeta', about: 'story', target: '$45', label: 'x' });
+check('upgrade explained as what it means', up.line.includes('הוא חושב עליה יותר טוב מקודם'), true);
+check('no jargon words in a note', !/דירוג|Overweight|Outperform/.test(up.line + pn.line), true);
 
 process.exit(bad ? 1 : 0);

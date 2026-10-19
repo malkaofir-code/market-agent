@@ -7,7 +7,7 @@ import { parse, score, direction } from './parse.js';
 import { clean, stripLeadEmoji } from './rtl.js';
 import { byId } from './templates.js';
 import { lessonFor } from './lessons.js';
-import { analystsFrom, noteFor } from './analysts.js';
+import { analystsFrom, noteFor, plainNote, TARGET_HINT } from './analysts.js';
 import { outlookFor, outlookLine } from './outlook.js';
 import { glossFor } from './glossary.js';
 import 'dotenv/config';
@@ -592,9 +592,8 @@ function factsOf(p, { cap = 190 } = {}) {
 /** The deck's caption, in the same order as the boards. */
 /** One caption line for the analyst note. Attributed, never ours. */
 export function analystLine(n) {
-  if (!n) return '';
-  const what = [n.firm, n.label, n.subject, n.target ? `יעד ${n.target}` : null].filter(Boolean).join(' · ');
-  return `🏦 ${n.about === 'story' ? 'אנליסט' : 'האנליסטים השבוע'}: ${what} (דעתם, לא המלצה שלנו)`;
+  const p = plainNote(n);
+  return p ? `🏦 ${p.line}. (${p.hint})` : '';
 }
 
 function lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystNote = null }) {
@@ -1820,12 +1819,12 @@ export function composeAnalysts(rows, { now = null, perBoard = 4, boards = 2, mi
   const slides = [cover];
   for (let i = 0; i < calls.length; i += perBoard) {
     slides.push({ type: 'analysts', palette: null, eyebrow: 'דעות בתי ההשקעות · לא המלצה שלנו',
-      rows: calls.slice(i, i + perBoard), note: ANALYST_DISCLAIMER });
+      rows: calls.slice(i, i + perBoard), hint: TARGET_HINT, note: ANALYST_DISCLAIMER });
   }
   const lines = calls.map(c =>
-    `▪ ${c.firm} · ${c.label}${c.target ? ` · יעד ${c.target}` : ''}\n   ${c.text}`).join('\n');
+    `▪ ${c.firm} ${c.label}${c.target ? ` · יעד ${c.target}` : ''}\n   ${c.text}`).join('\n');
   const caption = 'המלצות האנליסטים | מה בתי ההשקעות אמרו השבוע\n\n'
-    + `${lines}\n\n${ANALYST_DISCLAIMER}\n`
+    + `${lines}\n\n${TARGET_HINT}.\n${ANALYST_DISCLAIMER}\n`
     + 'החשבון הזה אינו יועץ השקעות מורשה. המידע לצורכי עניין בלבד.\n'
     + `${searchLine()}\n@marketalert.il`;
   return { key: `AN:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),

@@ -3,6 +3,7 @@
 // Pure: deck plan in, HTML out. No I/O, no layout measurement.
 // (Overflow is measured in render.js, which owns a real browser.)
 // ─────────────────────────────────────────────────────────────
+import { plainNote } from './analysts.js';
 import { bidi, esc } from './rtl.js';
 import { vars, byId } from './templates.js';
 
@@ -55,9 +56,9 @@ function tgStrip(link) {
 
 /** The analysts' word, printed on the board that tells the move. */
 function analystStrip(n) {
-  const what = [n.label, n.subject].filter(Boolean).map(x => bidi(x)).join(' · ');
-  return `<div class="an-strip"><span class="an-l">${bidi(n.about === 'story' ? 'אנליסט' : 'אנליסטים השבוע')}</span>
-<b class="an-f">${esc(n.firm)}</b><span class="an-w">${what}</span>${n.target ? `<span class="an-t"><bdi dir="ltr">${esc(n.target)}</bdi> ${bidi('יעד')}</span>` : ''}</div>`;
+  const p = plainNote(n);
+  return `<div class="an-strip"><span class="an-l">${bidi(n.about === 'story' ? 'מה אומר אנליסט' : 'מה אומרים האנליסטים')}</span>
+<p class="an-s">${bidi(p.line)}</p><p class="an-h">${bidi(p.hint)}</p></div>`;
 }
 
 // ── band D: footnote ─────────────────────────────────────────
@@ -234,6 +235,7 @@ const ARCHETYPES = {
         <span class="an-act">${bidi(r.label)}</span>
         ${r.target ? `<span class="an-pt">${bidi('יעד')} <bdi dir="ltr">${esc(r.target)}</bdi></span>` : ''}</div>
       <p class="an-tx">${bidi(r.text)}</p></li>`).join('')}</ul>
+    ${s.hint ? `<p class="an-hint">${bidi(s.hint)}</p>` : ''}
     <p class="an-note">${bidi(s.note)}</p></div>`,
 
   // 17 · the proof post's opening.

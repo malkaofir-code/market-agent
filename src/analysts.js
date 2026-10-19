@@ -43,12 +43,12 @@ export const FIRMS = [
 // target raise inside a sentence that also says "kept the rating" is
 // still a target raise.
 const ACTIONS = [
-  ['init', 'כיסוי חדש', 'nu', /כיסוי|המלצת (?:קנייה|מכירה) ראשונה|פתח(?:ה|ו)? (?:את )?(?:ה)?כיסוי|פתח(?:ה|ו)? ב(?:דירוג|המלצ)/],
-  ['up', 'שדרוג', 'up', /שדרג|שדרוג|(?:העלה|העלתה|מעלה|מעלים)(?: את)? (?:ה)?(?:דירוג|המלצ)/],
-  ['dn', 'הורדת דירוג', 'dn', /(?:הוריד|הורידה|הורידו|מוריד|מורידה|מורידים)(?: את)? (?:ה)?(?:דירוג|המלצ)|הורדת (?:ה)?(?:דירוג|המלצ)/],
-  ['ptup', 'העלאת יעד', 'up', /(?:העלה|העלתה|העלו|מעלה|מעלים)(?: את)? (?:ה)?מחיר(?:י)? ?(?:ה)?יעד/],
-  ['ptdn', 'הורדת יעד', 'dn', /(?:הוריד|הורידה|הורידו|מוריד|מורידה|מורידים)(?: את)? (?:ה)?מחיר(?:י)? ?(?:ה)?יעד/],
-  ['same', 'אישור המלצה', 'nu', /שימר|שומר|שמרו|חזר(?:ה)? ואישר|אישוש|מחזק(?:ת)? (?:את )?(?:ה)?המלצ|מאשר(?:ת)? (?:את )?(?:ה)?המלצ/],
+  ['init', 'התחיל לעקוב', 'nu', /כיסוי|המלצת (?:קנייה|מכירה) ראשונה|פתח(?:ה|ו)? (?:את )?(?:ה)?כיסוי|פתח(?:ה|ו)? ב(?:דירוג|המלצ)/],
+  ['up', 'שדרג את דעתו', 'up', /שדרג|שדרוג|(?:העלה|העלתה|מעלה|מעלים)(?: את)? (?:ה)?(?:דירוג|המלצ)/],
+  ['dn', 'הוריד את דעתו', 'dn', /(?:הוריד|הורידה|הורידו|מוריד|מורידה|מורידים)(?: את)? (?:ה)?(?:דירוג|המלצ)|הורדת (?:ה)?(?:דירוג|המלצ)/],
+  ['ptup', 'העלה יעד מחיר', 'up', /(?:העלה|העלתה|העלו|מעלה|מעלים)(?: את)? (?:ה)?מחיר(?:י)? ?(?:ה)?יעד/],
+  ['ptdn', 'הוריד יעד מחיר', 'dn', /(?:הוריד|הורידה|הורידו|מוריד|מורידה|מורידים)(?: את)? (?:ה)?מחיר(?:י)? ?(?:ה)?יעד/],
+  ['same', 'נשאר בדעתו', 'nu', /שימר|שומר|שמרו|חזר(?:ה)? ואישר|אישוש|מחזק(?:ת)? (?:את )?(?:ה)?המלצ|מאשר(?:ת)? (?:את )?(?:ה)?המלצ/],
 ];
 const RANK = { init: 0, up: 0, dn: 0, ptup: 1, ptdn: 1, same: 2 };
 
@@ -171,6 +171,32 @@ export function noteFor(story, pool, { skip = null, seed = 0 } = {}) {
   });
   const c = hit ?? calls[Math.abs(seed) % Math.min(calls.length, 4)];
   const shared = hit ? subjectsOf(hit.blob).find(x => mine.includes(x.toUpperCase())) : null;
-  return { firm: c.firm, label: c.label, target: c.target, dir: c.dir,
+  return { firm: c.firm, label: c.label, act: c.act, target: c.target, dir: c.dir,
     subject: shared ?? subjectsOf(c.blob)[0] ?? null, about: hit ? 'story' : 'week' };
+}
+
+/** What a price target is, once, in words a newcomer has. */
+export const TARGET_HINT = 'יעד מחיר = המחיר שהבנק חושב שהמניה יכולה להגיע אליו, בדרך כלל בתוך כשנה';
+
+/**
+ * The note as one plain Hebrew sentence a non-trader can read, and the
+ * line under it. The sentence only restates what the channel reported:
+ * who, what they did, and the number. "Upgraded" is explained as what it
+ * means (they think better of the stock than before), never as advice.
+ */
+export function plainNote(n) {
+  if (!n) return null;
+  const who = `בית ההשקעות ${n.firm}`;
+  const on = n.subject ? ` על ${n.subject}` : '';
+  const tgt = n.target ? ` ל-${n.target}` : '';
+  const line = {
+    up:   `${who} שדרג את דעתו${on}: הוא חושב עליה יותר טוב מקודם`,
+    dn:   `${who} הוריד את דעתו${on}: הוא חושב עליה פחות טוב מקודם`,
+    ptup: `${who} העלה את המחיר שהוא חושב שהמניה${n.subject ? ` של ${n.subject}` : ''} יכולה להגיע אליו${tgt}`,
+    ptdn: `${who} הוריד את המחיר שהוא חושב שהמניה${n.subject ? ` של ${n.subject}` : ''} יכולה להגיע אליו${tgt}`,
+    init: `${who} התחיל לעקוב${n.subject ? ` אחרי ${n.subject}` : ' אחרי מניה'}${n.target ? `, והמחיר שהוא רואה: ${n.target}` : ''}`,
+    same: `${who} נשאר בדעתו${on}${n.target ? `, עם מחיר יעד של ${n.target}` : ''}`,
+  }[n.act] ?? `${who} ${n.label}${on}`;
+  return { line: n.about === 'week' ? `השבוע בוול סטריט: ${line}` : line,
+    hint: 'דעת הבנק, לא ההמלצה שלנו' };
 }

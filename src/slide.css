@@ -459,16 +459,14 @@ html,body{margin:0;padding:0;background:var(--bg)}
 /* ── the analyst strip ────────────────────────────────────────────
    One attributed line under a movement: which bank said what. Quiet
    by design: it is context, not the headline. */
-.an-strip{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-top:14px;
-  padding:12px 4px 0;border-top:2px solid var(--rule);position:relative;z-index:4;color:var(--fg)}
-.an-strip .an-l{font-family:var(--f-mono);font-size:19px;font-weight:700;letter-spacing:.14em;
-  color:var(--acc)}
-.an-strip .an-f{font-family:var(--f-mono);font-size:26px;font-weight:700;direction:ltr;unicode-bidi:isolate}
-.an-strip .an-w{font-size:24px;opacity:.85}
-.an-strip .an-t{font-family:var(--f-mono);font-size:24px;margin-inline-start:auto}
-.slide--story .an-strip{margin-top:22px;padding-top:16px}
-.slide--story .an-strip .an-f{font-size:34px} .slide--story .an-strip .an-w,.slide--story .an-strip .an-t{font-size:30px}
-.slide--story .an-strip .an-l{font-size:22px}
+.an-strip{display:flex;flex-direction:column;gap:6px;margin-top:14px;
+  padding:14px 4px 0;border-top:2px solid var(--rule);position:relative;z-index:4;color:var(--fg)}
+.an-strip .an-l{font-family:var(--f-mono);font-size:20px;font-weight:700;letter-spacing:.1em;color:var(--acc)}
+.an-strip .an-s{font-size:30px;font-weight:700;line-height:1.28;margin:0}
+.an-strip .an-h{font-size:22px;line-height:1.3;margin:0;opacity:.7}
+.slide--story .an-strip{margin-top:22px;padding-top:18px}
+.slide--story .an-strip .an-s{font-size:38px} .slide--story .an-strip .an-h{font-size:26px}
+.slide--story .an-strip .an-l{font-size:24px}
 
 /* ── Ron's board ────────────────────────────────────────────────
    The interpretation, with him presenting it. The tail on the block
@@ -898,6 +896,7 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 .a-an li.nu .an-act{color:var(--dim2)}
 .a-an .an-pt{font-family:var(--f-mono);font-size:28px;margin-inline-start:auto;color:var(--fg)}
 .a-an .an-tx{font-size:33px;line-height:1.38;margin:0;color:var(--fg)}
+.a-an .an-hint{font-size:27px;line-height:1.4;margin:0;color:var(--fg);font-weight:700}
 .a-an .an-note{font-size:25px;line-height:1.4;color:var(--dim2);margin:0;
   border-top:2px solid var(--fg);padding-top:16px}
 
