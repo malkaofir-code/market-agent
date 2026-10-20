@@ -58,24 +58,24 @@ const PALETTES = {
               acc:'#FFB454', pos:'#6FD79B', neg:'#FF8A7A', grid:'rgba(246,238,228,.04)' },
 
   // ── paper worlds ───────────────────────────────────────────
-  doc:      { bg:'#EDE8DE', fg:'#14161A', dim:'#6C6659', dim2:'#3C3A34', rule:'#C6BEAE',
-              acc:'#FF6B1A', pos:'#12833F', neg:'#B0271F', grid:'rgba(20,22,26,.05)' },
-  ice:      { bg:'#E8EFF5', fg:'#0F1A24', dim:'#5E7387', dim2:'#2C3E4E', rule:'#BACBD9',
-              acc:'#0F62C4', pos:'#0E7A47', neg:'#B0271F', grid:'rgba(15,26,36,.05)' },
-  sand:     { bg:'#F2E7D3', fg:'#1D1710', dim:'#7A6A50', dim2:'#413523', rule:'#D3C2A2',
-              acc:'#C4520F', pos:'#12833F', neg:'#B0271F', grid:'rgba(29,23,16,.05)' },
+  doc:      { bg:'#EDE8DE', fg:'#14161A', dim:'#5C574B', dim2:'#3C3A34', rule:'#C6BEAE',
+              acc:'#FF6B1A', pos:'#0E6E35', neg:'#B0271F', grid:'rgba(20,22,26,.05)' },
+  ice:      { bg:'#E8EFF5', fg:'#0F1A24', dim:'#4C6175', dim2:'#2C3E4E', rule:'#BACBD9',
+              acc:'#0F62C4', pos:'#0B6A3D', neg:'#B0271F', grid:'rgba(15,26,36,.05)' },
+  sand:     { bg:'#F2E7D3', fg:'#1D1710', dim:'#655740', dim2:'#413523', rule:'#D3C2A2',
+              acc:'#C4520F', pos:'#0E6E35', neg:'#B0271F', grid:'rgba(29,23,16,.05)' },
 
   // ── fields: the accent IS the ground ───────────────────────
-  flare:    { bg:'#FF6B1A', fg:'#120A04', dim:'rgba(18,10,4,.62)', dim2:'rgba(18,10,4,.84)',
+  flare:    { bg:'#FF6B1A', fg:'#120A04', dim:'rgba(18,10,4,0.80)', dim2:'rgba(18,10,4,.84)',
               rule:'rgba(18,10,4,.3)', acc:'#120A04', pos:'#120A04', neg:'#120A04',
               grid:'rgba(20,22,26,.05)' },
-  citrus:   { bg:'#E8FF4F', fg:'#12140A', dim:'rgba(18,20,10,.6)', dim2:'rgba(18,20,10,.84)',
+  citrus:   { bg:'#E8FF4F', fg:'#12140A', dim:'rgba(18,20,10,0.80)', dim2:'rgba(18,20,10,.84)',
               rule:'rgba(18,20,10,.28)', acc:'#12140A', pos:'#12140A', neg:'#12140A',
               grid:'rgba(18,20,10,.05)' },
-  cobalt:   { bg:'#1F4FE0', fg:'#F4F7FF', dim:'rgba(244,247,255,.66)', dim2:'rgba(244,247,255,.88)',
-              rule:'rgba(244,247,255,.3)', acc:'#E8FF4F', pos:'#8CF5C0', neg:'#FFB0B8',
+  cobalt:   { bg:'#1F4FE0', fg:'#F4F7FF', dim:'rgba(244,247,255,0.88)', dim2:'rgba(244,247,255,.88)',
+              rule:'rgba(244,247,255,.3)', acc:'#E8FF4F', pos:'#8CF5C0', neg:'#FFD0D6',
               grid:'rgba(244,247,255,.06)' },
-  rose:     { bg:'#E8467A', fg:'#FFF2F6', dim:'rgba(255,242,246,.68)', dim2:'rgba(255,242,246,.9)',
+  rose:     { bg:'#B42858', fg:'#FFF2F6', dim:'rgba(255,242,246,0.9)', dim2:'rgba(255,242,246,.9)',
               rule:'rgba(255,242,246,.32)', acc:'#FFE45C', pos:'#9BF5CE', neg:'#FFD2D8',
               grid:'rgba(255,242,246,.06)' },
 
@@ -96,21 +96,21 @@ const PALETTES = {
               acc:'#7AE8C0', pos:'#7AE8C0', neg:'#FF6F7D', grid:'rgba(233,237,240,.035)' },
 
   // ── paper worlds ───────────────────────────────────────────
-  linen:    { bg:'#F5F1E8', fg:'#191713', dim:'#736C5E', dim2:'#403B31', rule:'#D2C9B6',
-              acc:'#A8321E', pos:'#12833F', neg:'#A8321E', grid:'rgba(25,23,19,.05)' },
-  newsprint:{ bg:'#DEDCD6', fg:'#101010', dim:'#63615B', dim2:'#33322E', rule:'#B4B1A8',
+  linen:    { bg:'#F5F1E8', fg:'#191713', dim:'#5F594C', dim2:'#403B31', rule:'#D2C9B6',
+              acc:'#A8321E', pos:'#0E6E35', neg:'#A8321E', grid:'rgba(25,23,19,.05)' },
+  newsprint:{ bg:'#DEDCD6', fg:'#101010', dim:'#55534D', dim2:'#33322E', rule:'#B4B1A8',
               acc:'#101010', pos:'#0E6B36', neg:'#A3201A', grid:'rgba(16,16,16,.06)' },
-  blush:    { bg:'#F6E7E7', fg:'#1E1112', dim:'#7E6062', dim2:'#452A2C', rule:'#DCC0C1',
-              acc:'#B0273A', pos:'#12833F', neg:'#B0273A', grid:'rgba(30,17,18,.05)' },
+  blush:    { bg:'#F6E7E7', fg:'#1E1112', dim:'#694F51', dim2:'#452A2C', rule:'#DCC0C1',
+              acc:'#B0273A', pos:'#0E6E35', neg:'#B0273A', grid:'rgba(30,17,18,.05)' },
 
   // ── fields: the accent IS the ground ───────────────────────
-  oxide:    { bg:'#C2410C', fg:'#FFF4EC', dim:'rgba(255,244,236,.7)', dim2:'rgba(255,244,236,.9)',
+  oxide:    { bg:'#9F330A', fg:'#FFF4EC', dim:'rgba(255,244,236,0.80)', dim2:'rgba(255,244,236,.9)',
               rule:'rgba(255,244,236,.32)', acc:'#FFE0B2', pos:'#B8F5D4', neg:'#FFD5CE',
               grid:'rgba(255,244,236,.06)' },
-  sky:      { bg:'#8ECDF0', fg:'#04202E', dim:'rgba(4,32,46,.62)', dim2:'rgba(4,32,46,.85)',
+  sky:      { bg:'#8ECDF0', fg:'#04202E', dim:'rgba(4,32,46,0.80)', dim2:'rgba(4,32,46,.85)',
               rule:'rgba(4,32,46,.28)', acc:'#04202E', pos:'#04202E', neg:'#04202E',
               grid:'rgba(4,32,46,.05)' },
-  ochre:    { bg:'#D9A521', fg:'#1C1403', dim:'rgba(28,20,3,.62)', dim2:'rgba(28,20,3,.86)',
+  ochre:    { bg:'#D9A521', fg:'#1C1403', dim:'rgba(28,20,3,0.80)', dim2:'rgba(28,20,3,.86)',
               rule:'rgba(28,20,3,.3)', acc:'#1C1403', pos:'#1C1403', neg:'#1C1403',
               grid:'rgba(28,20,3,.05)' }
 };
@@ -281,9 +281,13 @@ export function remember(recent = [], id, memory = 12) {
 export function vars(name) {
   const p = PALETTES[name] ?? PALETTES.ink;
   return `--bg:${p.bg};--fg:${p.fg};--dim:${p.dim};--dim2:${p.dim2};--rule:${p.rule};`
-       + `--acc:${p.acc};--pos:${p.pos};--neg:${p.neg};--grid:${p.grid}`;
+       + `--acc:${p.acc};--pos:${p.pos};--neg:${p.neg};--grid:${p.grid}`
+       // An accent bright enough for a dark ground is too pale to READ on
+       // a light one: orange text on paper measured 2.3:1. Text set in the
+       // accent on a light ground uses it darkened; fills keep the original.
+       + (isLight(name) ? `;--acc-ink:color-mix(in srgb, ${p.acc} 55%, #000)` : '');
 }
 
 /** Light grounds need a different scrim and shadow than dark ones. */
 export const isLight = name =>
-  ['doc', 'ice', 'sand', 'flare', 'citrus'].includes(name);
+  ['doc', 'ice', 'sand', 'flare', 'citrus', 'linen', 'newsprint', 'blush', 'sky', 'ochre'].includes(name);

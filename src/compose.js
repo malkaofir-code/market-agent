@@ -1531,8 +1531,8 @@ export function proofSlide(claim, { palette = null, variant = null } = {}) {
 
   const base = { palette, dir, figure, said, sub, type, path, why,
     fromPx: px(claim.base_px, claim.klass), toPx: px(claim.out_px, claim.klass),
-    fromLabel: `סגירה לפני הפוסט · ${dayOf(claim.base_date)}`,
-    toLabel: `סגירה · ${dayOf(claim.out_date)}`,
+    fromLabel: `לפני הפוסט · ${dayOf(claim.base_date)}`,
+    toLabel: `אחרי · ${dayOf(claim.out_date)}`,
     tag: forecast ? 'אומת' : 'מעקב',
     method: 'נמדד ממחיר הסגירה שלפני הפוסט' };
 

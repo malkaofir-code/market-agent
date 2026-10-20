@@ -95,6 +95,39 @@ const MASCOT_RETRIES = ['smaller', 'far-edge', 'smaller-far-edge'];
  * row and re-measure. Every other archetype still fails loudly - there
  * is nothing to shed on a cover.
  */
+/**
+ * Every visible piece of text on the board, with its size and contrast.
+ * Runs inside the page. Background is the nearest painted ancestor (the
+ * slide ground when nothing nearer paints), which is what a reader sees
+ * behind type on these flat boards; text over a photo is skipped.
+ */
+function auditText() {
+  const rgb = c => { const m = c.match(/[\d.]+/g); return m ? m.map(Number) : [0, 0, 0, 0]; };
+  const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+    return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+  const bgOf = el => { for (let e = el; e; e = e.parentElement) { const st = getComputedStyle(e);
+    if (st.backgroundImage !== 'none' && e.tagName === 'IMG') return null;
+    const c = rgb(st.backgroundColor); if (c[3] === undefined || c[3] > .5) return c; }
+    return rgb(getComputedStyle(document.body).backgroundColor); };
+  const out = [];
+  for (const el of document.querySelectorAll('.slide *')) {
+    const own = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+    if (!own || own.length < 2) continue;
+    const st = getComputedStyle(el), r = el.getBoundingClientRect();
+    if (st.visibility === 'hidden' || st.display === 'none' || !r.width || !r.height) continue;
+    if (el.closest('.has-ph .sn-txt, .cover-ph')) continue;
+    const size = parseFloat(st.fontSize) * (parseFloat(getComputedStyle(document.querySelector('.slide')).zoom) || 1);
+    const bg = bgOf(el); const fg = rgb(st.color);
+    const op = [...(function* () { for (let e = el; e; e = e.parentElement) yield parseFloat(getComputedStyle(e).opacity); })()].reduce((a, b) => a * b, 1);
+    let ratio = null;
+    if (bg) { const a = (fg[3] ?? 1) * op; const mix = fg.slice(0, 3).map((v, k) => v * a + bg[k] * (1 - a));
+      const L1 = lum(mix), L2 = lum(bg); ratio = (Math.max(L1, L2) + .05) / (Math.min(L1, L2) + .05); }
+    out.push({ cls: (el.className && typeof el.className === 'string' ? el.className.split(' ')[0] : el.tagName.toLowerCase()),
+      size: Math.round(size), ratio: ratio ? Number(ratio.toFixed(2)) : null, text: own.slice(0, 30) });
+  }
+  return out;
+}
+
 export async function renderDeck(deck, outDir, { scale = 1, format = 'png', story = false } = {}) {
   mkdirSync(outDir, { recursive: true });
   const size = story ? STORY : CANVAS;
@@ -108,7 +141,7 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
   // deck it replays — while consecutive windows dress him differently.
   const spin = [...(deck.key ?? '')].reduce((a, c) => a + c.charCodeAt(0), 0);
   const { slides, ...meta } = { ...deck, poses: POSES, spin };
-  const files = [], shed = [];
+  const files = [], shed = [], audit = [];
 
   try {
     for (let i = 0; i < slides.length; i++) {
@@ -276,6 +309,12 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
       // The API path needs JPEG (Meta accepts nothing else). Quality 95
       // because the ground is a 5.5%-ink graph-paper grid and hairline
       // rules - exactly the content JPEG smears at the usual 80.
+      // ── readability ───────────────────────────────────────────
+      // Instagram shows a 1080px board at roughly 390 points wide, so
+      // every pixel here is about a third of a point on the phone.
+      // Collected, never fatal: the test suite is what enforces it.
+      if (process.env.RENDER_AUDIT === '1') audit.push(...(await p.evaluate(auditText)).map(a => ({ slide: i + 1, type: slide.type, ...a })));
+
       const file = join(outDir, `slide-${String(i + 1).padStart(2, '0')}.${format}`);
       await p.locator('.slide').screenshot(
         format === 'jpeg' ? { path: file, type: 'jpeg', quality: 100 } : { path: file });
@@ -284,7 +323,7 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
   } finally {
     await browser.close();
   }
-  return { files, shed };
+  return { files, shed, audit };
 }
 
 // `node src/render.js --fixture` reproduces the design.html specimens.
