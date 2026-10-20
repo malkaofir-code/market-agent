@@ -697,6 +697,8 @@ html,body{margin:0;padding:0;background:var(--bg)}
 /* One word in the accent. The eye needs somewhere to land in the
    half-second before it starts reading. */
 .a-sn .sn-h em{font-style:normal;color:var(--acc)}
+/* Seven to nine words: smaller type, so the line ends above his head. */
+.a-sn.is-long .sn-h{font-size:88px;line-height:1.04}
 .a-sn .sn-s{font-family:var(--f-mono);font-size:38px;font-weight:700;margin:24px 0 0;
   color:var(--fg);opacity:.92;direction:ltr;unicode-bidi:isolate;
   text-shadow:0 3px 18px rgba(0,0,0,.6)}

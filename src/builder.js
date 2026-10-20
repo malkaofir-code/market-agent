@@ -526,7 +526,7 @@ const ARCHETYPES = {
   // viewer has under two seconds to take it in — so the headline is
   // short, enormous, and carries a single accented word to land the
   // eye somewhere specific.
-  scene: s => `<div class="a-sn${s.photo ? ' has-ph' : ''}${s.lead ? ' is-lead' : ''}">
+  scene: s => `<div class="a-sn${s.photo ? ' has-ph' : ''}${s.lead ? ' is-lead' : ''}${String(s.headline ?? '').split(/\s+/).length > 6 ? ' is-long' : ''}">
     ${sceneBg(s.dir, s.seed ?? 0)}
     ${s.photo ? `<img class="sn-ph" src="${esc(s.photo.src)}" alt="">
     <div class="sn-scrim"></div>` : ''}

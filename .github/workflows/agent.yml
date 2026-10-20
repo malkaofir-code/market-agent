@@ -219,11 +219,12 @@ jobs:
           # A story is about the hour it belongs to. More than two
           # windows behind and it is news, not "now".
           MAX_STORY_LAG_WINDOWS: '2'
-          # Three digests a day, in Asia/Jerusalem: the morning, half an
-          # hour before the US open, and the evening. The hour gate is
-          # in run.js, not in the cron expression, because pg_cron
-          # thinks in UTC and Israel changes its clocks twice a year.
-          DIGEST_HOURS: '8,21'
+          # One digest a day, the evening one, in Asia/Jerusalem. At ~96
+          # followers and a reach of ~5, two low-engagement posts a day
+          # were teaching the ranker the account is not worth showing;
+          # one stronger post is the better bet (Oct 2026). The hour gate
+          # is in run.js because pg_cron thinks in UTC.
+          DIGEST_HOURS: '21'
           # What a post IS. 'lesson': one story, what it means, and the
           # mechanism behind it in three plain steps (src/lessons.js) —
           # five or six boards. Anything else brings back the old deck,
@@ -305,9 +306,10 @@ jobs:
           # sees; two of them an hour apart split the same audience
           # across both and teach the ranker that neither held anyone.
           MIN_MINUTES_BETWEEN_REELS: '150'
-          # Five beats plus the opener and the close: seven cards, and
-          # enough of the day to be a summary rather than a headline.
-          REEL_BEATS: '5'
+          # Three beats plus the hook and the close: five cards, ~12s.
+          # Under fifteen seconds is where strangers finish a reel, and
+          # finishing is what gets it shown to the next stranger.
+          REEL_BEATS: '3'
           # The evening reel covers what happened since the afternoon
           # one. Fewer than this many messages in that stretch and there
           # is no second film to make — better one good reel than two
@@ -381,7 +383,7 @@ jobs:
           # line; on its own it is faster than a Hebrew headline can be
           # taken in. Seven cards at three seconds is a shade under
           # twenty, which is where a summary reel wants to sit.
-          REEL_HOLD_SEC: '3.0'
+          REEL_HOLD_SEC: '2.6'
           REEL_SAY_CLOSE: 'Follow for the U S market, every day.'
           # Ceilings on the two slow paths in voice.js. Narration is
           # optional; without these it is a way for an optional thing

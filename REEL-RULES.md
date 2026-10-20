@@ -46,7 +46,7 @@ TEST: watch muted. Anything you only understood from audio is a bug.
 a comma and a clause to survive it is two cards, or it is trimmed.
 TEST: `headline.split(/\s+/).length <= 9`.
 
-**07 · Three seconds a card, minimum.** Silent cards are held by reading
+**07 · 2.6 seconds a card (Oct 2026: was three).** Silent cards are held by reading
 time. 2.0 was the floor under a spoken line, where the voice set the pace.
 TEST: `REEL_HOLD_SEC='3.0'` — seven cards ≈ 19.9s.
 
@@ -65,7 +65,7 @@ TEST: count coloured elements per card. One, plus the candles behind.
 
 ## E · Length
 
-**10 · Eighteen to thirty seconds — the shortest that lands the day.** The
+**10 · About twelve seconds (Oct 2026: five cards — hook, three beats, the ask). Was eighteen to thirty.** The
 benchmarks want >45% completion at 15–30s and >55% under 15s. Advice going
 around says educational reels should run 45–60s; that is written for
 accounts that already have an audience, where saves matter more than reach.

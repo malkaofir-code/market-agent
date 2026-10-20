@@ -628,7 +628,8 @@ function lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystN
     analystNote ? analystLine(analystNote) : null,
     lesson ? `📘 השיעור: ${lesson.takeaway}` : null,
   ].filter(x => x !== null).join('\n');
-  const foot = `\nעדכון ${span(w)} · @marketalert.il\n${tags}`;
+  const ask = askLine(Math.floor(w.start / 3600));
+  const foot = `\n${ask ? `${ask}\n\n` : ''}עדכון ${span(w)} · @marketalert.il\n${tags}`;
   // The deep part goes last and is the part that gives way: a caption
   // that runs long loses details, never the news or its meaning.
   let deep = ['', '', '📖 לעומק:', ...factsOf(lead), lead.source ? `מקור: ${lead.source}` : null]
@@ -933,6 +934,22 @@ const JOIN = ['', 'Also, ', 'Meanwhile, ', 'And ', 'On top of that, '];
  * Three of them, rotating on the day, so a daily reel does not close
  * on the identical sentence every afternoon.
  */
+// ── the comment ask ──────────────────────────────────────────
+// A comment is the strongest signal a post can earn, and the account
+// has had none. One plain question at the end of every caption, never a
+// question about what to buy or sell. Rotates by window, so the same
+// line does not sit under every post.
+export const ASKS = [
+  'מה לדעתכם יקרה מחר? כתבו בתגובות: עולה או יורד',
+  'מה הכי הפתיע אתכם היום? כתבו בתגובות',
+  'על איזו חברה תרצו שנסביר מחר? כתבו בתגובות',
+  'היה ברור, או שצריך הסבר? כתבו בתגובות',
+];
+export const askLine = (seed = 0) => process.env.CAPTION_ASK === '0' ? ''
+  : `💬 ${ASKS[Math.abs(Math.floor(seed)) % ASKS.length]}`;
+/** The reel's last card: the same ask, short enough for a moving card. */
+export const REEL_ASK = 'עולה או יורד מחר? כתבו בתגובות';
+
 const SEND = [
   'שלחו לחבר שעוקב אחרי השוק',
   'מכירים מישהו שמשקיע? שלחו לו',
@@ -1063,7 +1080,13 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
 
   const decay = Number(process.env.SCORE_DECAY_HOURS || 4);
   const freshness = p => p.score - (w.end - p.ts) / 3600 / decay;
-  const pool = [...parsed].sort((a, b) => freshness(b) - freshness(a) || b.ts - a.ts);
+  // With three beats there is no room for a card that only says who
+  // spoke ("🗣️ The Kobeissi Letter") or a channel table: the speaker's
+  // line goes on the card instead, and boards stay in the caption.
+  const stories = parsed.filter(p => !BOARD.test(p.headline ?? '') && !AGENDA.test(p.headline ?? '')
+    && (p.headline ?? '').replace(/[^\p{L}\p{N}]/gu, '').length >= 14);
+  const pool = [...(stories.length >= 2 ? stories : parsed)]
+    .sort((a, b) => freshness(b) - freshness(a) || b.ts - a.ts).map(unSpeak);
   const beats = pool.slice(0, Number(process.env.REEL_BEATS || 4));
   if (beats.length < 2) return nothing('thin');
 
@@ -1122,7 +1145,7 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
   const slides = [lead
     ? { type: 'scene', lead: true, headline: leadSubject ?? 'היום בשוק',
         marked: leadSubject ? esc(leadSubject) : 'היום ב<em>שוק</em>',
-        big: lead.text, sub: hhmm(w.end), dir: leadDir,
+        big: lead.text, sub: 'הנה למה', dir: leadDir,
         gesture: GEST[leadDir] ?? 'explain', seed, palette: ground(0), own: true,
         say: `Here's the U S market today. ${sayTape(quotes)}`.trim() }
     // No plausible figure in the whole window is rare and is not worth
@@ -1137,16 +1160,18 @@ export function composeReel(rows, { carry = {}, endTs = null, template = null } 
 
   // 06 · the ask. A stranger who watched to the end is the only
   // person on this platform worth asking for anything.
-  const ask = process.env.REEL_SEND_ASK || SEND[seed % SEND.length];
+  // The last card asks for a comment, the strongest signal a reel can
+  // earn; the forward ask moves to the caption, where it costs no card.
+  const ask = process.env.REEL_CLOSE_ASK || 'עולה או יורד מחר?';
   slides.push({ type: 'scene', headline: ask, marked: markWord(ask, null),
-    sub: TG_LINK, dir: '', gesture: 'point', seed: seed + 99,
+    sub: 'כתבו בתגובות', dir: '', gesture: 'point', seed: seed + 99,
     palette: ground(beats.length + 1), own: true,
     say: process.env.REEL_SAY_CLOSE || "That's the day. Send it to someone who trades." });
 
   return {
     key: `R:${w.key}`, template, window: span(w), date: ddmmyy(w.end),
     stamp, quotes, slides,
-    caption: caption(parsed, w),
+    caption: caption(parsed, w).replace(/\n💬 [^\n]*\n/, `\n💬 ${REEL_ASK}\n📩 ${process.env.REEL_SEND_ASK || SEND[seed % SEND.length]}\n`),
     consumed: all.map(p => p.tg_id), carry: nextCarry,
   };
 }
@@ -1402,7 +1427,8 @@ export function caption(parsed, w) {
     .filter((t, i, a) => a.indexOf(t) === i).slice(0, 5)
     .map(t => '#' + t).join(' ');
 
-  const foot = `\nעדכון ${span(w)} · @marketalert.il\n${tags}`;
+  const ask = askLine(Math.floor(w.start / 3600));
+  const foot = `\n${ask ? `${ask}\n\n` : ''}עדכון ${span(w)} · @marketalert.il\n${tags}`;
   const head = opener + parsed[0].headline + '\n';
 
   // Whole stories, never a half one. Slicing at 2200 cut mid-word on
@@ -1679,6 +1705,7 @@ export function composeCallbackPost(hits, { now = null, score = null, recent = n
     + (board ? `בשקפים האחרונים: ${board.hits.length} הקריאות החזקות ביותר, ו-${board.misses.length} הפספוסים הגדולים.\n` : '')
     + 'כל מספר כאן נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
     + 'עד שלושה ימי מסחר, בלי לבחור תאריכים בדיעבד.\n'
+    + `\n💬 איזו תחזית שלנו הכי הפתיעה אתכם? כתבו בתגובות\n\n`
     + `עדכונים שוטפים · @marketalert.il\n`
     + '#שוקההון #מסחר #וולסטריט';
 
@@ -1757,7 +1784,7 @@ export function composeProofReel(claim, { now = null, score = null } = {}) {
     + `פורסם ${dmy(Number(claim.posted_at))} · ${claim.asset} ${figure} תוך ${days}\n`
     + (why ? `למה: ${why}\n` : '')
     + `\nכל מספר נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, `
-    + `בלי לבחור תאריכים בדיעבד.\n\n${searchLine()}\n@marketalert.il`;
+    + `בלי לבחור תאריכים בדיעבד.\n\n💬 ציפיתם לזה? כתבו בתגובות\n\n${searchLine()}\n@marketalert.il`;
 
   return { key: `R:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
     stamp: '', quotes: [], slides, caption, claimId: claim.id, proof: true };
@@ -1811,7 +1838,7 @@ export function composeScoreboardReel(hits, { now = null, score = null, days = 3
     : `${n} קריאות שהשוק אישר ב-${days} הימים האחרונים\n\n`) + `${lines}\n\n`
     + 'כל מספר נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
     + 'עד שלושה ימי מסחר, בלי לבחור תאריכים בדיעבד.\n'
-    + `${searchLine()}\n@marketalert.il`;
+    + `💬 איזו מהן ראיתם מגיעה? כתבו בתגובות\n\n${searchLine()}\n@marketalert.il`;
 
   return { key: `R:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
     stamp: '', quotes: [], slides, caption, scoreboard: true, claimIds: hits.map(h => h.id) };
@@ -1847,7 +1874,8 @@ export function composeAnalysts(rows, { now = null, perBoard = 3, boards = 3, mi
     `▪ ${c.firm} ${c.label}${c.target ? ` · יעד ${c.target}` : ''}\n   ${c.text}`).join('\n');
   const caption = 'המלצות האנליסטים | מה בתי ההשקעות אמרו השבוע\n\n'
     + `${lines}\n\n${TARGET_HINT}.\n${ANALYST_DISCLAIMER}\n`
-    + 'החשבון הזה אינו יועץ השקעות מורשה. המידע לצורכי עניין בלבד.\n'
+    + 'החשבון הזה אינו יועץ השקעות מורשה. המידע לצורכי עניין בלבד.\n\n'
+    + `💬 איזה מהבתים האלה אתם הכי סומכים עליו? כתבו בתגובות\n\n`
     + `${searchLine()}\n@marketalert.il`;
   return { key: `AN:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
     stamp: '', quotes: [], slides, caption, analysts: true, callIds: calls.map(c => c.tg_id) };
