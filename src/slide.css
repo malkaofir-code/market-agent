@@ -142,6 +142,9 @@ html,body{margin:0;padding:0;background:var(--bg)}
   border-top:1.5px solid var(--rule);padding-top:26px}
 
 /* ── 04 · interpretation ── */
+.a-nt{display:flex;flex-direction:column;gap:30px}
+.slide--story .a-nt{gap:44px}
+.slide--story .a-nt .abt{font-size:34px}
 .a-nt .abt{font-size:29px;font-weight:700;color:var(--dim2);margin:0;padding-bottom:22px;
   border-bottom:1.5px solid var(--rule);line-height:1.34}
 .a-nt .txt{font-size:60px;font-weight:800;line-height:1.32;margin:0;letter-spacing:-.015em;max-width:21ch;
@@ -366,6 +369,11 @@ html,body{margin:0;padding:0;background:var(--bg)}
 /* Alternating sides, so three stories in a row are not the same
    photograph three times. */
 .slide--story .ron{left:auto; right:-34px}
+/* On a story he already stands at the right, so "the far edge" is the
+   LEFT — the old rule sent him to the right a second time, which is
+   why a review retreat changed nothing on a story board. */
+.slide--story.of-far-edge .ron{right:auto; left:-34px}
+.slide--story.of-smaller-far-edge .ron{right:auto; left:-24px}
 .slide--story.of-alt .ron{right:auto; left:-34px}
 
 /* A story carries ONE update, so the cover photo can afford to be a
@@ -458,14 +466,14 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide--story .tg-strip .tg-a{font-size:36px}
 
 /* ── the analysts' board: one sentence, large ── */
-.a-nt{display:flex;flex-direction:column;justify-content:center;gap:28px;min-height:60%}
-.a-nt .eyeb{margin:0}
-.a-nt .nt-s{font-family:var(--f-disp);font-weight:800;font-size:68px;line-height:1.16;margin:0;
+.a-nn{display:flex;flex-direction:column;justify-content:center;gap:28px;min-height:60%}
+.a-nn .eyeb{margin:0}
+.a-nn .nt-s{font-family:var(--f-disp);font-weight:800;font-size:68px;line-height:1.16;margin:0;
   text-wrap:balance}
-.a-nt .nt-m{font-size:38px;line-height:1.3;margin:0;font-weight:700;color:var(--acc-ink,var(--acc))}
-.a-nt .nt-h{font-size:30px;line-height:1.3;margin:0;opacity:.72;border-top:2px solid var(--rule);
+.a-nn .nt-m{font-size:38px;line-height:1.3;margin:0;font-weight:700;color:var(--acc-ink,var(--acc))}
+.a-nn .nt-h{font-size:30px;line-height:1.3;margin:0;opacity:.72;border-top:2px solid var(--rule);
   padding-top:20px}
-.slide--story .a-nt .nt-s{font-size:76px}
+.slide--story .a-nn .nt-s{font-size:76px}
 
 /* ── Ron's board ────────────────────────────────────────────────
    The interpretation, with him presenting it. The tail on the block

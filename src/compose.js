@@ -8,6 +8,7 @@ import { clean, stripLeadEmoji } from './rtl.js';
 import { byId } from './templates.js';
 import { lessonFor } from './lessons.js';
 import { analystsFrom, noteFor, plainNote, TARGET_HINT } from './analysts.js';
+import { budgeted } from './budget.js';
 import { outlookFor, outlookLine } from './outlook.js';
 import { glossFor } from './glossary.js';
 import 'dotenv/config';
@@ -197,7 +198,7 @@ function askCover(lead, seed) {
   return bank[Math.abs(seed) % bank.length];
 }
 
-export function compose(rows, { now = null, carry = {}, endTs = null, template = null, analysts = null } = {}) {
+function composeRaw(rows, { now = null, carry = {}, endTs = null, template = null, analysts = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
   const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
@@ -1066,7 +1067,7 @@ const GEST = { up: 'yes', dn: 'pause', '': 'explain' };
  * The scene, his gesture and his wardrobe all follow the story's
  * direction rather than a rotation, so a fall looks like a fall.
  */
-export function composeReel(rows, { carry = {}, endTs = null, template = null } = {}) {
+function composeReelRaw(rows, { carry = {}, endTs = null, template = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const nothing = reason => ({ skip: reason, slides: [], consumed: all.map(p => p.tg_id) });
   if (!all.length) return nothing('empty');
@@ -1198,7 +1199,7 @@ export const TG_LINK = 't.me/hamal_shukhahon';
  * separate cursor, so telling an hour as stories never costs the
  * digest that will later summarise it.
  */
-export function composeStories(rows, { carry = {}, endTs = null, template = null, tally = 0, catchup = false, story = null, palette = null, analysts = null } = {}) {
+function composeStoriesRaw(rows, { carry = {}, endTs = null, template = null, tally = 0, catchup = false, story = null, palette = null, analysts = null } = {}) {
   const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
   const w0 = all.length ? windowOf(all[0].ts) : null;
   const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
@@ -1548,7 +1549,7 @@ export function proofSlide(claim, { palette = null, variant = null } = {}) {
 }
 
 /** One board, for the story track. */
-export function composeCallback(claim, { palette = null, now = null, variant = null } = {}) {
+function composeCallbackRaw(claim, { palette = null, now = null, variant = null } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   return {
     key: `C:${localDay(at)}T${hhmm(at)}`,
@@ -1620,7 +1621,7 @@ function ratio(score) {
   return tot ? { hit, tot, pct: Math.round(hit / tot * 100) } : null;
 }
 
-export function composeCallbackPost(hits, { now = null, score = null, recent = null, board = null } = {}) {
+function composeCallbackPostRaw(hits, { now = null, score = null, recent = null, board = null } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   if (!hits?.length) return { skip: 'nothing proven' };
 
@@ -1741,7 +1742,7 @@ export function searchLine() {
 // the reasoning, the evidence, the verdict, the record. A reel is
 // watched with the sound off at arm's length, so each beat is one
 // idea at one size, and the only one that repeats is the colour.
-export function composeProofReel(claim, { now = null, score = null } = {}) {
+function composeProofReelRaw(claim, { now = null, score = null } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   const move = Number(claim.move_pct);
   const dir = move >= 0 ? 'up' : 'dn';
@@ -1800,7 +1801,7 @@ export function composeProofReel(claim, { now = null, score = null } = {}) {
 // It runs on a Sunday, when the US market is shut and there is no
 // news worth a bulletin — the emptiest slot in the week, given to the
 // piece with the longest shelf life.
-export function composeScoreboardReel(hits, { now = null, score = null, days = 30, rows = 3 } = {}) {
+function composeScoreboardReelRaw(hits, { now = null, score = null, days = 30, rows = 3 } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   if (!hits?.length) return { skip: 'nothing proven' };
   const rt = ratio(score);
@@ -1854,7 +1855,7 @@ export function composeScoreboardReel(hits, { now = null, score = null, days = 3
 // words "לא המלצה שלנו" are on the cover, every board and the caption.
 export const ANALYST_DISCLAIMER = 'דעות של בתי השקעות כפי שדווחו בערוץ. לא המלצה שלנו ולא ייעוץ השקעות.';
 
-export function composeAnalysts(rows, { now = null, perBoard = 3, boards = 3, min = 4 } = {}) {
+function composeAnalystsRaw(rows, { now = null, perBoard = 3, boards = 3, min = 4 } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   const calls = analystsFrom(rows, { max: perBoard * boards });
   if (calls.length < min) return { skip: `only ${calls.length} attributed analyst move(s) (need ${min})` };
@@ -1880,3 +1881,17 @@ export function composeAnalysts(rows, { now = null, perBoard = 3, boards = 3, mi
   return { key: `AN:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
     stamp: '', quotes: [], slides, caption, analysts: true, callIds: calls.map(c => c.tg_id) };
 }
+
+
+// ── the budget ───────────────────────────────────────────────
+// Every deck leaves this file inside the word budget in budget.js,
+// whichever function built it. Nothing below composes anything: it
+// is the one door all the composers go out through.
+export const compose = (...a) => budgeted(composeRaw(...a));
+export const composeReel = (...a) => budgeted(composeReelRaw(...a));
+export const composeStories = (...a) => budgeted(composeStoriesRaw(...a));
+export const composeCallback = (...a) => budgeted(composeCallbackRaw(...a));
+export const composeCallbackPost = (...a) => budgeted(composeCallbackPostRaw(...a));
+export const composeProofReel = (...a) => budgeted(composeProofReelRaw(...a));
+export const composeScoreboardReel = (...a) => budgeted(composeScoreboardReelRaw(...a));
+export const composeAnalysts = (...a) => budgeted(composeAnalystsRaw(...a));

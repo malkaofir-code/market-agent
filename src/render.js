@@ -158,17 +158,32 @@ export async function renderDeck(deck, outDir, { scale = 1, format = 'png', stor
         if (!o) return null;
         const a = o.getBoundingClientRect();
         const hits = [];
-        for (const el of document.querySelectorAll('[data-protect]')) {
+        // Everything that is read is protected: the marked data AND
+        // every element that carries text of its own. A story went out
+        // with his head through the headline because only the figure
+        // was marked — a word under a cartoon is lost whichever word it
+        // is, so the rule is now about text, not about marking.
+        const guarded = new Set(document.querySelectorAll('[data-protect]'));
+        for (const el of document.querySelectorAll('.sl-bd *')) {
+          if (el.closest('.ron')) continue;
+          const own = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length > 1);
+          if (!own && !guarded.has(el)) continue;
+          const st = getComputedStyle(el);
+          if (st.visibility === 'hidden' || st.display === 'none') continue;
           const b = el.getBoundingClientRect();
+          if (!b.width || !b.height) continue;
           const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
           const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-          if (w > 0 && h > 0) {
-            const area = w * h;
-            // A few pixels of a descender brushing his shoulder is not
-            // a collision. A tenth of the protected element is.
-            if (area > 0.1 * b.width * b.height || area > 0.25 * a.width * a.height)
-              hits.push({ what: el.dataset.protect, cover: Math.round(100 * area / (b.width * b.height)) });
-          }
+          if (w <= 0 || h <= 0) continue;
+          const area = w * h;
+          // A descender brushing his shoulder is not a collision; a
+          // patch the size of a word is. The marked data keeps its
+          // looser rule (a tenth of it), text gets the strict one.
+          const word = w > 26 && h > 26;
+          const marked = guarded.has(el) && (area > 0.1 * b.width * b.height || area > 0.25 * a.width * a.height);
+          if ((own && word) || marked)
+            hits.push({ what: el.dataset.protect ?? `text "${(el.textContent || '').trim().slice(0, 24)}"`,
+              cover: Math.round(100 * area / (b.width * b.height)) });
         }
         return hits.length ? hits : null;
       });

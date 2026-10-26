@@ -233,7 +233,7 @@ const ARCHETYPES = {
 
   // 16d · the analysts' word, alone on a board: who, what they did, nothing else.
   analystNote: s => { const p = plainNote(s.note);
-    return `<div class="a-nt">
+    return `<div class="a-nn">
     <p class="eyeb">${bidi(s.note.about === 'story' ? 'מה אומר אנליסט' : 'מה אומרים האנליסטים')}</p>
     <p class="nt-s">${bidi(p.short)}</p>
     <p class="nt-m">${bidi(p.mean)}</p>
