@@ -265,8 +265,10 @@ jobs:
           # people — eleven units of work buying no audience at all.
           # Stories now hold six slots and the reel four, three hours
           # apart: three proof films and one day summary.
-          REEL_HOURS: '13,19'
-          MAX_REELS_PER_DAY: '2'
+          # One reel a day, the best of the day (Oct 2026). Two a day split a
+          # small audience; REEL-RULES rule 02 said the same.
+          REEL_HOURS: '19'
+          MAX_REELS_PER_DAY: '1'
           # One slot a day stays the news — the last one, so the day
           # is finished before it is summarised. Four proof films would
           # be four arguments and no bulletin, and a viewer who only

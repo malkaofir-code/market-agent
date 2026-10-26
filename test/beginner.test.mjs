@@ -33,7 +33,7 @@ check('the first boards tell you to swipe, and what for',
 const cover = S[0];
 check('the lead is the news, not an agenda line or a commentator',
   /Nvidia/.test(cover.headline), cover.headline);
-check('…under the eyebrow "הכי חשוב עכשיו"', cover.eyebrow === 'הכי חשוב עכשיו');
+check('…under an eyebrow that says why it matters', cover.eyebrow === 'הכי חשוב עכשיו' || cover.eyebrow.startsWith('למה כולם מדברים על'));
 check('…and the cover says what it means, not the headline again',
   cover.stand && !cover.stand.startsWith('Nvidia'), cover.stand);
 check('no agenda line ("היום ב-15:30") leads or fills the brief',

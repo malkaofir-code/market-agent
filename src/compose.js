@@ -9,6 +9,7 @@ import { byId } from './templates.js';
 import { lessonFor } from './lessons.js';
 import { analystsFrom, noteFor, plainNote, TARGET_HINT } from './analysts.js';
 import { budgeted } from './budget.js';
+import { dayOf as dayLines, SERIES, SCHEDULE } from './day.js';
 import { outlookFor, outlookLine } from './outlook.js';
 import { glossFor } from './glossary.js';
 import 'dotenv/config';
@@ -613,16 +614,18 @@ export function analystLine(n) {
   return p ? `🏦 ${p.line}. (${p.hint})` : '';
 }
 
-function lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystNote = null }) {
+function lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystNote = null, day = null }) {
   const LIMIT = 2120;
   const topics = topicsIn(parsed);
   const named = topics.slice(0, 4).map(t => t.word).join(' · ');
   const tags = ['שוקההון', 'מסחר', ...topics.slice(0, 3).map(t => t.tag)]
     .filter((t, i, a) => a.indexOf(t) === i).slice(0, 5).map(t => '#' + t).join(' ');
   const head = [
-    `שוק ההון האמריקאי | ${named || 'עדכון מהמסחר'}`, '',
+    `${SERIES.digest} | ${named || 'שוק ההון האמריקאי'}`, '',
     `🔑 הכי חשוב: ${plain(lead.headline)}`,
-    why ? `למה זה חשוב: ${why}` : null, '',
+    why ? `למה זה חשוב: ${why}` : null,
+    day?.money ? `💰 ${day.money} (${day.note})` : null,
+    day?.ron ? `🧑 ${day.ron}` : null, '',
     ...(others.length ? ['עוד שכדאי לדעת:', ...others.map(p =>
       `▪ ${plain(briefLine(p))}${p.note ? `\n   💡 ${plain(p.note)}` : ''}`), ''] : []),
     outlook ? outlookLine(outlook) : null,
@@ -630,7 +633,7 @@ function lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystN
     lesson ? `📘 השיעור: ${lesson.takeaway}` : null,
   ].filter(x => x !== null).join('\n');
   const ask = askLine(Math.floor(w.start / 3600));
-  const foot = `\n${ask ? `${ask}\n\n` : ''}עדכון ${span(w)} · @marketalert.il\n${tags}`;
+  const foot = `\n${ask ? `${ask}\n\n` : ''}${SCHEDULE}\nעדכון ${span(w)} · @marketalert.il\n${tags}`;
   // The deep part goes last and is the part that gives way: a caption
   // that runs long loses details, never the news or its meaning.
   let deep = ['', '', '📖 לעומק:', ...factsOf(lead), lead.source ? `מקור: ${lead.source}` : null]
@@ -689,10 +692,17 @@ function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, templat
   const analystNote = analysts?.length && process.env.ANALYST_NOTE !== '0'
     ? noteFor(`${lead.headline} ${lead.stand ?? ''}`, analysts, { skip: lead.tg_id, seed }) : null;
 
+  // The day in the reader's money and in Ron's voice (day.js), and an
+  // eyebrow that asks the question the cover answers. The topic word
+  // comes from the same table the caption tags use — nothing invented.
+  const day = dayLines(quotes, seed);
+  const topic = TOPICS.find(t => t.re.test(`${lead.headline} ${lead.stand ?? ''}`))?.word;
+  const hook = topic ? `למה כולם מדברים על ${topic}` : 'הכי חשוב עכשיו';
+
   const slides = [];
   // 1 · the one thing, and what it means for you
   slides.push({ type: coverType, index: hhmm(w.end).slice(0, 2), figure: fig,
-    eyebrow: 'הכי חשוב עכשיו', headline: brevity(plain(lead.headline), 90), stand: brevity(why, 90), source: lead.source,
+    eyebrow: hook, headline: brevity(plain(lead.headline), 90), stand: brevity(why, 90), source: lead.source, day,
     gloss: glossFor(`${lead.headline} ${why ?? ''}`, { max: 1, seen }),
     swipe: 'החליקו — עוד מה שחשוב, ומה זה אומר',
     photo: PHOTO_COVERS.has(coverType) ? lead.photo : null });
@@ -726,7 +736,7 @@ function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, templat
 
   return {
     key: w.key, template, window: span(w), date: ddmmyy(w.end), stamp, quotes,
-    slides, caption: lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystNote }),
+    slides, caption: lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystNote, day }),
     // Everything in the window is spent, shown or not.
     consumed: all.map(p => p.tg_id), carry: nextCarry,
     format: 'lesson', lesson: lesson?.id ?? null,
@@ -1172,7 +1182,14 @@ function composeReelRaw(rows, { carry = {}, endTs = null, template = null } = {}
   return {
     key: `R:${w.key}`, template, window: span(w), date: ddmmyy(w.end),
     stamp, quotes, slides,
-    caption: caption(parsed, w).replace(/\n💬 [^\n]*\n/, `\n💬 ${REEL_ASK}\n📩 ${process.env.REEL_SEND_ASK || SEND[seed % SEND.length]}\n`),
+    caption: (() => {
+      const day = dayLines(quotes, seed);
+      const c = caption(parsed, w).replace(/\n💬 [^\n]*\n/, `\n💬 ${REEL_ASK}\n📩 ${process.env.REEL_SEND_ASK || SEND[seed % SEND.length]}\n`);
+      const extra = [day?.money ? `💰 ${day.money} (${day.note})` : null, day?.ron ? `🧑 ${day.ron}` : null].filter(Boolean).join('\n');
+      if (!extra) return c;
+      const at = c.indexOf('\n\n');
+      return at < 0 ? `${extra}\n\n${c}` : `${c.slice(0, at)}\n\n${extra}${c.slice(at)}`;
+    })(),
     consumed: all.map(p => p.tg_id), carry: nextCarry,
   };
 }
@@ -1663,7 +1680,7 @@ function composeCallbackPostRaw(hits, { now = null, score = null, recent = null,
   const cover = {
     type: 'coverProof', palette: null, tag: 'אומת',
     method: 'כל מספר נמדד ממחירי סגירה',
-    eyebrow: 'הקריאות שלנו',
+    eyebrow: `${SERIES.proof} · כל חמישי`,
     headline: 'אמרנו. וזה מה שקרה.',
     stand: `${n === 1 ? 'עדכון אחד' : `${n} עדכונים`} מהשבוע האחרון, `
          + 'והמספרים שהגיעו אחריהם.',
@@ -1699,7 +1716,7 @@ function composeCallbackPostRaw(hits, { now = null, score = null, recent = null,
     `▪ ${dmy(Number(h.posted_at))} · ${h.asset} — ${h.headline ?? ''}\n`
     + `   ${Number(h.move_pct) > 0 ? '+' : ''}${Number(h.move_pct).toFixed(1)}% `
     + `תוך ${sessions(Number(h.days_after) || 1)}`).join('\n');
-  const caption = 'שוק ההון האמריקאי | מה שאמרנו · ומה שקרה\n\n'
+  const caption = `${SERIES.proof} | מה שאמרנו · ומה שקרה\n\n`
     + `${lines}\n\n`
     + (rt ? `הרשומה המלאה: ${rt.hit} מתוך ${rt.tot} תחזיות התממשו ב-30 הימים האחרונים (${rt.pct}%). `
           + 'השאר לא התממשו, והן נספרות.\n' : '')
@@ -1822,7 +1839,7 @@ function composeScoreboardReelRaw(hits, { now = null, score = null, days = 30, r
   const slides = [
     { type: 'sceneProof', beat: 'hook', ground: 'verd',
       headline: rt ? `${n} מתוך\n${rt.tot}\nתחזיות התממשו.` : `${n}\nקריאות.\nהשוק אישר.`,
-      sub: `${days} הימים האחרונים` },
+      sub: `${SERIES.scoreboard} · כל שני` },
     ...hits.slice(0, rows).map(row),
     { type: 'sceneProof', beat: 'record', ron: null, ground: 'sheet',
       eyebrow: 'איך זה נמדד', big: String(n),
@@ -1862,7 +1879,7 @@ function composeAnalystsRaw(rows, { now = null, perBoard = 3, boards = 3, min = 
 
   const cover = {
     type: 'cover', palette: null,
-    eyebrow: 'המלצות האנליסטים',
+    eyebrow: `${SERIES.analysts} · כל רביעי`,
     headline: 'מה בתי ההשקעות אומרים השבוע',
     stand: `${calls.length} דעות, כל אחת עם שם הבית שאמר אותה. לא ההמלצה שלנו.`,
   };
@@ -1873,7 +1890,7 @@ function composeAnalystsRaw(rows, { now = null, perBoard = 3, boards = 3, min = 
   }
   const lines = calls.map(c =>
     `▪ ${c.firm} ${c.label}${c.target ? ` · יעד ${c.target}` : ''}\n   ${c.text}`).join('\n');
-  const caption = 'המלצות האנליסטים | מה בתי ההשקעות אמרו השבוע\n\n'
+  const caption = `${SERIES.analysts} | מה בתי ההשקעות אמרו השבוע\n\n`
     + `${lines}\n\n${TARGET_HINT}.\n${ANALYST_DISCLAIMER}\n`
     + 'החשבון הזה אינו יועץ השקעות מורשה. המידע לצורכי עניין בלבד.\n\n'
     + `💬 איזה מהבתים האלה אתם הכי סומכים עליו? כתבו בתגובות\n\n`

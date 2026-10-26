@@ -475,6 +475,14 @@ html,body{margin:0;padding:0;background:var(--bg)}
   padding-top:20px}
 .slide--story .a-nn .nt-s{font-size:76px}
 
+/* ── the day strip: your money, and Ron ── */
+.day-strip{display:flex;flex-direction:column;gap:6px;margin-top:12px;padding:16px 0 0;
+  border-top:2px solid var(--rule);position:relative;z-index:4;color:var(--fg)}
+.day-strip .ds-m{font-size:34px;font-weight:800;margin:0;line-height:1.2}
+.day-strip .ds-a.up{color:var(--pos)} .day-strip .ds-a.dn{color:var(--neg)}
+.day-strip .ds-r{font-size:30px;font-weight:600;margin:0;line-height:1.3;color:var(--acc-ink,var(--acc))}
+.day-strip .ds-n{font-family:var(--f-mono);font-size:28px;margin:0;color:var(--dim)}
+
 /* ── Ron's board ────────────────────────────────────────────────
    The interpretation, with him presenting it. The tail on the block
    points at him — that is the whole trick, and without it the words

@@ -20,6 +20,8 @@
 
 /** Words a field may hold. `[n, w]`: at most n items of w words each. */
 export const BUDGET = {
+  // The day strip rides on any board that carries it (day.js).
+  _day:         { money: 12, ron: 14 },
   // ── digests ──
   cover:        { headline: 12, stand: 20 },
   coverRule:    { headline: 12, stand: 20 },
@@ -112,7 +114,9 @@ function budgetFields(obj, rules) {
 /** One slide, inside its budget. Unknown types pass through untouched. */
 export function budgetSlide(slide) {
   const rules = BUDGET[slide?.type];
-  return rules ? budgetFields(slide, rules) : slide;
+  let out = rules ? budgetFields(slide, rules) : slide;
+  if (out?.day) out = { ...out, day: budgetFields(out.day, BUDGET._day) };
+  return out;
 }
 
 /** A whole deck. A skipped deck has no slides and comes back as it is. */

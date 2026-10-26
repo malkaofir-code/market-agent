@@ -54,6 +54,17 @@ function tgStrip(link) {
 <span class="tg-a">${esc(link)}</span></div>`;
 }
 
+/** The day in the reader's money and in Ron's voice (day.js). */
+function dayStrip(d) {
+  if (!d || (!d.money && !d.ron)) return '';
+  const p = d.parts;
+  const money = p ? `<bdi dir="ltr">${esc(p.stake)}</bdi> ${bidi(p.fund)}: ${p.amount
+    ? `<bdi dir="ltr" class="ds-a ${p.amount.startsWith('-') ? 'dn' : 'up'}">${esc(p.amount)}</bdi> ${bidi('היום')}`
+    : bidi('כמעט בלי שינוי היום')}` : (d.money ? bidi(d.money) : '');
+  return `<div class="day-strip">${money ? `<p class="ds-m">${money}</p>` : ''}${
+    d.ron ? `<p class="ds-r">${bidi(d.ron)}</p>` : ''}${d.money && d.note ? `<p class="ds-n">${bidi(d.note)}</p>` : ''}</div>`;
+}
+
 // ── band D: footnote ─────────────────────────────────────────
 function foot(i, n, src, swipe = null) {
   // The first boards tell a newcomer there is more, and what: the
@@ -854,7 +865,7 @@ export function buildSlide(slide, ctx, i, n, { story = false, layer = null } = {
   const head = isProof ? proofHead(ctx, slide) : masthead(ctx);
   const tail = isProof ? proofFoot(slide) : foot(i + 1, n, slide.source, i + 1 < n ? slide.swipe : null);
   return `<div class="slide${lay}${story && !reel ? ' slide--story' + alt : ''}${reel ? ' slide--reel' : ''}${cover ? ' slide--cover' : ''}${isProof ? ' slide--proof' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
-${head}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${glossStrip(slide.gloss)}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
+${head}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${glossStrip(slide.gloss)}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${slide.day ? dayStrip(slide.day) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${tail}</div>`;
 }
 
