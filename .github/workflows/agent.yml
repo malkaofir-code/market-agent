@@ -51,9 +51,9 @@ on:
         type: boolean
         default: false
       mode:
-        description: 'digest = the carousel; stories = the hour as story boards; insights = read the account back, publish nothing; reel = one MP4 to the only surface strangers see; callback = check what we claimed against what the market did; analysts = weekly attributed analyst ratings and price targets'
+        description: 'digest = the carousel; stories = the hour as story boards; insights = read the account back, publish nothing; reel = one MP4 to the only surface strangers see; callback = check what we claimed against what the market did'
         type: choice
-        options: [digest, stories, insights, reel, callback, analysts]
+        options: [digest, stories, insights, reel, callback]
         default: digest
       now:
         description: 'Ignore the digest schedule and post this one now'
@@ -230,7 +230,10 @@ jobs:
           # five or six boards. Anything else brings back the old deck,
           # ten boards carrying seven stories, which readers found too
           # much to follow.
-          DIGEST_FORMAT: 'lesson'
+          DIGEST_FORMAT: 'cards'
+          # Card rollout: until this local date the evening carousel and the
+          # stories render and go to the owner on Telegram, nothing is posted.
+          REVIEW_UNTIL: '2026-11-11'
           DIGEST_OUTLOOK: '1'
           # ── the reel track ───────────────────────────────
           # One a day, at 17:00 local. Was two; one film that is worth
@@ -282,7 +285,9 @@ jobs:
           # the week, and the moment a record is worth reading. It has
           # its own hour and its own day so it never takes a news slot
           # — run.js adds one to the daily cap for it.
-          REEL_SCOREBOARD: '1'
+          REEL_SCOREBOARD: '0'
+          # One reel a week, Sunday 19:00 local: "השבוע בדקה" (owner, 8 Nov 2026).
+          REEL_DAY: 'Sun'
           REEL_SCORE_HOURS: '9'
           REEL_SCORE_DAY: 'Mon'
           SCORE_REEL_MIN: '3'
@@ -353,8 +358,6 @@ jobs:
           # inside a carousel.
           CALLBACK_POST_DAY: 'Thu'
           CALLBACK_POST_HOURS: '15'
-          ANALYSTS_DAY: 'Wed'
-          ANALYSTS_HOURS: '18'
           MAX_CALLBACK_POSTS_PER_DAY: '1'
           PROOF_POST_MIN: '2'
           PROOF_POST_MAX: '3'

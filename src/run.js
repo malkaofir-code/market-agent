@@ -24,11 +24,11 @@ import {
   provenLately,
   logRun, getState, setState, getToken, setToken, close,
 } from './db.js';
-import { compose, composeStories, composeReel, composeCallback, composeCallbackPost,
-  composeProofReel, composeScoreboardReel, composeAnalysts, rankRecord, analystLine, windowOf, WIN } from './compose.js';
+import { composeEvening, composeStories, composeWeekReel, windowOf, WIN } from './compose.js';
+import { composeCallback, composeCallbackPost, rankRecord } from './proof.js';
+import { headlineOf } from './story.js';
 import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
-import { analystPool, noteFor } from './analysts.js';
 import { connect, alert, deliver } from './tg.js';
 
 const DRY = process.argv.includes('--dry') || process.env.DRY_RUN === '1';
@@ -44,9 +44,25 @@ const REEL = process.argv.includes('--reel') || process.env.MODE === 'reel';
 const CALLBACK = process.argv.includes('--callback') || process.env.MODE === 'callback';
 // The fifth: once a week, what the investment banks said, with their
 // names on it. Attributed third-party views, never our recommendation.
-const ANALYSTS = process.argv.includes('--analysts') || process.env.MODE === 'analysts';
+
 // Scheduled ticks render for review only; publishing needs a person.
 const REVIEW = process.env.REVIEW === '1';
+// The card rollout (Nov 2026): until REVIEW_UNTIL (a local date,
+// YYYY-MM-DD), the evening carousel and the stories render, go to the
+// owner on Telegram, and publish nothing. Live from that date on.
+const localDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: process.env.TZ || 'Asia/Jerusalem' }).format(new Date());
+const reviewing = () => REVIEW || (!!process.env.REVIEW_UNTIL && localDate() < process.env.REVIEW_UNTIL);
+
+/** Review renders go to the owner's Telegram, so "look at it" needs no GitHub. */
+async function sendForReview(files, caption) {
+  let c = null;
+  try {
+    c = await connect(); await c.connect();
+    for (const [i, f] of files.entries()) await deliver(c, f, i === 0 ? String(caption ?? '').slice(0, 1000) : '');
+    say(`review: sent ${files.length} render(s) to Telegram`);
+  } catch (e) { say(`review: telegram send failed — ${e.message}`); }
+  finally { if (c) { try { await c.disconnect(); } catch {} try { await c.destroy(); } catch {} } }
+}
 // Telling an hour late, on purpose.
 //
 // The story track drops any hour it did not tell at the time — that
@@ -222,14 +238,6 @@ async function pickWindow() {
  * to, so an hour that went by unstoried is not worth telling later —
  * it is skipped, and the digest will still summarise it.
  */
-/** The week's analyst moves, for the note on every movement post. Never fatal. */
-async function analystsNow() {
-  try {
-    const now = Math.floor(Date.now() / 1000);
-    return analystPool(await messagesInAll(now - 7 * 86400, now));
-  } catch (e) { say('analyst notes off —', e.message); return []; }
-}
-
 async function runStories() {
   const nowWindow = windowOf(Math.floor(Date.now() / 1000)).start;
   const maxBehind = Number(process.env.MAX_STORY_LAG_WINDOWS ?? 2);
@@ -290,7 +298,7 @@ async function runStories() {
   const tally = Number((await getState(TALLY_KEY)) ?? 0);
   const deck = composeStories(rows, {
     carry: (await getState(CARRY_KEY)) ?? {}, endTs: w.end, template: null, tally,
-    catchup: CATCHUP, story: tpl.layout, palette: tpl.pal, analysts: await analystsNow() });
+    catchup: CATCHUP });
   const consumed = deck.consumed.map(Number);
   if (deck.skip) {
     say('SKIP —', w.key, `(${deck.skip})`);
@@ -309,8 +317,9 @@ async function runStories() {
   const { files } = await renderDeck(deck, dir, { format: 'jpeg', story: true });
   say('rendered', files.length, 'story board(s)');
 
-  if (REVIEW) {
+  if (reviewing()) {
     say(`REVIEW — ${files.length} stories rendered for ${deck.key}, NOT published`);
+    if (!DRY) await sendForReview(files, `🖼️ סטורי לבדיקה · ${deck.key}`);
     await markStoried(deck.key, consumed);
     await upsertWindow(deck.key, w.start, w.end);
     await setWindow({ key: deck.key, status: 'review', slides: files.length });
@@ -429,7 +438,7 @@ async function recordClaims(rows, deck, meta, files = []) {
     const kept = new Map();
     const out = [];
     for (const r of rows) {
-      const head = String(r.text ?? '').split('\n')[0].replace(/[\u200e\u200f]/g, '').trim();
+      const head = headlineOf(r.text);
       // 24 characters, not the whole headline: a reel card trims to
       // nine words and a story board can squeeze, so an exact match
       // would file nothing at all from the two tracks that publish most.
@@ -714,68 +723,78 @@ async function runCallbackPost() {
 }
 
 /**
- * The weekly analysts post: what the banks said, each row with the
- * name of the bank that said it. One a week, on its own day and hour,
- * and it never runs thin: under four attributed moves there is no post.
+ * 21:00 · "השוק בערב" — the day as three cards.
+ *
+ * Reads every message not yet used by a digest from the last day,
+ * whatever window it fell in: the old hour-window machinery (pick the
+ * oldest window, merge forward) is how a single photo-only message
+ * froze this track for ten days. Everything read is consumed, used or
+ * not, so nothing can block the next evening.
  */
-async function runAnalysts() {
-  if (!DRY && process.env.IGNORE_SCHEDULE !== '1') {
-    const day = (process.env.ANALYSTS_DAY || 'Wed').trim();
-    const hours = (process.env.ANALYSTS_HOURS || '18').split(',').map(x => x.trim());
-    if (localDayName() !== day || !hours.includes(String(localHour()))) {
-      say(`SKIP — ${localDayName()} ${localHour()}:xx is not the analysts slot (${day} ${hours.join(',')})`);
-      return 'none';
-    }
-  }
-  const spacing = Number(process.env.ANALYSTS_MIN_DAYS || 5);
-  if (!DRY && await analystPostsSince(spacing)) {
-    say(`SKIP — an analysts post already went out in the last ${spacing} days`);
-    return 'none';
-  }
-  const gap = Number(process.env.MIN_MINUTES_BETWEEN_POSTS || 12);
-  const last = await lastPostAt();
-  if (!DRY && last && (Date.now() / 1000 - last) < gap * 60) {
-    say(`SKIP — only ${Math.round((Date.now() / 1000 - last) / 60)}min since the last post`);
-    return 'none';
-  }
-
+async function runEvening() {
   const now = Math.floor(Date.now() / 1000);
-  const days = Number(process.env.ANALYSTS_DAYS || 7);
-  const rows = await messagesInAll(now - days * 86400, now);
-  const deck = composeAnalysts(rows, { now });
-  if (deck.skip) { say(`SKIP — ${deck.skip}`); return 'none'; }
-  say(`${deck.key} — ${deck.callIds.length} analyst move(s) -> ${deck.slides.length} slides`);
+  const key = `E:${stampKey(now)}`;
+  const back = Number(process.env.EVENING_LOOKBACK_HOURS || 26) * 3600;
+  const rows = await messagesIn(now - back, now);
+  const ids = rows.map(r => Number(r.tg_id));
+  if (!rows.length) { say('SKIP — no new messages since the last evening post'); return; }
 
-  const dir = join('./out', deck.key.replace(/[:]/g, ''));
-  const { files } = await renderDeck(deck, dir, { format: 'jpeg' });
-  if (!files.length) { say('SKIP — nothing rendered'); return 'none'; }
-  if (DRY || REVIEW) {
-    say(`${DRY ? 'DRY' : 'REVIEW'} — ${files.length} analyst slides rendered, NOT published`);
-    return 'done';
+  const carry = (await getState(CARRY_KEY)) ?? {};
+  const deck = composeEvening(rows, { now, carry });
+  if (deck.carry) await setState(CARRY_KEY, deck.carry);
+  await upsertWindow(key, now - back, now);
+  if (deck.skip) {
+    say('SKIP —', key, `(${deck.skip})`);
+    if (!DRY) { await markConsumed(key, ids); await setWindow({ key, status: deck.skip, slides: 0 }); }
+    return;
+  }
+  say(`${key} — ${rows.length} msgs -> ${deck.slides.length} cards `
+    + `[${deck.slides.map(c => `${c.photo ? 'img' : 'txt'}:${String(c.headline).slice(0, 24)}`).join(' | ')}]`);
+
+  const dir = join('./out', key.replace(/:/g, ''));
+  const { files, shed } = await renderDeck(deck, dir, { format: 'jpeg' });
+  if (shed.length) say('render review:', shed.map(x => `${x.slide}:${x.note}`).join(' · '));
+  if (!files.length) { say('SKIP — nothing rendered'); return; }
+
+  // Review: render, consume, publish nothing. The cards go up as the
+  // run's artifact for a person to look at.
+  if (reviewing() || DRY) {
+    say(`${DRY ? 'DRY' : 'REVIEW'} — ${files.length} card(s) rendered, NOT published`);
+    if (!DRY) {
+      await sendForReview(files, `🖼️ השוק בערב לבדיקה · ${key}\n\n${deck.caption}`);
+      await markConsumed(key, ids);
+      await setWindow({ key, status: 'review', slides: files.length, shed });
+      await logRun(key, 'review', true, `${files.length} card(s)`);
+      await notify(`🖼️ ${key} — ${files.length} cards rendered for review (not posted)`);
+    }
+    return;
   }
 
   const { upload, remove, publish } = await import('./publish/api.js');
-  const prefix = deck.key.replace(/[:]/g, '');
-  const urls = await upload(files, prefix);
-  await upsertWindow(deck.key, now - days * 86400, now);
-  let r = null, failure = null;
-  try { r = await publish(urls, deck.caption); }
-  catch (e) { failure = e; }
+  const prefix = key.replace(/:/g, '');
+  let result = null, failure = null;
+  try {
+    const urls = await upload(files, prefix);
+    result = await publish(urls, deck.caption);
+  } catch (e) { failure = e; }
   finally { await remove(files, prefix); }
 
-  if (r) {
-    await setWindow({ key: deck.key, status: 'posted', slides: files.length, posted_at: now });
-    await setPublished(deck.key, { media_id: r.id ?? null, permalink: r.permalink ?? null,
-      choices: { kind: 'analysts', moves: deck.callIds.length, types: deck.slides.map(x => x.type) } });
-    await logRun(deck.key, 'analysts', true, `${deck.callIds.length} moves`);
-    say(`POSTED analysts carousel ${r.id}`);
-    await notify(`🏦 המלצות האנליסטים — ${deck.callIds.length} שינויים\n${r.permalink ?? ''}`);
-    return 'done';
+  // Consumed either way: a failed evening must not become a stuck one.
+  await markConsumed(key, ids);
+  if (!result) {
+    await setWindow({ key, status: 'failed', slides: files.length, shed, error: failure?.message });
+    await logRun(key, 'publish', false, failure?.message ?? 'nothing posted');
+    await notify(`❌ ${key}\n${failure?.message ?? 'nothing posted'}`);
+    process.exitCode = 1;
+    return;
   }
-  await setWindow({ key: deck.key, status: 'failed', slides: 0, error: failure?.message });
-  await logRun(deck.key, 'analysts', false, failure?.message ?? 'nothing posted');
-  await notify(`❌ analysts post ${deck.key}\n${failure?.message ?? 'nothing posted'}`);
-  return 'done';
+  await setWindow({ key, status: 'posted', slides: files.length, shed, posted_at: Math.floor(Date.now() / 1000) });
+  await setPublished(key, { media_id: result.id ?? null, permalink: result.permalink ?? null,
+    choices: { kind: 'evening', types: deck.slides.map(c => (c.photo ? 'card-img' : 'card')) } });
+  await recordClaims(rows, deck, { wkey: key, media_id: result.id, permalink: result.permalink ?? null,
+    posted_at: Math.floor(Date.now() / 1000) }, files);
+  await logRun(key, 'publish', true, result.permalink ?? result.id);
+  await notify(`✅ ${key} — ${files.length} cards\n${result.permalink ?? ''}`);
 }
 
 async function runInsights() {
@@ -939,86 +958,24 @@ async function runReel() {
   const back = Number(process.env.REEL_LOOKBACK_HOURS || 24) * 3600;
   const floor = (!forced && last && last > day) ? Number(last)
     : Math.min(day, now - back);
-  // ── the proof reel comes first ───────────────────────────
-  //
-  // The reel is the only thing this account publishes that a stranger
-  // is ever served, and it was spending that on a summary of the day
-  // — which every finance account in the country also posts, and none
-  // of them can be told apart in a feed. A proven call cannot be
-  // copied: it needs a post that already exists, a reason given at
-  // the time, and closes that settled it.
-  //
-  // So on any day one is available, that is the film. The day summary
-  // is the fallback, not the format.
-  let rows = [], tpl = null, tplRecent = null, deck = null, proofHit = null;
-  // One slot a day still belongs to the day summary. Three proof
-  // films a day would be three arguments and no news, and a viewer
-  // who only ever meets the account being right about last week
-  // never finds out it covers this morning.
-  const summaryHours = hourList('REEL_SUMMARY_HOURS').length
-    ? hourList('REEL_SUMMARY_HOURS') : ['17'];
-  // ── the weekly scoreboard ────────────────────────────────
-  // Monday morning, before the US opens: the quietest slot of the
-  // week, given to the piece with the longest shelf life.
-  if (scoreSlot && process.env.REEL_SCOREBOARD !== '0') {
-    // Its own switch, not REEL_PROOF's. The single-call proof film and
-    // the weekly record are two different formats and turning one off
-    // used to turn both off.
-    const days = Number(process.env.SCORE_REEL_DAYS || 30);
-    const rowsMax = Number(process.env.SCORE_REEL_ROWS || 5);
-    const recent = await provenLately(days, Number(process.env.SCORE_REEL_MAX || 12), 'forecast');
-    const min = Number(process.env.SCORE_REEL_MIN || 3);
-    if (recent.length >= min) {
-      const score = await claimRecord(30);
-      deck = composeScoreboardReel(recent, { score, days, rows: rowsMax });
-      say(`scoreboard reel — ${score.hit}/${score.hit + score.miss} forecasts confirmed in ${days}d, ${recent.length} on the card`);
-    } else say(`scoreboard: only ${recent.length} proven call(s) (need ${min}) — skipping it`);
+  // ── the week's only reel ─────────────────────────────────
+  // One reel a week (owner, 8 Nov 2026): Sunday, "השבוע בדקה". The
+  // daily summary film, the single-call proof film and the Monday
+  // scoreboard are gone; the week's record is one scene inside it.
+  const reelDay = (process.env.REEL_DAY || 'Sun').trim();
+  if (!forced && !DRY && localDayName() !== reelDay) {
+    say(`SKIP — the reel is weekly, on ${reelDay}`); return;
   }
-
-  if (!deck && process.env.REEL_PROOF !== '0' && !summaryHours.includes(hourNow)) {
-    proofHit = await provenForReel(Number(process.env.PROOF_REEL_DAYS || 7));
-    if (proofHit) {
-      const score = await claimRecord(30);
-      deck = composeProofReel(proofHit, { score });
-      say(`proof reel — ${proofHit.kind} on ${proofHit.symbol}: `
-        + `${proofHit.move_pct}% in ${proofHit.days_after} session(s)`);
-    } else say('no proven call waiting — falling back to the day summary');
-  } else if (!deck) say(`${hourNow}:xx is the day-summary slot`);
-
-  if (!deck) {
-    rows = await messagesInAll(floor, now);
-    const need = Number(process.env.REEL_MIN_MESSAGES || 5);
-    if (rows.length < need) {
-      say(`SKIP — only ${rows.length} message(s) in the window (need ${need})`);
-      return;
-    }
-    ({ t: tpl, recent: tplRecent } = await nextTemplate(`R:${stampKey(now)}`));
-    deck = composeReel(rows, {
-      carry: (await getState(CARRY_KEY)) ?? {}, template: tpl.id, endTs: now });
-    if (deck.skip) { say('SKIP — reel', `(${deck.skip})`); return; }
+  if (!forced && !DRY && last && now - Number(last) < 6 * 86400) {
+    say('SKIP — this week\'s reel already went out'); return;
   }
+  let rows = await messagesInAll(now - 7 * 86400, now), tpl = null, tplRecent = null, proofHit = null;
+  const weekScore = await claimRecord(7);
+  let deck = composeWeekReel(rows, { now, score: weekScore });
+  if (deck.skip) { say('SKIP — reel', `(${deck.skip})`); return; }
 
   // One row per reel, not one row per day.
-  //
-  // composeReel keys itself off the first message it was given, so two
-  // runs over an overlapping day could land on the same key — the
-  // second silently overwriting the first's row, taking its media id
-  // with it and leaving the cap above convinced only one had gone out.
-  // The key carries the hour it was published in instead.
   deck.key = `R:${stampKey(now)}`;
-
-  // Every post about a move carries the analysts' word, reels in the
-  // caption. A proof reel is about its own claim; a day reel is about
-  // the most recent message in the window.
-  if (process.env.ANALYST_NOTE !== '0' && deck.caption) {
-    const about = proofHit ? `${proofHit.headline ?? ''} ${proofHit.asset ?? ''}`
-      : String(rows?.at(-1)?.text ?? '').split('\n')[0];
-    const n = noteFor(about, await analystsNow(), { skip: proofHit ? proofHit.tg_id : rows?.at(-1)?.tg_id });
-    if (n) {
-      const [first, ...rest] = deck.caption.split('\n\n');
-      deck.caption = [first, analystLine(n), ...rest].join('\n\n');
-    }
-  }
 
   say(`${deck.key} — ${rows.length} msgs -> ${deck.slides.length} frames `
     + `[${deck.slides.map(x => x.beat ?? x.type)}]`
@@ -1144,6 +1101,11 @@ async function runReel() {
   say(`encoded ${built.seconds}s · ${built.scenes} scenes · ${built.audio} · ${mood}`);
 
   if (DRY) { say('DRY RUN OK —', mp4); return; }
+  if (reviewing()) {
+    say('REVIEW — the reel goes to Telegram, NOT published');
+    await handOff(mp4, `🖼️ השבוע בדקה לבדיקה\n\n${deck.caption}`);
+    return;
+  }
 
   const { upload, remove, publishReel } = await import('./publish/api.js');
   const prefix = deck.key.replace(/[:]/g, '');
@@ -1285,14 +1247,13 @@ async function main() {
 
   // A review run publishes nothing, so the post-rate guards have no
   // opinion about it — let it render even at the daily cap.
-  const stop = (DRY || REVIEW) ? null : await blocked({ stories: STORIES || CALLBACK || ANALYSTS, reel: REEL });
+  const stop = (DRY || REVIEW) ? null : await blocked({ stories: STORIES || CALLBACK, reel: REEL });
   if (stop) { say('SKIP —', stop); return; }
 
   // A reel publishes, so unlike insights it sits BEHIND the kill
   // switch, the active hours and the failure latch — not in front of
   // them with the read-only mode.
   if (CALLBACK) return runCallback();
-  if (ANALYSTS) return runAnalysts();
 
   if (REEL) {
     // Two slots a day, gated on the LOCAL hour for the same reason the
@@ -1351,164 +1312,7 @@ async function main() {
     }
   }
 
-  let w = await pickWindow();
-  if (!w) { say('SKIP — nothing unconsumed'); return; }
-
-  // Old news is worse than no news - but retire the whole stale
-  // backlog in ONE pass, not one window per run. The migration
-  // arrived carrying a week of unconsumed history, and retiring a
-  // single window per hourly tick would have spent three days
-  // replaying August before reaching today. The same loop absorbs
-  // any future outage.
-  // MAX_WINDOW_AGE_MIN=0 disables retirement entirely: nothing that was
-  // never posted is ever thrown away, however far behind we are. The
-  // backlog then drains oldest-first, throttled by
-  // MIN_MINUTES_BETWEEN_POSTS and MAX_POSTS_PER_DAY.
-  const maxAge = Number(process.env.MAX_WINDOW_AGE_MIN ?? 0);
-  const stale = x => maxAge > 0 && Math.floor((Date.now() / 1000 - x.end) / 60) > maxAge;
-  let retired = 0, dropped = 0;
-  while (w && !w.replay && stale(w)) {
-    await upsertWindow(w.key, w.start, w.end);
-    await markConsumed(w.key, w.rows.map(r => Number(r.tg_id)));
-    // A failed publish leaves its messages unconsumed, so the next
-    // tick's retire loop used to sweep the window up and overwrite
-    // 'failed' with 'stale' - laundering the failure, so the
-    // auto-pause counted zero and never latched. Consume the
-    // messages, but never downgrade a recorded failure.
-    const prior = await getWindow(w.key);
-    if (prior?.status !== 'failed') await setWindow({ key: w.key, status: 'stale', slides: 0 });
-    retired++; dropped += w.rows.length;
-    if (retired >= 500) { say('retire loop hit its 500-window guard'); break; }
-    w = await pickWindow();
-  }
-  if (retired) say(`RETIRED ${retired} stale window(s), ${dropped} msg(s)`);
-  if (!w) { say('SKIP — nothing fresh left'); return; }
-  if (w.backlog > 1) say(`catching up — ${w.key} is ${w.backlog} window(s) behind`);
-
-  // A three-message window makes a four-slide post, and four slides
-  // read as an afterthought next to a full deck. Merge forward into
-  // the following CLOSED windows until there is enough to fill one.
-  // Deliberately after the retire loop: merging moves the end forward,
-  // so doing it earlier would make every stale window look fresh.
-  if (!w.replay) {
-    const minMsgs = Number(process.env.MIN_MESSAGES || 6);
-    const openStart = windowOf(Math.floor(Date.now() / 1000)).start;
-    let merged = 0;
-    while (w.rows.length < minMsgs && w.end < openStart) {
-      w.end += WIN * 60;
-      w.rows = await messagesIn(w.start, w.end);
-      merged++;
-    }
-    if (merged) say(`merged ${merged} following window(s) — ${w.rows.length} msg(s)`);
-  }
-
-  await upsertWindow(w.key, w.start, w.end);
-  if (!w.rows.length) { say(`SKIP — ${w.key} has no unconsumed messages`); return; }
-  // THE TEN-DAY OUTAGE (29 Oct – 8 Nov 2026)
-  //
-  // A photo-only message (tg 3933: an image, no text) sat in the
-  // 09:15 window of 28 Oct. parse() drops a message with no text, so
-  // the deck's `consumed` never named it, the window was posted and
-  // the message stayed unconsumed. Every tick after that picked the
-  // OLDEST unconsumed message — that one — landed on a window already
-  // marked posted, said "already posted" and went home. 137 messages
-  // and ten evenings went unposted, with nothing in the log but a
-  // skip. So: everything in a window is consumed when the window is
-  // done with, whether or not the parser could read it; and a window
-  // that is already posted consumes its leftovers before returning.
-  const everyRow = w.rows.map(r => Number(r.tg_id));
-  if (!w.replay && (await getWindow(w.key))?.status === 'posted') {
-    say('SKIP —', w.key, `already posted — consuming ${everyRow.length} leftover message(s)`);
-    await markConsumed(w.key, everyRow);
-    return;
-  }
-
-  const carry = (await getState(CARRY_KEY)) ?? {};
-  const { t: tpl, recent: tplRecent } = await nextTemplate(w.key);
-  const deck = compose(w.rows, { carry, endTs: w.end, template: tpl.id, analysts: await analystsNow() });
-  if (deck.carry) await setState(CARRY_KEY, deck.carry);
-
-  const consumed = [...new Set([...everyRow, ...deck.consumed.map(Number)])];
-  if (deck.skip) {
-    say('SKIP —', w.key, `(${deck.skip})`);
-    if (!w.replay) {
-      // Every skip left here means the window genuinely has nothing to
-      // post — no messages, or nothing but futures snapshots. A deck
-      // with even one slide never reaches this branch any more.
-      await markConsumed(w.key, consumed);
-      await setWindow({ key: w.key, status: deck.skip, slides: deck.slides.length });
-    }
-    return;
-  }
-
-  say(`${w.key} — ${w.rows.length} msgs -> ${deck.slides.length} slides `
-    + `[${deck.slides.map(s => s.type)}] · template ${tpl.id} ${tpl.name}`);
-
-  const api = (process.env.PUBLISHER || 'api') === 'api';
-  const dir = join('./out', w.key.replace(/:/g, ''));
-  const { files, shed } = await renderDeck(deck, dir, { format: api ? 'jpeg' : 'png' });
-  if (shed.length) say('tripwire shed', shed.length, 'row(s):', shed.map(s => s.headline.slice(0, 40)));
-  say('rendered', files.length, 'slide(s)');
-
-  // ── the review gate ──────────────────────────────────────
-  // Scheduled ticks render and stop. The slides go up as a run
-  // artifact and the window is marked 'review'; nothing reaches
-  // Instagram until a person dispatches that window with publish
-  // ticked. The messages are consumed either way, so the next tick
-  // advances to fresh news instead of re-rendering the same deck
-  // every hour — a replay (--window=) ignores consumed_by, so an
-  // approved deck can still be published hours later.
-  if (REVIEW && !w.replay) {
-    say(`REVIEW — ${deck.slides.length} slides rendered for ${w.key}, NOT published`);
-    await markConsumed(w.key, consumed);
-    await setWindow({ key: w.key, status: 'review', slides: deck.slides.length, shed });
-    await logRun(w.key, 'review', true, `${files.length} slide(s)`);
-    await notify(`🖼️ ${w.key} — ${deck.slides.length} slides ready for review\n`
-      + `Actions → tick → window=${w.key}, publish ✔`);
-    return;
-  }
-
-  let result;
-  try {
-    // Both publishers expose the same upload/remove/publish, so
-    // everything above this line is identical. The browser one
-    // uploads nothing - it hands the local files to instagram.com.
-    const { upload, remove, publish } = api
-      ? await import('./publish/api.js')
-      : await import('./publish/browser.js');
-    const prefix = w.key.replace(/:/g, '');
-    const urls = await upload(files, prefix);
-    say('uploaded', urls.length);
-    try {
-      result = await publish(urls, deck.caption, { dryRun: DRY });
-      say(DRY ? `DRY RUN OK — ${deck.slides.length} slides built, NOT published`
-              + (result.note ? ` (${result.note})` : '')
-              : `POSTED ${result.permalink ?? result.id}`);
-    } finally {
-      await remove(files, prefix);
-    }
-  } catch (e) {
-    say('FAILED —', e.message);
-    await setWindow({ key: w.key, status: 'failed', slides: deck.slides.length, shed, error: e.message });
-    await logRun(w.key, 'publish', false, e.message);
-    await notify(`❌ ${w.key}\n${e.message}`);
-    process.exitCode = 1;
-    return;
-  }
-
-  if (DRY) { say('dry run — window left open'); return; }
-  await markConsumed(w.key, consumed);
-  await keepTemplate(tplRecent, tpl.id);
-  await setWindow({ key: w.key, status: 'posted', slides: deck.slides.length, shed,
-    posted_at: Math.floor(Date.now() / 1000) });
-  // The result is worthless without the decision that produced it.
-  await setPublished(w.key, { media_id: result.id, permalink: result.permalink,
-    choices: { template: String(tpl.id), name: tpl.name, cover: deck.slides[0]?.type,
-      types: deck.slides.map(x => x.type), slot: deck.slot ?? null } });
-  await recordClaims(w.rows ?? [], deck, { wkey: w.key, media_id: result.id,
-    permalink: result.permalink ?? null, posted_at: Math.floor(Date.now() / 1000) }, files);
-  await logRun(w.key, 'publish', true, result.permalink ?? result.id);
-  await notify(`✅ ${w.key} — ${deck.slides.length} slides\n${result.permalink ?? ''}`);
+  return runEvening();
 }
 
 /**

@@ -142,8 +142,7 @@ export function dayOf(quotes, seed = 0) {
 // a stream is something they scroll past.
 export const SERIES = {
   digest: 'השוק בערב',
-  scoreboard: 'הציון השבועי',
-  analysts: 'המלצות האנליסטים',
   proof: 'צדקנו או טעינו?',
+  week: 'השבוע בדקה',
 };
-export const SCHEDULE = '📅 כל ערב ב-21:00: השוק בערב · שני: הציון השבועי · רביעי: המלצות האנליסטים · חמישי: צדקנו או טעינו?';
+export const SCHEDULE = '📅 כל ערב ב-21:00: השוק בערב · חמישי: צדקנו או טעינו? · ראשון: השבוע בדקה';

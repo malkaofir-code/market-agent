@@ -1,7 +1,7 @@
 // The day in the reader's money, and Ron's mood: arithmetic and feelings, never advice.
 import { readFileSync } from 'fs';
 import { marketMove, moneyLine, ronLine, moodOf, dayOf } from '../src/day.js';
-import { compose, composeReel } from '../src/compose.js';
+import { composeEvening } from '../src/compose.js';
 let bad = 0;
 const check = (name, got, want) => { const ok = got === want; if (!ok) bad++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${ok ? '' : ` -> ${got} (want ${want})`}`); };
 
@@ -22,16 +22,12 @@ for (const m of [-3, -1, 0, 1, 3, null]) for (let s = 0; s < 4; s++) {
 }
 console.log('ok   no Ron line gives advice');
 
-process.env.DIGEST_FORMAT = 'lesson';
-const fl = JSON.parse(readFileSync(new URL('./fixture-lesson.json', import.meta.url)));
-const carry = { SPX: { sym: 'SPX', chg: 0.85, last: '6,800', at: Math.floor(Date.now() / 1000) } };
-const d = compose(fl, { carry, endTs: fl.at(-1).ts + 60, template: 26 });
-check('digest cover carries the day', !!d.slides[0].day?.money, true);
-check('digest caption: the money line', d.caption.includes('₪10,000'), true);
-check('digest caption: Ron', d.caption.includes('רון:'), true);
-check('digest caption: the weekly schedule', d.caption.includes('צדקנו או טעינו?'), true);
-check('digest cover eyebrow asks why', d.slides[0].eyebrow.startsWith('למה כולם מדברים על') || d.slides[0].eyebrow === 'הכי חשוב עכשיו', true);
-const r = composeReel(fl, { carry, template: 26, endTs: fl.at(-1).ts + 60 });
-check('reel caption: the money line', r.caption.includes('₪10,000'), true);
-check('captions stay under Instagram\'s limit', d.caption.length <= 2200 && r.caption.length <= 2200, true);
+const rows = JSON.parse(readFileSync(new URL('./fixture-cards.json', import.meta.url)));
+const now = Math.floor(Date.now() / 1000);
+const carry = { SPX: { sym: 'SPX', chg: 0.85, last: '6,800', at: now } };
+const d = composeEvening(rows, { carry, now });
+check('evening first card carries the day', !!d.slides[0].day?.money, true);
+check('evening caption: the money line', d.caption.includes('₪10,000'), true);
+check('evening caption: Ron', d.caption.includes('רון:'), true);
+check('evening caption: the weekly schedule', d.caption.includes('צדקנו או טעינו?'), true);
 process.exit(bad ? 1 : 0);

@@ -1,3 +1,5 @@
+> **Nov 2026:** one reel a week — Sunday 19:00, "השבוע בדקה" (src/compose.js composeWeekReel): the week's biggest move, its three biggest stories, the week's record, the question. The daily, proof and scoreboard films are retired; the rules below still govern how a scene is built.
+
 # Reel — the line of truth
 
 Fourteen rules the next reel has to pass. Each says what to do, why it is

@@ -3,7 +3,6 @@
 // Pure: deck plan in, HTML out. No I/O, no layout measurement.
 // (Overflow is measured in render.js, which owns a real browser.)
 // ─────────────────────────────────────────────────────────────
-import { plainNote } from './analysts.js';
 import { bidi, esc } from './rtl.js';
 import { vars, byId } from './templates.js';
 
@@ -139,47 +138,6 @@ const photo = (p, stat) => p
   : '';
 
 const ARCHETYPES = {
-  // 19 · the proof reel's scene.
-  //
-  // The reel is the only surface a stranger ever sees, and until now
-  // it spent that on a summary of the day — which every finance
-  // account in the country also posts. This spends it on the one
-  // thing none of them can copy without having done the work: a call
-  // this account published, the reason it gave at the time, and the
-  // closes that settled it.
-  //
-  // One archetype, six beats, because a reel is a sequence and the
-  // sequence IS the argument: claim, reason, evidence, verdict.
-  sceneProof: s => {
-    const beat = s.beat ?? 'said';
-    const inner = {
-      hook: () => `<p class="sp-tick"></p>
-        <p class="sp-hook">${bidi(s.headline)}</p>
-        <p class="sp-sub">${bidi(s.sub)}</p>`,
-      said: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
-        <p class="sp-h">${bidi(s.headline)}</p>`,
-      why: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
-        <p class="sp-why">${bidi(s.headline)}</p>`,
-      chart: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
-        ${priceLine(s.path, s.dir, { from: s.fromPx, to: s.toPx })}
-        <p class="sp-sub">${bidi(s.sub)}</p>`,
-      number: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
-        <p class="sp-big">${esc(s.big)}</p>
-        <p class="sp-sub">${bidi(s.sub)}</p>`,
-      // One proven call as one card, for the weekly scoreboard: the
-      // instrument and the date small, the move enormous, the headline
-      // underneath as the thing that was actually said.
-      row: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
-        <p class="sp-big ${s.dir ?? ''}">${esc(s.big)}</p>
-        <p class="sp-row-h">${bidi(s.headline)}</p>
-        <p class="sp-sub">${bidi(s.sub)}</p>`,
-      record: () => `<p class="sp-eyeb">${bidi(s.eyebrow)}</p>
-        <p class="sp-rec"><b>${esc(s.big)}</b>${bidi(s.headline)}</p>
-        <p class="sp-note">${bidi(s.sub)}</p>
-        <p class="sp-handle">${HANDLE}</p>`,
-    }[beat] ?? (() => `<p class="sp-h">${bidi(s.headline)}</p>`);
-    return `<div class="a-sp2 sp-${esc(beat)}"><div class="sp-txt">${inner()}</div></div>`;
-  },
 
   // 15 · the certificate — the proof board.
   //
@@ -231,24 +189,17 @@ const ARCHETYPES = {
     <figure class="po-fr"><img src="${esc(s.src)}" alt=""></figure>
     <p class="po-cap">${bidi(s.caption)}</p></div>`,
 
-  // 16c · analysts — other people's calls, with their names on them.
-  analysts: s => `<div class="a-an">
-    <p class="eyeb">${bidi(s.eyebrow || 'דעות בתי ההשקעות')}</p>
-    <ul class="an-list">${(s.rows ?? []).map(r => `<li class="${esc(r.dir)}">
-      <div class="an-top"><b class="an-firm">${esc(r.firm)}</b>
-        <span class="an-act">${bidi(r.label)}</span>
-        ${r.target ? `<span class="an-pt">${bidi('יעד')} <bdi dir="ltr">${esc(r.target)}</bdi></span>` : ''}</div>
-      <p class="an-tx">${bidi(r.text)}</p></li>`).join('')}</ul>
-    ${s.hint ? `<p class="an-hint">${bidi(s.hint)}</p>` : ''}
-    <p class="an-note">${bidi(s.note)}</p></div>`,
-
-  // 16d · the analysts' word, alone on a board: who, what they did, nothing else.
-  analystNote: s => { const p = plainNote(s.note);
-    return `<div class="a-nn">
-    <p class="eyeb">${bidi(s.note.about === 'story' ? 'מה אומר אנליסט' : 'מה אומרים האנליסטים')}</p>
-    <p class="nt-s">${bidi(p.short)}</p>
-    <p class="nt-m">${bidi(p.mean)}</p>
-    <p class="nt-h">${bidi(p.hint)}</p></div>`; },
+  // 00 · THE CARD — the one design (Nov 2026). The channel's headline,
+  // one line of what it means, the picture only when it is licensed.
+  card: s => `<div class="a-cd${s.photo ? ' has-img' : ''}">
+    ${s.photo ? `<figure class="cd-img" data-protect="the photo"><img src="${esc(s.photo.src)}" alt=""></figure>` : ''}
+    <div class="cd-txt">
+      <p class="eyeb">${bidi(s.eyebrow || '')}</p>
+      ${s.figure ? `<p class="cd-fig ${esc(s.dir || '')}" data-protect="the figure">${esc(s.figure)}</p>` : ''}
+      <h1 class="cd-h">${bidi(s.headline)}</h1>
+      ${s.mean ? `<div class="cd-m"><p class="cd-ml">${bidi(s.label || '')}</p><p class="cd-mt">${bidi(s.mean)}</p></div>` : ''}
+      ${s.credit ? `<p class="cd-cr">${esc(s.credit)}</p>` : ''}
+    </div></div>`,
 
   // 17 · the proof post's opening.
   coverProof: s => `<div class="a-pv">
@@ -276,259 +227,6 @@ const ARCHETYPES = {
        <b class="rc-m ${i.dir ?? ''}">${esc(i.move)}</b><span class="rc-s">${bidi(i.said)}</span></li>`).join('')}</ul>
     <p class="rc-note">${bidi(s.note)}</p></div>`,
 
-  // 01 · cover — the photo bleeds off the top and dissolves into the
-  // ground; the headline sits inside the fade rather than beside it.
-  cover: s => `<div class="a-cv">
-    <div class="txt"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
-    <h1>${bidi(s.headline)}</h1>
-    <p class="stand">${bidi(s.stand)}</p></div></div>`,
-
-  // 01b · cover, framed — the composition carried over from direction
-  // B: the photo as a physical object, headline block cutting across.
-  // Standing cover; `cover` above stays for windows with no image.
-  coverFramed: s => `<div class="a-cf">
-    ${s.photo ? `<div class="frame"><img src="${esc(s.photo.src)}" alt=""></div>` : ''}
-    <div class="block"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
-    <h1>${bidi(s.headline)}</h1></div>
-    <p class="stand">${bidi(s.stand)}</p><div class="kick"></div></div>`,
-
-  // 01c · cover, ruled — the broadsheet opening. A heavy rule, a small
-  // eyebrow, and a headline given the whole width. No picture competes
-  // with it; when the window has one it goes on a later board.
-  coverRule: s => `<div class="a-cr">
-    <div class="cr-bar"></div>
-    <p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
-    <h1>${bidi(s.headline)}</h1>
-    <div class="cr-hr"></div>
-    <p class="stand">${bidi(s.stand)}</p></div>`,
-
-  // 01d · cover, edged — a full-height accent bar down the reading
-  // edge. In RTL that is the RIGHT, which is where the eye starts, so
-  // the bar is the first thing seen and the headline hangs off it.
-  coverEdge: s => `<div class="a-ce"><div class="ce-bar"></div>
-    <div class="txt"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
-    <h1>${bidi(s.headline)}</h1>
-    <p class="stand">${bidi(s.stand)}</p></div></div>`,
-
-  // 01e · cover, poster — one thing, enormous. Everything else is
-  // reduced to a caption. For the loud grounds, where a paragraph of
-  // standfirst on a field of orange is unreadable anyway.
-  coverPoster: s => `<div class="a-po">
-    <p class="eyeb">${bidi(s.eyebrow || 'עכשיו')}</p>
-    <h1>${bidi(s.headline)}</h1>
-    <p class="cap">${bidi(s.stand)}</p></div>`,
-
-  // 01f · cover, banded — the headline inverted inside a solid band
-  // across the middle, the picture above it, the standfirst below.
-  coverBand: s => `<div class="a-cb">
-    ${s.photo ? `<div class="cb-ph"><img src="${esc(s.photo.src)}" alt=""></div>` : ''}
-    <div class="cb-band"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
-    <h1>${bidi(s.headline)}</h1></div>
-    <p class="stand">${bidi(s.stand)}</p></div>`,
-
-  // 01g · cover, stacked — the headline boxed like something coming
-  // off a wire, with a stamped index. The most machine-like opening in
-  // the set, for the grounds that can carry it.
-  coverStack: s => `<div class="a-ck">
-    <div class="ck-tab">${bidi(s.eyebrow || 'עדכון')}</div>
-    <div class="ck-box"><h1>${bidi(s.headline)}</h1></div>
-    <p class="stand">${bidi(s.stand)}</p></div>`,
-
-  // 01h · cover, split — the board cut in two. An accent field holds
-  // the eyebrow, the headline crosses the seam so it belongs to
-  // neither half. The seam is the composition; nothing else on the
-  // board is decorated.
-  coverSplit: s => `<div class="a-sp">
-    <div class="sp-field"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p></div>
-    <h1>${bidi(s.headline)}</h1>
-    <p class="stand">${bidi(s.stand)}</p></div>`,
-
-  // 01i · cover, index — a chapter opener. The hour enormous as a
-  // numeral, the headline small beneath it. Inverts the usual
-  // hierarchy: the biggest thing carries the least information, which
-  // is what makes it read as a record rather than a bulletin.
-  coverIndex: s => `<div class="a-ix">
-    <p class="ix-n">${esc(s.index ?? '01')}</p>
-    <div class="ix-hr"></div>
-    <p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
-    <h1>${bidi(s.headline)}</h1>
-    <p class="stand">${bidi(s.stand)}</p></div>`,
-
-  // 01j · cover, bracket — the headline held in a drawn bracket.
-  // Drawn with borders, not a glyph: a quotation mark inside an RTL
-  // line is a bidi argument nobody wins, and a border has no
-  // direction.
-  coverBracket: s => `<div class="a-bk">
-    <p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
-    <div class="bk-hold"><h1>${bidi(s.headline)}</h1></div>
-    <p class="stand">${bidi(s.stand)}</p></div>`,
-
-  // 01k · cover, margin — a narrow column against a wide empty field.
-  // The quietest opening in the set and the only one that GAINS from
-  // emptiness, which is why it takes no mascot: he would fill exactly
-  // the space that is the design.
-  coverMargin: s => `<div class="a-mg">
-    <div class="mg-col"><p class="eyeb">${bidi(s.eyebrow || 'הסיפור של החלון')}</p>
-      <h1>${bidi(s.headline)}</h1>
-      <div class="mg-hr"></div>
-      <p class="stand">${bidi(s.stand)}</p></div></div>`,
-
-  // 01l · cover, bleed — the photograph as the whole board, headline
-  // burned into the bottom over a scrim. Forty-four per cent of the
-  // source messages carry a picture and not one opening used it
-  // full-bleed; they framed it, banded it or ignored it. Without a
-  // photo it falls back to the ruled opening rather than rendering an
-  // empty scrim.
-  coverBleed: s => s.photo ? `<div class="a-bl">
-    <img class="bl-img" src="${esc(s.photo.src)}" alt="">
-    <div class="bl-scrim"></div>
-    <div class="bl-txt"><p class="eyeb">${bidi(s.eyebrow || 'עכשיו')}</p>
-      <h1>${bidi(s.headline)}</h1>${s.stand ? `<p class="stand">${bidi(s.stand)}</p>` : ''}</div></div>` : ARCHETYPES.coverRule(s),
-
-  // 01m · cover, figure — the number at the size of the board, the
-  // headline reduced to a caption. For a market account this is the
-  // most legible thing that can go in a feed: a reader moving fast
-  // reads one number and either stops or does not. Falls back when
-  // the window's lead carries no clean figure.
-  coverFigure: s => s.figure ? `<div class="a-fg">
-    <p class="eyeb">${bidi(s.eyebrow || 'עכשיו')}</p>
-    <p class="fg-n">${esc(s.figure)}</p>
-    <h1>${bidi(s.headline)}</h1>${s.stand ? `<p class="stand">${bidi(s.stand)}</p>` : ''}</div>` : ARCHETYPES.coverPoster(s),
-
-  // 02 · hero figure — sized to its measure, not to a constant.
-  hero: s => {
-    // The measure is the COLUMN, not the canvas. With Ron on the board
-    // a lane is gone, and a figure sized against the full 1080 grew
-    // straight through him — the review then shrank him instead, which
-    // is the wrong end of the problem to fix.
-    const room = s.ronSide ? 600 : 940;
-    const size = Math.min(s.ronSide ? 208 : 258, Math.floor(room / (String(s.figure).length * 0.62)));
-    return `<div class="a-hr"><p class="eyeb">${bidi(s.eyebrow || 'המספר של החלון')}</p>
-    <p class="fig ${s.dir ?? ''}" data-protect="the figure" style="font-size:${size}px">${esc(s.figure)}</p>
-    ${photo(s.photo && { ...s.photo, h: 300 })}
-    <p class="quo">${bidi(s.quote)}</p></div>`;
-  },
-
-  // 03 · item — one story, its photo, and the sentence under it.
-  item: s => `<div class="a-it">
-    <div class="hd"><span class="rowidx">${pad2(s.n)}</span><h2>${bidi(s.headline)}</h2></div>
-    ${photo(s.photo, s.stat)}
-    ${s.body ? `<p class="body">${bidi(s.body)}</p>` : ''}</div>`,
-
-  // 04 · interpretation — the one heavy frame in the system.
-  note: s => `<div class="a-nt"><p class="eyeb">MEANING · משמעות</p>
-    ${s.about ? `<p class="abt">${bidi(s.about)}</p>` : ''}
-    ${(s.basis?.length || s.stat) ? `<div class="why">
-      <p class="why-k">מה דווח</p>
-      ${s.stat ? `<p class="why-n">${bidi(s.stat)}</p>` : ''}
-      ${(s.basis ?? []).map(b => `<p class="why-l">${bidi(b)}</p>`).join('')}
-    </div>` : ''}
-    <p class="txt">${bidi(s.text)}</p>
-    <p class="dis">${bidi(s.disclaimer || 'פרשנות, לא המלצה.')}</p></div>`,
-
-  // 04b · Ron's board — the interpretation, with him presenting it.
-  //
-  // He is the one thing on this account nobody else can copy: a feed
-  // of market headlines is a utility, and utilities get muted, while
-  // a character is a reason to follow. So once a deck he stops being
-  // decoration and stands next to the day's "so what".
-  //
-  // The tail on the block points at him, which is what makes it read
-  // as speech rather than as a caption that happens to sit near a
-  // drawing. The source stays credited in the footer and the
-  // disclaimer stays on the board: he PRESENTS the interpretation,
-  // he is not being passed off as its author.
-  voice: s => `<div class="a-vo">
-    <p class="eyeb">${bidi(s.eyebrow || 'רון מסביר')}</p>
-    <div class="say"><p class="txt">${bidi(s.text)}</p></div>
-    ${s.about ? `<p class="abt">${bidi(s.about)}</p>` : ''}
-    <p class="dis">${bidi(s.disclaimer || 'פרשנות, לא המלצה.')}</p></div>`,
-
-  // 05 · tape chart — hand-built bars, pinned LTR.
-  chart: s => `<div class="a-ch"><p class="eyeb">TAPE · חוזים עתידיים</p>
-    <h2>${bidi(s.title || 'התמונה בחוזים')}</h2>
-    <div class="bars" data-protect="the chart">${s.series.map(d => {
-      const sg = sign(d.chg), w = Math.min(46, Math.abs(d.chg) * 36);
-      return `<div class="bar"><span class="sym">${esc(d.sym)}</span>
-      <div class="track"><div class="fill ${sg}" style="width:${w}%"></div><div class="zero"></div></div>
-      <span class="val ${sg}">${fmtPct(d.chg)}</span></div>`;
-    }).join('')}</div>
-    <p class="note">נכון ל־${bidi(s.stamp)} · שעון ישראל</p></div>`,
-
-  // 06 · list — everything that did not earn its own photo slide.
-  list: s => `<div class="a-ls"><h2>${bidi(s.title || 'עוד מהחלון הזה')}</h2><div class="rows" data-protect="the list">${
-    s.rows.map(r => `<div class="row"><span class="row-n">${pad2(r.n)}</span>
-    <span><p class="row-h">${bidi(r.headline)}</p>${
-      r.source ? `<span class="row-s">${bidi(r.source)}</span>` : ''}</span></div>`).join('')
-  }</div></div>`,
-
-  // 04c · the lesson — the mechanism behind the story, in three steps.
-  //
-  // Numbered because it IS a sequence: this, so this, so this. The
-  // takeaway sits under a rule at the foot as the one line to keep.
-  // No figures on this board by design — see lessons.js.
-  lesson: s => `<div class="a-le"><p class="eyeb">${bidi(s.eyebrow || 'השיעור')}</p>
-    <h2>${bidi(s.title)}</h2>
-    <ol class="steps" data-protect="the steps">${(s.steps ?? []).map((t, i) =>
-      `<li><span class="k">${i + 1}</span><span class="t">${bidi(t)}</span></li>`).join('')}</ol>
-    <p class="take">${bidi(s.takeaway)}</p>
-    <p class="dis">${bidi('הסבר כללי, לא המלצה.')}</p></div>`,
-
-  // 04d · the brief — two more stories, each WITH what it means.
-  //
-  // The list board it replaces carried headlines only, which is the
-  // exact thing a reader cannot use: a headline says what happened and
-  // never why it matters.
-  brief: s => `<div class="a-br">${s.eyebrow ? `<p class="eyeb">${bidi(s.eyebrow)}</p>` : ''}<h2>${bidi(s.title)}</h2><div class="rows" data-protect="the brief">${
-    s.rows.map(r => `<div class="row"><span class="row-n">${pad2(r.n)}</span>
-    <span><p class="row-h">${bidi(r.headline)}</p>${
-      r.meaning ? `<p class="row-m">${bidi(r.meaning)}</p>` : ''}</span></div>`).join('')
-  }</div></div>`,
-
-  // 04f · the details — the drill-down, for whoever swiped this far.
-  //
-  // The lead story's own facts, as the channel wrote them, one per
-  // row. Nothing here is new to the deck's argument; it is the
-  // evidence under the cover, for the reader who wants it.
-  detail: s => `<div class="a-dt"><p class="eyeb">${bidi(s.eyebrow || 'לעומק · הפרטים')}</p>
-    <h2>${bidi(s.title)}</h2>
-    <ul class="facts" data-protect="the facts">${(s.facts ?? []).map(f =>
-      `<li>${bidi(f)}</li>`).join('')}</ul></div>`,
-
-  // 04e · the outlook — what the window points at, and how fast.
-  //
-  // Two short lists, up and down, never a price and never a date. The
-  // speed is a three-dot meter because "how fast" is a range: days,
-  // weeks, months. Every row says where it came from — the channel's
-  // own forecast, or our reading of a fixed mechanism (outlook.js).
-  outlook: s => {
-    const SP = { fast: ['תוך ימים', 3], mid: ['תוך שבועות', 2], slow: ['תוך חודשים', 1] };
-    const BASIS = { report: 'מהדיווח', ours: 'ההערכה שלנו' };
-    const row = r => { const [lbl, n] = SP[r.speed] ?? SP.fast; return `<div class="row">
-      <p class="nm">${bidi(r.name)}</p>
-      <span class="sp" aria-label="${lbl}"><i class="dots">${[1, 2, 3].map(k =>
-        `<b class="${k <= n ? 'on' : ''}"></b>`).join('')}</i>${bidi(lbl)}</span>
-      <p class="why">${bidi(r.why)}</p><span class="bs">${bidi(BASIS[r.basis] ?? '')}</span></div>`; };
-    const side = (k, title, rows) => rows.length ? `<section class="side ${k}">
-      <h3><span class="ar">${k === 'up' ? '▲' : '▼'}</span>${bidi(title)}</h3>${rows.map(row).join('')}</section>` : '';
-    return `<div class="a-ol"><p class="eyeb">${bidi(s.eyebrow || 'לאן זה יכול לזוז')}</p>
-    <h2>${bidi(s.title || 'מה עשוי לעלות, ומה עשוי לרדת')}</h2>
-    <div class="sides" data-protect="the outlook">${side('up', 'עשוי לעלות', s.up ?? [])}${side('dn', 'עשוי לרדת', s.dn ?? [])}</div>
-    <p class="dis">${bidi('הערכה לפי הדיווחים — לא המלצה ולא ייעוץ השקעות.')}</p></div>`;
-  },
-
-  // 07 · what to watch — a single sentence, no furniture competing.
-  watch: s => `<div class="a-wt"><p class="eyeb">${bidi(s.eyebrow || 'מה לעקוב')}</p>
-    <p class="big">${bidi(s.text)}</p><div class="kick"></div></div>`,
-
-  // 08 · telegram — once a day, on the 23:00 deck.
-  telegram: s => `<div class="a-tg"><p class="eyeb">TELEGRAM · בזמן אמת</p>
-    <p class="big">${bidi(s.big)}</p>
-    <div class="sched">${(s.schedule || []).map(r =>
-      `<div class="sr"><span class="st">${esc(r.time)}</span><span class="se">${bidi(r.label)}</span></div>`
-    ).join('')}</div>
-    <div class="link">${esc(s.link)}</div></div>`,
-
   // 09 · the scene — the reel's board, and nothing like the others.
   //
   // Every other archetype here is a page: text laid on a field, read
@@ -537,7 +235,7 @@ const ARCHETYPES = {
   // viewer has under two seconds to take it in — so the headline is
   // short, enormous, and carries a single accented word to land the
   // eye somewhere specific.
-  scene: s => `<div class="a-sn${s.photo ? ' has-ph' : ''}${s.lead ? ' is-lead' : ''}${String(s.headline ?? '').split(/\s+/).length > 6 ? ' is-long' : ''}">
+  scene: s => `<div class="a-sn${s.photo ? ' has-ph' : ''}${s.lead ? ' is-lead' : ''}${String(s.headline ?? '').split(/\s+/).length > 6 ? ' is-long' : ''}${s.ron === null ? ' no-ron' : ''}">
     ${sceneBg(s.dir, s.seed ?? 0)}
     ${s.photo ? `<img class="sn-ph" src="${esc(s.photo.src)}" alt="">
     <div class="sn-scrim"></div>` : ''}
@@ -550,24 +248,6 @@ const ARCHETYPES = {
          <p class="sn-big" data-dir="${esc(s.dir || '')}">${bidi(s.big)}</p>`
       : `<p class="sn-h">${s.marked ?? bidi(s.headline)}</p>`}
       ${s.sub ? `<p class="sn-s">${bidi(s.sub)}</p>` : ''}</div></div>`,
-
-  // 08 · the ask.
-  //
-  // The deck has never asked for anything. Saves and shares are what
-  // the ranking actually rewards — a save says "I will need this
-  // again", a share puts the account in front of someone who has
-  // never seen it — and a reader who was not asked does neither.
-  //
-  // One board, at the end, where the reader has already got the news
-  // and owes nothing. Never on the cover, which is a headline's job,
-  // and never on a news board, which would make the reporting look
-  // like bait.
-  ask: s => `<div class="a-ask"><p class="eyeb">${bidi(s.eyebrow || 'לפני שאתם ממשיכים')}</p>
-    <p class="big">${bidi(s.big)}</p>
-    <div class="acts" data-protect="the three asks">${(s.acts || []).map(a =>
-      `<div class="act"><span class="ai">${esc(a.mark)}</span><span class="al">${bidi(a.label)}</span></div>`
-    ).join('')}</div>
-    ${s.foot ? `<p class="afoot" data-protect="the sign-off">${bidi(s.foot)}</p>` : ''}</div>`,
 };
 
 /**
@@ -720,7 +400,7 @@ const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed'
   // steps, and he has just presented the meaning on the board before.
   'lesson', 'brief', 'outlook', 'detail',
   // The record is a table. He has nowhere to stand on it.
-  'record', 'proofOrig', 'recordRows', 'analysts', 'analystNote']);
+  'record', 'proofOrig', 'recordRows', 'analysts', 'analystNote', 'card']);
 
 /**
  * The mascot layer. `ctx.poses` is filled by render.js, which owns the
@@ -752,6 +432,9 @@ function ronLayer(slide, ctx, i = 0) {
   // A day-summary scene is ABOUT him — no rule downstream may drop
   // him from one. A proof scene is about the evidence, and he stands
   // on it only where he is invited.
+  // The weekly reel's middle scenes are the news, with nobody in front
+  // of it: a scene may opt out with ron:null like any other board.
+  if (slide.type === 'scene' && slide.ron === null) return '';
   if (slide.type !== 'scene') {
     if (slide.ron === null || NO_RON.has(slide.type)) return '';
     if (slide.story && !STORY_RON.has(slide.story)) return '';

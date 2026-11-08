@@ -85,7 +85,7 @@ html,body{margin:0;padding:0;background:var(--bg)}
 /* ── cover overlay: the photo is a sibling of .sl-bd so it can bleed
    behind the masthead; the body band stops being a grid row and
    simply hangs at the bottom of the frame. ── */
-.slide--cover .sl-bd{justify-content:flex-end;padding-top:0}
+
 .cv-bleed{position:absolute;inset:0 0 auto 0;height:640px;overflow:hidden;z-index:1}
 .cv-bleed img{width:100%;height:100%;object-fit:cover;opacity:.92;display:block}
 /* The top of this gradient is the masthead's ground. At .62 a busy
@@ -97,119 +97,46 @@ html,body{margin:0;padding:0;background:var(--bg)}
   rgba(11,13,16,.97) 0%,rgba(11,13,16,.93) 17%,rgba(11,13,16,.6) 34%,
   rgba(11,13,16,.82) 70%,var(--bg) 100%)}
 /* ── 01 · cover (photo bleeds off the top, headline in the fade) ── */
-.a-cv{z-index:3}
-.a-cv h1{font-family:var(--f-disp);font-weight:900;font-size:112px;line-height:1.02;
-  letter-spacing:-.03em;margin:24px 0 0;max-width:15ch;text-wrap:balance}
-.a-cv .stand{font-size:36px;line-height:1.42;color:var(--dim2);margin:30px 0 0;max-width:26ch}
 
 /* ── 01b · cover, framed (the B composition, kept dark).
    Laid out in FLOW with negative margins, not absolutely: an
    absolute child of .sl-bd is measured against a grid row, which
    put the headline block off the top of the frame entirely. ── */
-.a-cf{display:flex;flex-direction:column;position:relative;z-index:3}
-.a-cf .frame{width:700px;height:520px;align-self:flex-start;margin-inline-start:-12px;
-  transform:rotate(-1.6deg);border:14px solid var(--fg);overflow:hidden;flex:0 0 auto}
-.a-cf .frame img{width:100%;height:100%;object-fit:cover;display:block}
+
 /* In RTL flex-start is the RIGHT edge - the photo hangs off the right,
    the headline block off the left, so they straddle rather than stack. */
-.a-cf .block{width:610px;align-self:flex-end;margin-top:-118px;margin-inline-end:-8px;
-  background:var(--acc);color:var(--bg);padding:30px 34px;position:relative;z-index:3;transform:rotate(1deg)}
-.a-cf .block .eyeb{color:var(--bg);opacity:.8;margin-bottom:16px}
-.a-cf .block h1{font-family:var(--f-disp);font-weight:900;font-size:86px;line-height:1.04;
-  letter-spacing:-.028em;margin:0}
-.a-cf .stand{font-size:34px;line-height:1.42;color:var(--dim2);
-  margin:0;max-width:30ch;border-top:1.5px solid var(--rule);padding-top:26px;z-index:3}
-.a-cf .kick{width:200px;height:7px;background:var(--acc);margin-top:30px}
 
 /* ── 02 · hero figure ── */
 /* The -.05em tracking is applied after the LAST glyph too, so a
    right-aligned figure ends its advance flush with the frame and the
    ink of the % overhangs into the clip. Give it that width back. */
-.a-hr .fig{font-family:var(--f-mono);font-weight:600;line-height:.82;letter-spacing:-.05em;
-  direction:ltr;unicode-bidi:isolate;margin:0;display:block;padding-inline-end:.09em;width:fit-content;margin-inline-start:auto;white-space:nowrap}
-.a-hr .fig.up{color:var(--pos)} .a-hr .fig.dn{color:var(--neg)}
-.a-hr .quo{font-size:34px;line-height:1.44;color:var(--dim2);margin:0;max-width:29ch;
-  border-top:1.5px solid var(--rule);padding-top:26px}
+
+ 
 
 /* ── 03 · item + photo ── */
-.a-it .hd{display:flex;align-items:flex-start;gap:26px}
-.a-it h2{font-size:62px;font-weight:800;line-height:1.2;letter-spacing:-.02em;margin:0}
-.a-it .body{font-size:33px;line-height:1.45;color:var(--dim2);margin:0;max-width:34ch}
+
 /* No photo? The headline takes the room the image would have had,
    rather than leaving a third of the frame empty. */
-.a-it:not(:has(.ph)) h2{font-size:76px;line-height:1.1;letter-spacing:-.03em}
-.a-it:not(:has(.ph)) .body{font-size:34px;max-width:30ch;
-  border-top:1.5px solid var(--rule);padding-top:26px}
 
 /* ── 04 · interpretation ── */
-.a-nt{display:flex;flex-direction:column;gap:30px}
-.slide--story .a-nt{gap:44px}
-.slide--story .a-nt .abt{font-size:34px}
-.a-nt .abt{font-size:29px;font-weight:700;color:var(--dim2);margin:0;padding-bottom:22px;
-  border-bottom:1.5px solid var(--rule);line-height:1.34}
-.a-nt .txt{font-size:60px;font-weight:800;line-height:1.32;margin:0;letter-spacing:-.015em;max-width:21ch;
-  border-inline-start:9px solid var(--acc);padding-inline-start:34px}
+
 /* The working, between the story and the verdict: what was reported,
    set quieter and smaller than the meaning it leads into, so the eye
    still lands on the conclusion but can walk back up to the evidence. */
-.a-nt .why{margin:0;display:flex;flex-direction:column;gap:12px}
-.a-nt .why-k{font-family:var(--f-mono);font-size:28px;letter-spacing:.09em;
-  color:var(--dim);margin:0;text-transform:uppercase}
-.a-nt .why-n{font-family:var(--f-mono);font-size:52px;font-weight:700;color:var(--acc-ink,var(--acc));
-  margin:0;line-height:1;direction:ltr;unicode-bidi:isolate;align-self:flex-start}
-.a-nt .why-l{font-size:30px;line-height:1.4;color:var(--dim2);margin:0;max-width:34ch;
-  padding-inline-start:22px;border-inline-start:2px solid var(--rule)}
-.a-nt .dis{font-family:var(--f-mono);font-size:28px;color:var(--dim);margin:0}
 
 /* ── 08 · the ask ── */
-.a-ask .big{font-family:var(--f-disp);font-size:72px;font-weight:800;line-height:1.12;
-  letter-spacing:-.03em;margin:0;max-width:17ch}
-.a-ask .acts{display:flex;flex-direction:column;gap:26px;margin-top:6px}
-.a-ask .act{display:grid;grid-template-columns:66px 1fr;align-items:center;gap:24px;
-  padding-top:26px;border-top:1.5px solid var(--rule)}
-.a-ask .ai{font-family:var(--f-mono);font-size:40px;font-weight:700;color:var(--acc-ink,var(--acc));
-  text-align:center;direction:ltr;unicode-bidi:isolate}
-.a-ask .al{font-size:34px;font-weight:600;line-height:1.3;margin:0}
-.a-ask .afoot{font-family:var(--f-mono);font-size:28px;color:var(--dim);margin:0}
 
 /* ── 05 · tape chart ── */
-.a-ch h2{font-family:var(--f-disp);font-weight:800;font-size:58px;letter-spacing:-.028em;margin:0}
-.a-ch .bars{display:flex;flex-direction:column;gap:30px;margin-top:10px}
-.a-ch .bar{display:grid;grid-template-columns:110px 1fr 150px;align-items:center;gap:22px;direction:ltr}
-.a-ch .sym{font-family:var(--f-mono);font-size:38px;font-weight:700}
-.a-ch .track{height:44px;background:var(--rule);position:relative}
-.a-ch .fill{position:absolute;top:0;bottom:0}
-.a-ch .fill.pos{background:var(--pos);left:50%} .a-ch .fill.neg{background:var(--neg);right:50%}
-.a-ch .zero{position:absolute;top:-6px;bottom:-6px;left:50%;width:2px;background:var(--fg)}
-.a-ch .val{font-family:var(--f-mono);font-size:34px;font-weight:700;text-align:right}
-.a-ch .val.pos{color:var(--pos)} .a-ch .val.neg{color:var(--neg)}
-.a-ch .note{font-size:28px;color:var(--dim);margin:14px 0 0}
+
+ 
+
+ 
 
 /* ── 06 · list ── */
-.a-ls h2{font-family:var(--f-disp);font-weight:800;font-size:58px;letter-spacing:-.028em;margin:0 0 12px}
-.a-ls .row{display:grid;grid-template-columns:60px 1fr;gap:26px;align-items:start;
-  padding:30px 0;border-top:1.5px solid var(--rule)}
-.a-ls .rows .row:last-child{border-bottom:1.5px solid var(--rule)}
-.a-ls .row-n{font-family:var(--f-mono);font-size:28px;font-weight:700;color:var(--acc-ink,var(--acc));
-  direction:ltr;unicode-bidi:isolate;padding-top:6px}
-.a-ls .row-h{font-size:44px;font-weight:800;line-height:1.24;margin:0}
-.a-ls .row-s{font-family:var(--f-mono);font-size:28px;color:var(--dim);margin:12px 0 0;display:block}
 
 /* ── 07 · what to watch ── */
-.a-wt .big{font-family:var(--f-disp);font-weight:800;font-size:84px;line-height:1.12;
-  letter-spacing:-.03em;margin:0;max-width:16ch}
-.a-wt .kick{width:200px;height:7px;background:var(--acc)}
 
 /* ── 08 · telegram card ── */
-.a-tg .big{font-family:var(--f-disp);font-weight:800;font-size:84px;line-height:1.08;margin:0;max-width:16ch}
-.a-tg .sr{display:grid;grid-template-columns:160px 1fr;gap:22px;align-items:baseline;
-  padding:20px 0;border-top:1.5px solid var(--rule)}
-.a-tg .sched .sr:last-child{border-bottom:1.5px solid var(--rule)}
-.a-tg .st{font-family:var(--f-mono);font-size:34px;font-weight:700;color:var(--acc-ink,var(--acc));direction:ltr;unicode-bidi:isolate}
-.a-tg .se{font-size:34px;font-weight:700}
-.a-tg .link{font-family:var(--f-mono);font-size:36px;font-weight:700;direction:ltr;unicode-bidi:isolate;
-  text-align:center;padding:22px;margin-top:38px;background:var(--acc);color:var(--bg)}
-
 
 /* ── the mascot review's fallbacks ───────────────────────────────
    render.js measures Ron against every [data-protect] element and,
@@ -237,7 +164,6 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide.of-smaller .ron{width:calc(var(--ron-w,380px) * .68); height:calc(var(--ron-h,600px) * .68)}
 .slide.of-far-edge .ron{left:auto; right:-28px}
 .slide.of-smaller-far-edge .ron{width:calc(var(--ron-w,380px) * .6); height:calc(var(--ron-h,600px) * .6); left:auto; right:-20px}
-
 
 /* ═══ THE FIVE GROUNDS ═══════════════════════════════════════════
    Every component rule above already reads these tokens, so a ground
@@ -286,7 +212,6 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide[data-type="telegram"] .ron{left:-46px}
 .slide[data-type="ask"]   .ron{left:-38px}
 
-
 /* ── making room for him ─────────────────────────────────────────
    The old caps were max-width in ch, and they were wrong in a way
    that only shows in Hebrew: the text runs RIGHT to left, so a cap
@@ -303,27 +228,21 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide[data-ron="left"]  .sl-bd > :not(.ron){padding-inline-end:calc(var(--lane) / var(--sq))}
 /* The chart's bars are a fixed-width plot, not prose: let the padding
    move them rather than squeezing the track. */
-.slide[data-ron] .a-ch .bars{max-width:none; margin-inline-start:0}
+
 /* The chart's row is two fixed columns and a track. Zooming the band
    grows the fixed pair and starves the track, so the bars — the only
    thing on the slide anyone reads — get thinner as the type gets
    bigger. Give the track back what the lane took. */
-.slide[data-ron] .a-ch .bar{grid-template-columns:86px 1fr 120px;gap:16px}
 
 /* The channel address is a single unbreakable LTR token. In its own
    full-width plate it fit; inside the lane it ran off the right edge
    of the plate and lost its last letter — an address that is wrong is
    worse than an address that is small. Let the plate shrink to the
    text and the text shrink to the column. */
-.slide[data-ron] .a-tg .link{font-size:30px;padding:20px 24px;
-  width:fit-content;margin-inline-start:auto;white-space:nowrap;max-width:100%}
 
 /* The framed cover's headline plate is a fixed 610px, which predates
    the lane and cheerfully overran it — the plate's corner landed on
    his arm. Let it take the column it is given instead. */
-.slide[data-ron] .a-cf .block{width:auto;max-width:100%;margin-inline-end:0}
-.slide[data-ron] .a-cf .frame{max-width:100%}
-
 
 /* ═══ THE STORY BOARD ═════════════════════════════════════════════
    1080x1920, and the outer quarters are not ours: Instagram draws
@@ -380,7 +299,6 @@ html,body{margin:0;padding:0;background:var(--bg)}
    band rather than a bleed — it stops competing with the headline. */
 .slide--story .cv-bleed{height:900px}
 
-
 /* ═══ THE NEW OPENINGS ════════════════════════════════════════════
    Five more ways for a deck to start. The rotation in templates.js
    never lets two windows in a row open the same way, so these are
@@ -389,23 +307,11 @@ html,body{margin:0;padding:0;background:var(--bg)}
    underneath them independently. */
 
 /* ── 01c · ruled: the broadsheet ── */
-.a-cr{display:flex;flex-direction:column;z-index:3}
-.a-cr .cr-bar{height:14px;background:var(--acc);width:100%;margin-bottom:34px}
-.a-cr h1{font-family:var(--f-disp);font-weight:900;font-size:94px;line-height:1.04;
-  letter-spacing:-.032em;margin:20px 0 0;max-width:18ch;text-wrap:balance}
-.a-cr .cr-hr{height:1.5px;background:var(--rule);margin:34px 0 26px}
-.a-cr .stand{font-size:35px;line-height:1.42;color:var(--dim2);margin:0;max-width:30ch}
 
 /* ── 01d · edged: a bar down the reading edge ──
    inline-start is the RIGHT in Hebrew, which is where the eye lands
    first — so the bar is seen before the words, and the headline hangs
    off it rather than sitting beside a decoration. */
-.a-ce{display:flex;gap:44px;align-items:stretch;z-index:3}
-.a-ce .ce-bar{flex:0 0 26px;background:var(--acc);align-self:stretch;min-height:300px}
-.a-ce .txt{flex:1;display:flex;flex-direction:column;justify-content:center}
-.a-ce h1{font-family:var(--f-disp);font-weight:900;font-size:86px;line-height:1.05;
-  letter-spacing:-.03em;margin:18px 0 0;max-width:18ch;text-wrap:balance}
-.a-ce .stand{font-size:34px;line-height:1.42;color:var(--dim2);margin:28px 0 0;max-width:28ch}
 
 /* ── 01e · poster: one thing, enormous ──
    For the loud grounds. A paragraph of standfirst on a field of
@@ -417,23 +323,8 @@ html,body{margin:0;padding:0;background:var(--bg)}
   border-top:1.5px solid var(--rule);padding-top:22px}
 
 /* ── 01f · banded: the headline inverted in a solid band ── */
-.a-cb{display:flex;flex-direction:column;z-index:3}
-.a-cb .cb-ph{height:400px;overflow:hidden;flex:0 0 auto;margin-bottom:-26px}
-.a-cb .cb-ph img{width:100%;height:100%;object-fit:contain;object-position:center;display:block}
-.a-cb .cb-band{background:var(--acc);color:var(--bg);padding:34px 38px;position:relative;z-index:3}
-.a-cb .cb-band .eyeb{color:var(--bg);opacity:.78;margin:0 0 14px}
-.a-cb .cb-band h1{font-family:var(--f-disp);font-weight:900;font-size:88px;line-height:1.05;
-  letter-spacing:-.03em;margin:0;max-width:16ch}
-.a-cb .stand{font-size:33px;line-height:1.42;color:var(--dim2);margin:30px 0 0;max-width:30ch}
 
 /* ── 01g · stacked: off the wire ── */
-.a-ck{display:flex;flex-direction:column;z-index:3}
-.a-ck .ck-tab{align-self:flex-start;font-family:var(--f-mono);font-size:28px;font-weight:700;
-  letter-spacing:.16em;background:var(--acc);color:var(--bg);padding:10px 20px}
-.a-ck .ck-box{border:4px solid var(--fg);padding:32px 34px;margin-top:-2px}
-.a-ck .ck-box h1{font-family:var(--f-disp);font-weight:900;font-size:92px;line-height:1.04;
-  letter-spacing:-.03em;margin:0;max-width:15ch;text-wrap:balance}
-.a-ck .stand{font-size:33px;line-height:1.42;color:var(--dim2);margin:30px 0 0;max-width:30ch}
 
 /* Ron's lane on the new openings — same rule as everywhere else: the
    padding goes on HIS side, and inline-start is the right in Hebrew. */
@@ -449,8 +340,6 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide[data-type="coverEdge"] .ron{left:-40px}
 /* The edge bar is furniture, not prose: it must not be pushed by the
    lane, only the words beside it. */
-.slide[data-ron="left"] .a-ce{padding-inline-end:0}
-.slide[data-ron="left"] .a-ce .txt{padding-inline-end:var(--lane)}
 
 /* ── the Telegram strip ──────────────────────────────────────────
    Printed on the news board itself, every sixth story. It is an
@@ -466,14 +355,37 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .slide--story .tg-strip .tg-a{font-size:36px}
 
 /* ── the analysts' board: one sentence, large ── */
-.a-nn{display:flex;flex-direction:column;justify-content:center;gap:28px;min-height:60%}
-.a-nn .eyeb{margin:0}
-.a-nn .nt-s{font-family:var(--f-disp);font-weight:800;font-size:68px;line-height:1.16;margin:0;
-  text-wrap:balance}
-.a-nn .nt-m{font-size:38px;line-height:1.3;margin:0;font-weight:700;color:var(--acc-ink,var(--acc))}
-.a-nn .nt-h{font-size:30px;line-height:1.3;margin:0;opacity:.72;border-top:2px solid var(--rule);
-  padding-top:20px}
-.slide--story .a-nn .nt-s{font-size:76px}
+
+/* ═══ 00 · THE CARD (Nov 2026) ═════════════════════════════════════
+   The one design. Picture on top when the channel's picture is
+   licensed, text on the ground below it — never type over a photo,
+   so contrast does not depend on what the picture happens to be. */
+.a-cd{display:flex;flex-direction:column;gap:30px}
+.a-cd .cd-img{margin:0;height:500px;overflow:hidden;border-radius:6px;background:var(--rule)}
+.a-cd .cd-img img{width:100%;height:100%;object-fit:cover;display:block}
+.slide--story .a-cd{gap:44px}
+.slide--story .a-cd .cd-img{height:720px}
+.a-cd .cd-txt{display:flex;flex-direction:column;gap:24px}
+.a-cd .eyeb{margin:0}
+.a-cd .cd-fig{font-family:var(--f-mono);font-size:124px;font-weight:700;line-height:.9;margin:0;
+  direction:ltr;unicode-bidi:isolate;align-self:flex-start;letter-spacing:-.04em}
+.a-cd .cd-fig.up{color:var(--pos)} .a-cd .cd-fig.dn{color:var(--neg)}
+.a-cd .cd-h{font-family:var(--f-disp);font-weight:800;font-size:84px;line-height:1.08;margin:0;
+  letter-spacing:-.02em;text-wrap:balance}
+.a-cd.has-img .cd-h{font-size:64px}
+.slide--story .a-cd .cd-h{font-size:104px}
+.slide--story .a-cd.has-img .cd-h{font-size:88px}
+.a-cd .cd-m{border-inline-start:8px solid var(--acc);padding-inline-start:28px;
+  display:flex;flex-direction:column;gap:10px}
+.a-cd .cd-ml{font-family:var(--f-mono);font-size:28px;letter-spacing:.08em;font-weight:700;
+  color:var(--acc-ink,var(--acc));margin:0}
+.a-cd .cd-mt{font-size:42px;line-height:1.34;margin:0;font-weight:600;color:var(--dim2);max-width:25ch}
+.a-cd.has-img .cd-mt{font-size:36px}
+.slide--story .a-cd .cd-mt{font-size:50px;max-width:24ch}
+.slide--story .a-cd .cd-ml{font-size:32px}
+.slide--story .a-cd .cd-fig{font-size:150px}
+.a-cd .cd-cr{font-family:var(--f-mono);font-size:28px;color:var(--dim);margin:0;
+  direction:ltr;unicode-bidi:isolate;text-align:right}
 
 /* ── the day strip: your money, and Ron ── */
 .day-strip{display:flex;flex-direction:column;gap:6px;margin-top:12px;padding:16px 0 0;
@@ -489,20 +401,11 @@ html,body{margin:0;padding:0;background:var(--bg)}
    read as a caption that happens to sit near a drawing rather than
    as something he is saying. He gets more room here than anywhere
    else in the system, because on this board he IS the content. */
-.a-vo{display:flex;flex-direction:column;justify-content:center;z-index:3}
+
 /* The fill is mixed from the ground's own ink, so it lifts off a dark
    board and off paper alike — a flat white tint vanished on the light
    grounds and the block stopped reading as a block. */
-.a-vo .say{position:relative;background:rgba(128,128,128,.10);
-  background:color-mix(in srgb, var(--fg) 7%, transparent);
-  border:2px solid var(--rule);padding:30px 32px;margin-top:18px}
-.a-vo .say::after{content:"";position:absolute;bottom:-18px;inset-inline-start:64px;
-  width:0;height:0;border-inline-start:0 solid transparent;
-  border-inline-end:26px solid transparent;border-top:18px solid var(--rule)}
-.a-vo .txt{font-family:var(--f-disp);font-size:56px;font-weight:800;line-height:1.3;
-  letter-spacing:-.015em;margin:0;max-width:17ch}
-.a-vo .abt{font-size:28px;line-height:1.4;color:var(--dim);margin:26px 0 0;max-width:26ch}
-.a-vo .dis{font-family:var(--f-mono);font-size:28px;color:var(--dim);margin:20px 0 0}
+
 /* He stands taller on his own board than anywhere else. */
 .slide[data-type="voice"]{--ron-w:430px; --ron-h:700px; --lane:400px}
 .slide[data-type="voice"] .ron{left:-46px}
@@ -513,60 +416,16 @@ html,body{margin:0;padding:0;background:var(--bg)}
    declared like every opening before them, and two are built to be
    left alone. */
 /* ── 01h · split ── */
-.a-sp{display:flex;flex-direction:column;gap:0}
-.a-sp .sp-field{background:var(--acc);margin:-8px -64px 0;padding:44px 64px 96px}
-.a-sp .sp-field .eyeb{color:var(--bg);opacity:.88}
-.a-sp h1{font-family:var(--f-disp);font-size:112px;font-weight:800;line-height:.96;
-  letter-spacing:-.038em;margin:-60px 0 0;max-width:14ch;
-  background:var(--bg);padding:28px 30px 0;align-self:flex-start}
-.a-sp .stand{font-size:36px;line-height:1.36;color:var(--dim2);margin:32px 0 0;max-width:26ch}
 
 /* ── 01i · index ── */
-.a-ix{display:flex;flex-direction:column;gap:0}
-.a-ix .ix-n{font-family:var(--f-mono);font-size:290px;font-weight:700;line-height:.76;
-  letter-spacing:-.055em;color:var(--acc-ink,var(--acc));margin:0;direction:ltr;unicode-bidi:isolate;
-  align-self:flex-start}
-.a-ix .ix-hr{height:3px;background:var(--fg);margin:38px 0 26px}
-.a-ix h1{font-family:var(--f-disp);font-size:76px;font-weight:800;line-height:1.08;
-  letter-spacing:-.028em;margin:14px 0 0;max-width:20ch}
-.a-ix .stand{font-size:32px;line-height:1.4;color:var(--dim2);margin:22px 0 0;max-width:30ch}
 
 /* ── 01j · bracket ── */
-.a-bk{display:flex;flex-direction:column;gap:28px}
-.a-bk .bk-hold{border-top:12px solid var(--acc);border-bottom:12px solid var(--acc);
-  border-inline-start:12px solid var(--acc);padding:44px 48px 50px;align-self:flex-start;
-  max-width:96%}
-.a-bk h1{font-family:var(--f-disp);font-size:100px;font-weight:800;line-height:.99;
-  letter-spacing:-.038em;margin:0;max-width:13ch}
-.a-bk .stand{font-size:36px;line-height:1.36;color:var(--dim2);margin:0;max-width:26ch}
 
 /* ── 01k · margin ── */
-.a-mg{display:flex;justify-content:flex-start;align-items:flex-end;height:100%}
-.a-mg .mg-col{max-width:72%}
-.a-mg h1{font-family:var(--f-disp);font-size:104px;font-weight:800;line-height:1;
-  letter-spacing:-.038em;margin:20px 0 0}
-.a-mg .mg-hr{height:2px;background:var(--rule);margin:34px 0 24px}
-.a-mg .stand{font-size:33px;line-height:1.4;color:var(--dim2);margin:0;max-width:30ch}
 
 /* ── 01l · bleed ── */
-.a-bl{position:absolute;inset:0;overflow:hidden}
-.a-bl .bl-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.a-bl .bl-scrim{position:absolute;inset:0;
-  background:linear-gradient(180deg,rgba(8,9,11,.72) 0%,rgba(8,9,11,.18) 26%,
-    rgba(8,9,11,.55) 58%,rgba(8,9,11,.95) 100%)}
-.a-bl .bl-txt{position:absolute;inset:auto 64px 96px;color:#fff}
-.a-bl .bl-txt .eyeb{color:var(--acc-ink,var(--acc))}
-.a-bl h1{font-family:var(--f-disp);font-size:112px;font-weight:800;line-height:.97;
-  letter-spacing:-.038em;margin:16px 0 0;max-width:14ch;color:#fff;
-  text-shadow:0 2px 40px rgba(0,0,0,.5)}
 
 /* ── 01m · figure ── */
-.a-fg{display:flex;flex-direction:column;justify-content:center;height:100%;gap:0}
-.a-fg .fg-n{font-family:var(--f-disp);font-size:300px;font-weight:800;line-height:.84;
-  letter-spacing:-.06em;color:var(--acc-ink,var(--acc));margin:18px 0 0;
-  direction:ltr;unicode-bidi:isolate;align-self:flex-start}
-.a-fg h1{font-family:var(--f-disp);font-size:60px;font-weight:800;line-height:1.14;
-  letter-spacing:-.024em;margin:40px 0 0;max-width:22ch;color:var(--dim2)}
 
 /* ── the mascot's lane on the new openings ──────────────────────
    The lane is declared on the SLIDE so the text can read it; without
@@ -585,9 +444,6 @@ html,body{margin:0;padding:0;background:var(--bg)}
 
 /* And the measures come in, so a headline stops before his lane
    rather than relying on the lane padding alone. */
-.a-ix h1{max-width:16ch}
-.a-fg h1{max-width:17ch}
-.a-sp h1{max-width:13ch}
 
 /* ═══ STORY LAYOUTS ══════════════════════════════════════════════
    The dimension the story track never had. */
@@ -595,21 +451,12 @@ html,body{margin:0;padding:0;background:var(--bg)}
    for three seconds, at 1080 wide and 570px taller, it carries half
    again the type — and the layouts that drop the mascot carry more
    again, because the room is there and nothing else is using it. */
-.slide--story .a-cv h1{font-size:96px;line-height:1.02;letter-spacing:-.035em;max-width:15ch}
-.slide--story .a-cv .stand{font-size:38px;line-height:1.38;max-width:24ch}
 
 /* The board fills. v1 and v2's first pass both left the bottom third
    empty with him floating in the middle of it — the type at the top,
    the mascot adrift, and 500px of nothing under him. Pushing the two
    apart is what makes a 1920px canvas look designed rather than
    unfinished. */
-.slide--story[data-story="top"] .sl-bd,
-.slide--story[data-story="rules"] .sl-bd{justify-content:space-between}
-
-.slide--story[data-story="quote"] .sl-bd{justify-content:center}
-.slide--story[data-story="quote"] .a-cv h1{font-size:126px;line-height:.97;
-  letter-spacing:-.042em;max-width:11ch}
-.slide--story[data-story="quote"] .a-cv .stand{font-size:42px;margin-top:40px;max-width:21ch}
 
 /* He goes UP, the type goes to the floor.
    Two earlier attempts failed for the same reason, which is worth
@@ -621,53 +468,21 @@ html,body{margin:0;padding:0;background:var(--bg)}
    the board and looks exactly like 'top'.
    Both have to move: pin him to the top, and move the reserve to the
    other side so the floor is genuinely free. */
-.slide--story[data-story="base"] .ron{top:190px;bottom:auto}
-.slide--story[data-story="base"][data-ron] .sl-bd{
-  padding-bottom:0;
-  padding-top:calc(var(--ron-fit, calc(var(--ron-h) * var(--ron-k))) - 90px);
-  justify-content:flex-end}
-.slide--story[data-story="base"] .a-cv h1{font-size:104px;max-width:13ch}
-
-.slide--story[data-story="bar"]::before{content:'';position:absolute;
-  left:0;right:0;top:0;height:340px;background:var(--acc);z-index:0}
-.slide--story[data-story="bar"] .sl-hd{position:relative;z-index:2}
-.slide--story[data-story="bar"] .sl-hd .hd-name,
-.slide--story[data-story="bar"] .sl-hd .hd-meta{color:var(--bg);opacity:.9}
-.slide--story[data-story="bar"] .sl-bd{position:relative;z-index:1;padding-top:118px;
-  justify-content:space-between}
 
 /* 2px of --rule on a dark ground is invisible at thumbnail size, and
    a frame nobody can see is not a layout. Four of the accent, inset
    further, so it reads as a deliberate edge. */
-.slide--story[data-story="frame"]::before{content:'';position:absolute;
-  inset:196px 30px;border:4px solid var(--acc);opacity:.55;pointer-events:none}
-.slide--story[data-story="frame"] .sl-bd{justify-content:center;padding:0 34px}
-.slide--story[data-story="frame"] .a-cv h1{font-size:104px;max-width:13ch}
-
-.slide--story[data-story="rules"] .a-cv h1{border-top:12px solid var(--acc);
-  border-bottom:2px solid var(--rule);padding:40px 0 44px;margin-top:10px}
 
 /* The headline sits ON the seam, half on each ground, and the
    standfirst goes into the flood in the flood's own ink. The first
    pass left the two as disconnected slabs with the standfirst set in
    a colour it was already standing on — invisible. */
-.slide--story[data-story="flood"]::before{content:'';position:absolute;
-  left:0;right:0;bottom:0;height:46%;background:var(--acc);z-index:0}
-.slide--story[data-story="flood"] .sl-bd{position:relative;z-index:1;
-  justify-content:center;padding-bottom:120px}
-.slide--story[data-story="flood"] .a-cv h1{font-size:112px;line-height:.99;max-width:12ch}
-.slide--story[data-story="flood"] .a-cv .stand{color:var(--bg);opacity:.85;font-size:40px;
-  margin-top:56px;max-width:21ch}
 
 /* The three mascot-free layouts enlarge the MEANING board too, not
    just the cover. Without this a quote/frame/flood board that happens
    to draw an interpretation renders at the post's 60px in a space
    sized for 126 — the exact under-filled look the layouts exist to
    fix, showing up on a third of them. */
-.slide--story[data-story="quote"] .a-nt .txt{font-size:88px;max-width:14ch}
-.slide--story[data-story="flood"] .a-nt .txt{font-size:80px;max-width:14ch}
-.slide--story[data-story="frame"] .a-nt .txt{font-size:78px;max-width:15ch}
-.slide--story[data-story="flood"] .a-nt .dis{color:var(--bg);opacity:.75}
 
 /* ── 09 · the scene ── the reel's frame ──────────────────────────
    Not a page with a picture on it. The scene is the whole board: it
@@ -715,7 +530,14 @@ html,body{margin:0;padding:0;background:var(--bg)}
    half-second before it starts reading. */
 .a-sn .sn-h em{font-style:normal;color:var(--acc-ink,var(--acc))}
 /* Seven to nine words: smaller type, so the line ends above his head. */
-.a-sn.is-long .sn-h{font-size:88px;line-height:1.04}
+.a-sn.is-long .sn-h{font-size:80px;line-height:1.06}
+.a-sn .sn-h{text-wrap:balance;overflow-wrap:anywhere}
+/* The weekly reel's news scenes have nobody in them: the line is the
+   subject, so it sits in the middle of the frame, large. */
+.a-sn.no-ron .sn-txt{top:34%}
+.a-sn.no-ron .sn-h{font-size:112px}
+.a-sn.no-ron.is-long .sn-h{font-size:92px}
+.a-sn.no-ron .sn-s{font-size:64px}
 .a-sn .sn-s{font-family:var(--f-mono);font-size:38px;font-weight:700;margin:24px 0 0;
   color:var(--fg);opacity:.92;direction:ltr;unicode-bidi:isolate;
   text-shadow:0 3px 18px rgba(0,0,0,.6)}
@@ -802,7 +624,6 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 .a-sn.is-lead .sn-big[data-dir="up"]{color:var(--pos)}
 .a-sn.is-lead .sn-big[data-dir="dn"]{color:var(--neg)}
 .a-sn.is-lead .sn-s{margin-top:14px}
-
 
 /* ═══════════════════════════════════════════════════════════
    THE PROOF WORLD — a white sheet, and one reserved green.
@@ -900,22 +721,8 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
 .a-pf .pf-sub{font-size:29px;color:var(--dim2);line-height:1.3;max-width:14ch}
 
 /* ── 16c · analysts ── */
-.a-an{display:flex;flex-direction:column;gap:22px}
-.a-an .an-list{list-style:none;margin:0;padding:0;border-top:2px solid var(--rule)}
-.a-an .an-list li{padding:28px 0 30px;border-bottom:1.5px solid var(--rule);
-  display:flex;flex-direction:column;gap:10px}
-.a-an .an-top{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
-.a-an .an-firm{font-family:var(--f-mono);font-size:40px;font-weight:700;direction:ltr;
-  unicode-bidi:isolate;letter-spacing:-.01em}
-.a-an .an-act{font-size:28px;font-weight:800;padding:2px 14px;border:2px solid currentColor;
-  border-radius:4px}
-.a-an li.up .an-act{color:var(--pos)} .a-an li.dn .an-act{color:var(--neg)}
-.a-an li.nu .an-act{color:var(--dim2)}
-.a-an .an-pt{font-family:var(--f-mono);font-size:28px;margin-inline-start:auto;color:var(--fg)}
-.a-an .an-tx{font-size:33px;line-height:1.38;margin:0;color:var(--fg)}
-.a-an .an-hint{font-size:30px;line-height:1.4;margin:0;color:var(--fg);font-weight:700}
-.a-an .an-note{font-size:30px;line-height:1.4;color:var(--dim2);margin:0;
-  border-top:2px solid var(--fg);padding-top:16px}
+
+ 
 
 /* ── 16b · the original post ── */
 .a-po{display:flex;flex-direction:column;align-items:center;gap:26px}
@@ -987,40 +794,13 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
    Everything is centred and enormous, because a reel is watched at
    arm's length with the sound off and three seconds a card. */
 .slide--reel .pf-hd,.slide--reel .pf-ft{display:none}
-.a-sp2{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  padding:0 78px}
-.a-sp2 .sp-txt{width:100%;text-align:center;
-  /* Instagram draws its own furniture over the top and bottom
-     quarters of a reel; everything here lives between them. */
-  margin-top:-90px}
-.a-sp2 .sp-eyeb{font-family:var(--f-mono);font-size:34px;letter-spacing:.2em;font-weight:700;
-  color:var(--acc-ink,var(--acc));margin:0 0 30px}
-.a-sp2 .sp-h{font-size:92px;font-weight:800;line-height:1.14;letter-spacing:-.03em;margin:0}
-.a-sp2 .sp-why{font-size:66px;font-weight:700;line-height:1.28;letter-spacing:-.02em;margin:0;
-  color:var(--dim2)}
-.a-sp2 .sp-sub{font-size:40px;color:var(--dim2);margin:32px 0 0;font-weight:600}
+
 /* The hook: a tick the size of a fist, then the sentence. */
-.a-sp2 .sp-tick{width:150px;height:150px;border-radius:50%;background:var(--fg);
-  margin:0 auto 44px;position:relative}
-.a-sp2 .sp-tick::after{content:"\2713";position:absolute;inset:0;display:flex;
-  align-items:center;justify-content:center;color:var(--bg);font-size:92px;font-weight:700}
-.a-sp2 .sp-hook{font-family:var(--f-disp);font-size:130px;font-weight:900;line-height:1.02;
-  letter-spacing:-.04em;margin:0;color:var(--fg)}
-.a-sp2 .sp-big{font-family:var(--f-mono);font-size:280px;font-weight:600;line-height:.84;
-  letter-spacing:-.06em;direction:ltr;unicode-bidi:isolate;margin:0;color:var(--fg)}
-.a-sp2 .sp-rec{font-size:56px;font-weight:700;line-height:1.2;margin:0}
-.a-sp2 .sp-rec b{font-family:var(--f-mono);font-size:190px;font-weight:600;line-height:.9;
-  display:block;color:var(--acc-ink,var(--acc));letter-spacing:-.05em}
-.a-sp2 .sp-note{font-size:34px;color:var(--dim2);margin:34px auto 0;max-width:24ch;line-height:1.4}
-.a-sp2 .sp-handle{font-family:var(--f-mono);font-size:38px;font-weight:700;letter-spacing:.1em;
-  color:var(--acc-ink,var(--acc));margin:38px 0 0;direction:ltr}
+
 /* The chart beat gets the width it needs and loses the labels'
    absolute anchoring, which was written for a story board. */
 .slide--reel:has(.sp-hook) .ron{height:42%}
 .slide--reel:has(.sp-hook) .sp-txt{margin-top:-340px}
-.a-sp2 .pf-chart .pl{height:520px}
-.a-sp2 .pf-chart .pl-px{font-size:34px}
-.a-sp2 .pf-chart .pl-then{font-size:28px}
 
 /* the scoreboard's per-call card */
 /* Every row here is a CONFIRMED call, so every row is the same
@@ -1028,91 +808,31 @@ html:has(.lay-fg), body:has(.lay-fg){background:transparent}
    direction back into the palette, and the whole reason this world
    reads without explanation is that green means verified and nothing
    else. A confirmed fall is as good a row as a confirmed rally. */
-.a-sp2 .sp-big.up,.a-sp2 .sp-big.dn{color:var(--fg)}
-.a-sp2 .sp-row-h{font-size:46px;font-weight:700;line-height:1.24;margin:26px 0 0;
-  color:var(--dim2)}
+
 /* The hook carries a number and three short lines; it needs the room
    the single-sentence hook does not. */
-.a-sp2 .sp-hook{white-space:pre-line}
-
 
 /* ── the lesson format ──────────────────────────────────────
    One mechanism, three steps, one line to keep. Large type and wide
    leading on purpose: this board is READ, and it is read by someone
    who does not trade. */
-.a-le{display:flex;flex-direction:column;justify-content:center;gap:34px;z-index:3}
-.a-le .eyeb{margin:0}
-.a-le h2{font-family:var(--f-disp);font-weight:800;font-size:66px;line-height:1.14;
-  letter-spacing:-.022em;margin:0;max-width:20ch;text-wrap:balance}
-.a-le .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:22px}
-.a-le .steps li{display:grid;grid-template-columns:74px 1fr;gap:24px;align-items:center;
-  padding:22px 0;border-top:1.5px solid var(--rule)}
-.a-le .steps li:last-child{border-bottom:1.5px solid var(--rule)}
-.a-le .k{font-family:var(--f-mono);font-weight:700;font-size:34px;color:var(--bg);
-  background:var(--acc);width:62px;height:62px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center}
-.a-le .t{font-size:42px;font-weight:700;line-height:1.3}
-.a-le .take{font-family:var(--f-disp);font-size:46px;font-weight:800;line-height:1.28;
-  color:var(--acc-ink,var(--acc));margin:6px 0 0;max-width:24ch}
-.a-le .dis{font-family:var(--f-mono);font-size:28px;color:var(--dim);margin:0}
-
-.a-br{display:flex;flex-direction:column;justify-content:center;gap:12px}
-.a-br h2{font-family:var(--f-disp);font-weight:800;font-size:58px;letter-spacing:-.028em;margin:0 0 18px}
-.a-br .row{display:grid;grid-template-columns:60px 1fr;gap:26px;align-items:start;
-  padding:30px 0;border-top:1.5px solid var(--rule)}
-.a-br .rows .row:last-child{border-bottom:1.5px solid var(--rule)}
-.a-br .row-n{font-family:var(--f-mono);font-size:28px;font-weight:700;color:var(--acc-ink,var(--acc));padding-top:8px}
-.a-br .row-h{font-size:42px;font-weight:800;line-height:1.24;margin:0}
-.a-br .row-m{font-size:32px;line-height:1.4;color:var(--dim2);margin:14px 0 0}
-.a-br .row-m::before{content:"💡 ";}
 
 /* ── the outlook ────────────────────────────────────────────
    Up and down as two stacked lists, not two columns: at 1080px a
    Hebrew reason line needs the full measure. Green and red are the
    market's own convention and carry only the arrow and the heading;
    the rows stay in ink so the colour never reads as a promise. */
-.a-ol{display:flex;flex-direction:column;justify-content:center;gap:26px}
-.a-ol .eyeb{margin:0}
-.a-ol h2{font-family:var(--f-disp);font-weight:800;font-size:60px;line-height:1.12;
-  letter-spacing:-.024em;margin:0;text-wrap:balance}
-.a-ol .sides{display:flex;flex-direction:column;gap:26px}
-.a-ol h3{display:flex;align-items:center;gap:16px;margin:0 0 4px;font-size:34px;font-weight:800;
-  letter-spacing:.02em}
-.a-ol .up h3{color:var(--pos)} .a-ol .dn h3{color:var(--neg)}
-.a-ol .ar{font-size:28px}
-.a-ol .row{display:grid;grid-template-columns:1fr auto;column-gap:24px;row-gap:8px;align-items:baseline;
-  padding:20px 0;border-top:1.5px solid var(--rule)}
-.a-ol .side .row:last-child{border-bottom:1.5px solid var(--rule)}
-.a-ol .nm{font-size:44px;font-weight:800;line-height:1.2;margin:0}
-.a-ol .sp{display:flex;align-items:center;gap:12px;font-size:28px;
-  font-weight:700;color:var(--dim2);white-space:nowrap}
-.a-ol .dots{display:flex;gap:6px;font-style:normal;direction:ltr}
-.a-ol .dots b{width:14px;height:14px;border-radius:50%;border:2px solid var(--dim);display:block}
-.a-ol .dots b.on{background:var(--acc);border-color:var(--acc)}
-.a-ol .why{grid-column:1/2;font-size:31px;line-height:1.36;color:var(--dim2);margin:0}
-.a-ol .bs{font-size:28px;font-weight:600;color:var(--dim);align-self:end;white-space:nowrap}
-.a-ol .dis{font-size:28px;color:var(--dim);margin:0}
+
+ 
 
 /* ── beginner-first ─────────────────────────────────────────
    The glossary line: one word a newcomer would stop at, and what it
    means. Quiet on purpose — it is a footnote to the board, not a
    second headline — but in full-size text, because it is read. */
-.gls{display:flex;flex-direction:column;gap:10px;margin-top:4px;padding:18px 22px;
-  border-inline-start:6px solid var(--acc);background:color-mix(in srgb,var(--fg) 6%,transparent);
-  position:relative;z-index:3;max-width:100%}
-.gls p{margin:0;font-size:29px;line-height:1.38;color:var(--dim2)}
-.gls b{color:var(--fg);font-weight:800;margin-inline-end:12px}
-.gls b::after{content:" —";font-weight:400;color:var(--dim)}
+
 /* The swipe cue takes the footer's middle slot. */
 .ft-swipe{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--f-text);font-size:28px;
   font-weight:700;color:var(--acc-ink,var(--acc));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ft-swipe i{font-style:normal;font-size:28px;line-height:1}
 /* The drill-down board. */
-.a-dt{display:flex;flex-direction:column;justify-content:center;gap:26px}
-.a-dt .eyeb{margin:0}
-.a-dt h2{font-family:var(--f-disp);font-weight:800;font-size:52px;line-height:1.16;
-  letter-spacing:-.02em;margin:0;text-wrap:balance}
-.a-dt .facts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
-.a-dt .facts li{font-size:34px;line-height:1.42;padding:22px 0;border-top:1.5px solid var(--rule)}
-.a-dt .facts li:last-child{border-bottom:1.5px solid var(--rule)}
-.a-br .eyeb{margin:0 0 6px}
+

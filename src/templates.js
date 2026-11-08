@@ -38,81 +38,22 @@ export // No green FIELD and no white SHEET may be added to this table.
 // are reachable only through the proof archetypes' GROUND map.
 const PALETTES = {
   // ── dark worlds ────────────────────────────────────────────
+  // Nov 2026: one brand ground (ink) for every card; the five dark grounds
+  // below are the weekly reel's scene rotation and nothing else.
   ink:      { bg:'#0B0D10', fg:'#F2F0EB', dim:'#9AA0AA', dim2:'#C3C7CE', rule:'#262B33',
               acc:'#FF6B1A', pos:'#35D07F', neg:'#FF5A5A', grid:'rgba(242,240,235,.035)' },
   deep:     { bg:'#0E3540', fg:'#EFF6F6', dim:'#8FB6BE', dim2:'#CBE1E5', rule:'#1E5464',
               acc:'#FF6B1A', pos:'#35D07F', neg:'#FF7A6E', grid:'rgba(239,246,246,.04)' },
-  slate:    { bg:'#1A2029', fg:'#F0F1F3', dim:'#98A1AE', dim2:'#C9CFD8', rule:'#2E3846',
-              acc:'#FF6B1A', pos:'#35D07F', neg:'#FF5A5A', grid:'rgba(240,241,243,.035)' },
   midnight: { bg:'#0C1330', fg:'#EDEFFA', dim:'#8B93BE', dim2:'#C4C9E6', rule:'#232C55',
               acc:'#6E8BFF', pos:'#4FD9A4', neg:'#FF6B8A', grid:'rgba(237,239,250,.04)' },
-  forest:   { bg:'#0B2418', fg:'#ECF5EE', dim:'#86AE96', dim2:'#C2DCCB', rule:'#1B4230',
-              acc:'#F2B33D', pos:'#59E39B', neg:'#FF7A6E', grid:'rgba(236,245,238,.04)' },
-  oxblood:  { bg:'#2A0F14', fg:'#F8ECEC', dim:'#BE9095', dim2:'#E4C9CB', rule:'#4A1F27',
-              acc:'#F2A33D', pos:'#5FD79B', neg:'#FF8A7A', grid:'rgba(248,236,236,.04)' },
-  steel:    { bg:'#152230', fg:'#EAF0F6', dim:'#8DA0B4', dim2:'#C2CFDC', rule:'#26384B',
-              acc:'#4FC3E8', pos:'#4FD9A4', neg:'#FF6F7D', grid:'rgba(234,240,246,.04)' },
-  carbon:   { bg:'#000000', fg:'#FFFFFF', dim:'#8A8A8A', dim2:'#C8C8C8', rule:'#242424',
-              acc:'#E8FF4F', pos:'#5FFF9E', neg:'#FF5757', grid:'rgba(255,255,255,.05)' },
-  espresso: { bg:'#20160F', fg:'#F6EEE4', dim:'#B29B84', dim2:'#DFCDB9', rule:'#3A2A1D',
-              acc:'#FFB454', pos:'#6FD79B', neg:'#FF8A7A', grid:'rgba(246,238,228,.04)' },
-
-  // ── paper worlds ───────────────────────────────────────────
-  doc:      { bg:'#EDE8DE', fg:'#14161A', dim:'#5C574B', dim2:'#3C3A34', rule:'#C6BEAE',
-              acc:'#FF6B1A', pos:'#0E6E35', neg:'#B0271F', grid:'rgba(20,22,26,.05)' },
-  ice:      { bg:'#E8EFF5', fg:'#0F1A24', dim:'#4C6175', dim2:'#2C3E4E', rule:'#BACBD9',
-              acc:'#0F62C4', pos:'#0B6A3D', neg:'#B0271F', grid:'rgba(15,26,36,.05)' },
-  sand:     { bg:'#F2E7D3', fg:'#1D1710', dim:'#655740', dim2:'#413523', rule:'#D3C2A2',
-              acc:'#C4520F', pos:'#0E6E35', neg:'#B0271F', grid:'rgba(29,23,16,.05)' },
-
-  // ── fields: the accent IS the ground ───────────────────────
-  flare:    { bg:'#FF6B1A', fg:'#120A04', dim:'rgba(18,10,4,0.80)', dim2:'rgba(18,10,4,.84)',
-              rule:'rgba(18,10,4,.3)', acc:'#120A04', pos:'#120A04', neg:'#120A04',
-              grid:'rgba(20,22,26,.05)' },
-  citrus:   { bg:'#E8FF4F', fg:'#12140A', dim:'rgba(18,20,10,0.80)', dim2:'rgba(18,20,10,.84)',
-              rule:'rgba(18,20,10,.28)', acc:'#12140A', pos:'#12140A', neg:'#12140A',
-              grid:'rgba(18,20,10,.05)' },
-  cobalt:   { bg:'#1F4FE0', fg:'#F4F7FF', dim:'rgba(244,247,255,0.88)', dim2:'rgba(244,247,255,.88)',
-              rule:'rgba(244,247,255,.3)', acc:'#E8FF4F', pos:'#8CF5C0', neg:'#FFD0D6',
-              grid:'rgba(244,247,255,.06)' },
-  rose:     { bg:'#B42858', fg:'#FFF2F6', dim:'rgba(255,242,246,0.9)', dim2:'rgba(255,242,246,.9)',
-              rule:'rgba(255,242,246,.32)', acc:'#FFE45C', pos:'#9BF5CE', neg:'#FFD2D8',
-              grid:'rgba(255,242,246,.06)' },
-
-  // ── added with the second thirty ──────────────────────────
-
-  // ── dark worlds ────────────────────────────────────────────
-  graphite: { bg:'#17181A', fg:'#F4F3F1', dim:'#9B9994', dim2:'#CFCDC8', rule:'#2C2E31',
-              acc:'#FFA62B', pos:'#4BD98C', neg:'#FF6259', grid:'rgba(244,243,241,.035)' },
   abyss:    { bg:'#03181C', fg:'#E8F6F7', dim:'#7BA5AB', dim2:'#BEDDE1', rule:'#0E3238',
               acc:'#2FD4E8', pos:'#4FE0A8', neg:'#FF7A85', grid:'rgba(232,246,247,.04)' },
-  wine:     { bg:'#2B0B1E', fg:'#FBEDF4', dim:'#B98CA4', dim2:'#E3C9D8', rule:'#4B1837',
-              acc:'#FFC24D', pos:'#5FD79B', neg:'#FF8FA8', grid:'rgba(251,237,244,.04)' },
-  moss:     { bg:'#1A1E0C', fg:'#F2F5E4', dim:'#9BA57C', dim2:'#D2DBB8', rule:'#333A18',
-              acc:'#CDFF4F', pos:'#8DE86B', neg:'#FF8A6E', grid:'rgba(242,245,228,.04)' },
   navy:     { bg:'#0A1A33', fg:'#EEF3FB', dim:'#8199B8', dim2:'#C2D2E7', rule:'#182F52',
               acc:'#F5C451', pos:'#4FD9A4', neg:'#FF7A88', grid:'rgba(238,243,251,.04)' },
   basalt:   { bg:'#101418', fg:'#E9EDF0', dim:'#7E8A94', dim2:'#B8C2CA', rule:'#1F262D',
               acc:'#7AE8C0', pos:'#7AE8C0', neg:'#FF6F7D', grid:'rgba(233,237,240,.035)' },
 
   // ── paper worlds ───────────────────────────────────────────
-  linen:    { bg:'#F5F1E8', fg:'#191713', dim:'#5F594C', dim2:'#403B31', rule:'#D2C9B6',
-              acc:'#A8321E', pos:'#0E6E35', neg:'#A8321E', grid:'rgba(25,23,19,.05)' },
-  newsprint:{ bg:'#DEDCD6', fg:'#101010', dim:'#55534D', dim2:'#33322E', rule:'#B4B1A8',
-              acc:'#101010', pos:'#0E6B36', neg:'#A3201A', grid:'rgba(16,16,16,.06)' },
-  blush:    { bg:'#F6E7E7', fg:'#1E1112', dim:'#694F51', dim2:'#452A2C', rule:'#DCC0C1',
-              acc:'#B0273A', pos:'#0E6E35', neg:'#B0273A', grid:'rgba(30,17,18,.05)' },
-
-  // ── fields: the accent IS the ground ───────────────────────
-  oxide:    { bg:'#9F330A', fg:'#FFF4EC', dim:'rgba(255,244,236,0.80)', dim2:'rgba(255,244,236,.9)',
-              rule:'rgba(255,244,236,.32)', acc:'#FFE0B2', pos:'#B8F5D4', neg:'#FFD5CE',
-              grid:'rgba(255,244,236,.06)' },
-  sky:      { bg:'#8ECDF0', fg:'#04202E', dim:'rgba(4,32,46,0.80)', dim2:'rgba(4,32,46,.85)',
-              rule:'rgba(4,32,46,.28)', acc:'#04202E', pos:'#04202E', neg:'#04202E',
-              grid:'rgba(4,32,46,.05)' },
-  ochre:    { bg:'#D9A521', fg:'#1C1403', dim:'rgba(28,20,3,0.80)', dim2:'rgba(28,20,3,.86)',
-              rule:'rgba(28,20,3,.3)', acc:'#1C1403', pos:'#1C1403', neg:'#1C1403',
-              grid:'rgba(28,20,3,.05)' }
 };
 
 /**

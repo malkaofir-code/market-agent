@@ -14,6 +14,7 @@
 // a callback card built on a claim the message never made is worse
 // than no callback at all.
 // ─────────────────────────────────────────────────────────────
+import { stripChrome } from './story.js';
 import { clean } from './rtl.js';
 
 // Quotes and geresh are written five ways in this channel
@@ -352,6 +353,7 @@ function unlisted(headline) {
  * says "the fall continued", never "we said it would".
  */
 export function subjectFrom(row) {
+  row = { ...row, text: stripChrome(row.text) };
   const ss = sentences(row.text);
   const headline = ss[0] ?? '';
   if (!headline || hits(SNAPSHOT, flat(headline)) || hits(DIARY, flat(headline))) return null;
@@ -398,6 +400,9 @@ export function subjectFrom(row) {
  * case, not a failure.
  */
 export function claimsFrom(row) {
+  // The channel's chrome ("🔴 מבזק", "🔄 עודכן", credits) is not the
+  // headline: a proof card must quote the story, not the word "מבזק".
+  row = { ...row, text: stripChrome(row.text) };
   const text = String(row.text ?? '');
   const headline = sentences(text)[0] ?? '';
   const out = new Map();

@@ -20,6 +20,9 @@
 
 /** Words a field may hold. `[n, w]`: at most n items of w words each. */
 export const BUDGET = {
+  // The one design (Nov 2026). Headline is the channel's, the line
+  // under it one sentence.
+  card:         { eyebrow: 4, headline: 12, mean: 20 },
   // The day strip rides on any board that carries it (day.js).
   _day:         { money: 12, ron: 14 },
   // ── digests ──
@@ -80,7 +83,10 @@ export function tight(text, max) {
   const t = text.replace(/\s+/g, ' ').trim();
   const w = words(t);
   if (w.length <= max) return t;
-  const fits = s => { const n = words(s).length; return n >= 3 && n <= max; };
+  // A sentence or clause only when it keeps at least half the room:
+  // "תחזית AWS החלשה" is a clause, and three words of a twenty-word
+  // budget is a fragment, not a meaning.
+  const fits = s => { const n = words(s).length; return n >= Math.max(3, Math.ceil(max / 2)) && n <= max; };
   const first = t.split(/(?<=[.!?])\s+/)[0];
   if (fits(first)) return first;
   const clause = t.split(/\s*[—–,:;]\s*/)[0];

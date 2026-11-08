@@ -1,4 +1,4 @@
-import { composeCallback } from '../src/compose.js';
+import { composeCallback } from '../src/proof.js';
 const deck = composeCallback({
   id: 7, kind: 'forecast', posted_at: Math.floor(Date.parse('2026-09-08T07:00:00Z') / 1000),
   headline: 'ג\'יי פי מורגן מזהיר: תיקון בשווקים לקראת סוף הרבעון',

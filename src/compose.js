@@ -1,18 +1,30 @@
 // ─────────────────────────────────────────────────────────────
-// compose.js — a 15-minute window -> a deck plan.
-// Deterministic. No model, no network. Every rule here is either
-// quoted from design.html or measured off the 299-message sample.
+// compose.js — channel messages → cards. (Nov 2026 rewrite)
+//
+// One design, used everywhere: the CARD. The channel's own headline,
+// one line of what it means (the channel's "💡 משמעות"), the reader's
+// money when the tape has an index move, and the picture only when
+// the channel credits it to Wikimedia Commons under a CC licence.
+//
+//   composeEvening   21:00 "השוק בערב" — 3 cards: the day, then the
+//                    two biggest stories.
+//   composeStories   one card per story set (the hour's top story).
+//   composeWeekReel  Sunday "השבוע בדקה" — the only reel of the week.
+//
+// The proof carousel and callback board live in proof.js. Everything
+// a composer returns goes out through budget.js, so no board can carry
+// a wall of text, whichever path built it.
+//
+// Deterministic. No model, no network: every word on a card is a word
+// the channel wrote, cut at a sentence, a clause or a safe word.
 // ─────────────────────────────────────────────────────────────
-import { parse, score, direction } from './parse.js';
+import { parse } from './parse.js';
 import { clean, stripLeadEmoji } from './rtl.js';
-import { byId } from './templates.js';
-import { lessonFor } from './lessons.js';
-import { analystsFrom, noteFor, plainNote, TARGET_HINT } from './analysts.js';
 import { budgeted } from './budget.js';
 import { dayOf as dayLines, SERIES, SCHEDULE } from './day.js';
-import { outlookFor, outlookLine } from './outlook.js';
-import { glossFor } from './glossary.js';
+import { storiesOf } from './story.js';
 import 'dotenv/config';
+
 
 const TZ = process.env.TZ || 'Asia/Jerusalem';
 // 15 was the original design; hourly is what the free Actions tier
@@ -27,12 +39,12 @@ const MAX = Number(process.env.MAX_SLIDES || 10);
 const MIN_DECK = Number(process.env.MIN_SLIDES ?? 1);
 const MAX_CTA = Number(process.env.MAX_SLIDES_WITH_CTA || 9);
 
-const fmt = (ts, o) => new Intl.DateTimeFormat('en-GB',
+export const fmt = (ts, o) => new Intl.DateTimeFormat('en-GB',
   { timeZone: TZ, hour12: false, ...o }).format(new Date(ts * 1000));
-const hhmm = ts => fmt(ts, { hour: '2-digit', minute: '2-digit' });
-const ddmmyy = ts => fmt(ts, { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '.');
-const dmy = ts => fmt(ts, { day: '2-digit', month: '2-digit' }).replace(/\//g, '.');
-const localDay = ts => fmt(ts, { year: 'numeric', month: '2-digit', day: '2-digit' })
+export const hhmm = ts => fmt(ts, { hour: '2-digit', minute: '2-digit' });
+export const ddmmyy = ts => fmt(ts, { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '.');
+export const dmy = ts => fmt(ts, { day: '2-digit', month: '2-digit' }).replace(/\//g, '.');
+export const localDay = ts => fmt(ts, { year: 'numeric', month: '2-digit', day: '2-digit' })
   .split('/').reverse().join('-');
 
 /**
@@ -47,7 +59,7 @@ const localDay = ts => fmt(ts, { year: 'numeric', month: '2-digit', day: '2-digi
  */
 const daysBack = w => Math.round(
   (Date.parse(localDay(w.end)) - Date.parse(localDay(w.start))) / 86400000);
-const span = w => {
+export const span = w => {
   const d = daysBack(w);
   if (d <= 0) return `${hhmm(w.start)}\u2013${hhmm(w.end)}`;
   if (d === 1) return `\u05de\u05d0\u05de\u05e9 ${hhmm(w.start)}\u2013${hhmm(w.end)}`;
@@ -135,853 +147,10 @@ export const isSnapshot = p =>
   SNAPSHOT.test(stripLeadEmoji(p.headline)) ||
   (p.levels.length >= 2 && p.reporting.length <= 1);
 
-// The channel names the same company both ways, so "AMZN מפתחת
-// תחנות משלוח" and "אמזון בונה תחנות משלוח" scored only 0.5 overlap
-// and both reached the deck as adjacent rows.
-const ALIAS = { אנבידיה:'NVDA', אמזון:'AMZN', טסלה:'TSLA', אפל:'AAPL',
-  מיקרוסופט:'MSFT', גוגל:'GOOGL', אלפאבית:'GOOGL', מטא:'META', פייסבוק:'META',
-  ברודקום:'AVGO', אינטל:'INTC', נטפליקס:'NFLX', 'מיקרון':'MU' };
 
-/** Headline reduced to comparable tokens: no emoji, no punctuation. */
-const key = h => stripLeadEmoji(h).replace(/[^\p{L}\p{N} ]/gu, ' ')
-  .split(/\s+/).filter(w => w.length > 2).map(w => ALIAS[w] ?? w);
-
-/**
- * The same story arrives twice under different wording ("NVDA: מו״מ
- * להשקעה" and "אנבידיה במו״מ להשקעה"). Two headlines sharing 60% of
- * their significant tokens are one story; the higher-scoring copy
- * wins. A carousel showing the same headline twice reads as broken.
- */
-export function dedupe(parsed) {
-  const out = [];
-  for (const p of [...parsed].sort((a, b) => b.score - a.score || a.ts - b.ts)) {
-    const k = key(p.headline);
-    const dup = out.some(o => {
-      const ok = key(o.headline);
-      const shared = k.filter(w => ok.includes(w)).length;
-      // >=0.5 rather than 0.6: the Amazon pair landed at exactly 0.5.
-      // Guarded by a 2-token floor so two short headlines sharing one
-      // common word are not merged.
-      return shared >= 2 && shared / Math.min(k.length, ok.length || 1) >= 0.5;
-    });
-    if (!dup) out.push(p);
-  }
-  return out.sort((a, b) => a.ts - b.ts);
-}
-
-/**
- * The morning post opens with a question, not a headline.
- *
- * A headline on slide one hands the reader the whole story and they
- * scroll on — a quarter of them leave on the first slide. A question
- * opens a loop the rest of the deck closes, and the headline it would
- * have been becomes the standfirst underneath, so nothing is hidden,
- * only ordered.
- *
- * Deterministic, like the rest of this file: the frame is chosen by
- * what the lead actually IS — a number, an interpretation, a policy
- * move — and rotated by the window key so the same question does not
- * open every Monday.
- */
-const ASK = {
-  figure: ['המספר הזה משנה משהו?', 'כמה זה באמת אומר?', 'מה מסתתר מאחורי המספר?'],
-  policy: ['מי משלם על זה בסוף?', 'למה דווקא עכשיו?', 'מה זה עושה לכיס שלכם?'],
-  note:   ['מה השוק מתמחר עכשיו?', 'האם זה שינוי מגמה?', 'מה באמת קרה כאן?'],
-  plain:  ['מה צריך לדעת הבוקר?', 'על מה השוק מדבר היום?', 'מה פתח את היום?'],
-};
-
-function askCover(lead, seed) {
-  const kind = lead.figures?.length ? 'figure'
-    : /מכס|ריבית|פד\b|רגולצי|חוק|ממשל|טראמפ/.test(`${lead.headline} ${lead.stand ?? ''}`) ? 'policy'
-    : lead.note ? 'note'
-    : 'plain';
-  const bank = ASK[kind];
-  return bank[Math.abs(seed) % bank.length];
-}
-
-function composeRaw(rows, { now = null, carry = {}, endTs = null, template = null, analysts = null } = {}) {
-  const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
-  const w0 = all.length ? windowOf(all[0].ts) : null;
-  const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
-    consumed: all.map(p => p.tg_id), carry: tape(all, carry).carry });
-  if (!all.length) return nothing('empty');
-
-  // snapshots feed the tape, then leave the deck
-  const parsed = dedupe(all.filter(p => !isSnapshot(p)));
-  // a window of nothing but futures snapshots has no news in it
-  if (!parsed.length) return nothing('snapshots-only');
-
-  // endTs lets run.js merge several thin windows into one deck and
-  // still stamp the true span on the masthead — otherwise a 14:00-16:00
-  // post would claim to cover only the first hour.
-  const w0m = windowOf(parsed[0].ts);
-  const w = endTs && endTs > w0m.end ? { ...w0m, end: endTs } : w0m;
-  const { quotes, carry: nextCarry, stamp } = tape(all, carry);   // snapshots included
-
-  // The lesson format: one story, what it means, and the one thing it
-  // teaches — instead of seven stories and one sentence of meaning.
-  // The old deck stays one variable away.
-  if (process.env.DIGEST_FORMAT === 'lesson')
-    return composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, template, now, analysts });
-
-  // §04: "a story cannot appear on both the cover and a card" —
-  // each message is consumed exactly once across the deck.
-  // A merged window can span half a day, and raw score then hands the
-  // cover to whatever scored highest anywhere in it — which on the
-  // morning deck is last night. Age is worth a point: a story sheds
-  // one point for every SCORE_DECAY_HOURS between it and the close of
-  // the window, so this morning takes a tie and last night has to be
-  // genuinely bigger to lead. Ties break newest-first for the same
-  // reason.
-  const decay = Number(process.env.SCORE_DECAY_HOURS || 4);
-  const fresh = p => p.score - (w.end - p.ts) / 3600 / decay;
-  const pool = [...parsed].sort((a, b) => fresh(b) - fresh(a) || b.ts - a.ts);
-  const used = new Set();
-  const take = pred => {
-    const hit = pool.find(p => !used.has(p.tg_id) && pred(p));
-    if (hit) used.add(hit.tg_id);
-    return hit ?? null;
-  };
-
-  const slides = [];
-  // The Telegram card, once a day, on the evening deck.
-  //
-  // This used to key off the window's START being 23:xx, which was
-  // right when a deck was one hour and the last one went out at 23:00.
-  // Under three digests a day the evening deck STARTS wherever the
-  // afternoon one left off — 15:15 — so the test never fired again and
-  // the card silently stopped appearing. The window's END is the
-  // stable thing: the evening digest always closes on the 21:15
-  // boundary.
-  // Which of the three daily decks this is.
-  //
-  // This used to be read off the window's END. That was right only
-  // while a digest covered exactly one hour: the morning deck merges
-  // forward until it has a full deck — through to 11:15 on 1 September
-  // — so the 08:xx test never fired, the morning post lost its
-  // question cover, and the evening test would go the same way on a
-  // quiet night. The slot is a property of WHEN THE DECK GOES OUT, not
-  // of wherever the merge happened to stop.
-  const at = now ?? Math.floor(Date.now() / 1000);
-  const hour = Number(fmt(at, { hour: '2-digit' }));
-  const slot = hour < 12 ? 'morning' : hour < 19 ? 'afternoon' : 'evening';
-  const isCta = slot === 'evening';
-  const cap = isCta ? MAX_CTA : MAX;
-
-  // 01 · cover — highest score, not most recent.
-  // The framed treatment needs a photo to frame; without one it falls
-  // back to the plain cover, which reads as deliberate rather than
-  // broken because the text hangs off the bottom either way.
-  const lead = take(() => true);
-  // The opening composition belongs to the TEMPLATE, not to whether
-  // this particular message happened to carry a photo. That was the
-  // whole complaint: every deck opened the same way, so the profile
-  // grid read as one post repeated. Three of the seven openings can
-  // hold a picture; the rest ignore it and it lands on a later board.
-  const tpl = template ? byId(template) : null;
-  const PHOTO_COVERS = new Set(['cover', 'coverFramed', 'coverBand']);
-  let coverType = tpl?.cover ?? (lead.photo ? 'coverFramed' : 'cover');
-  // A framed cover with nothing to frame is an empty frame. The ruled
-  // opening is the natural stand-in: same weight, no picture needed.
-  if (!lead.photo && coverType === 'coverFramed') coverType = 'coverRule';
-  // One of the three posts a day opens on a question — the morning
-  // one, which is the first thing anyone sees that day. The evening
-  // deck carries the Telegram card instead; the afternoon one is
-  // straight news, half an hour before the US bell, when a reader
-  // wants the fact and not a riddle.
-  const asks = slot === 'morning';
-  const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
-  // The index opening prints the hour, and the figure opening prints
-  // the lead's number. Both fall back inside the archetype when the
-  // window cannot supply one, so the rotation never has to know.
-  const leadFig = lead.figures?.length && lead.figureCount < 4
-    ? lead.figures[0].text.replace(/[−־]/g, '-') : null;
-  slides.push({ type: coverType,
-    index: hhmm(w.end).slice(0, 2),
-    figure: leadFig,
-    // When the lead carries a number, the eyebrow IS the number — so
-    // the question has something concrete sitting above it instead of
-    // asking about a figure the reader cannot see.
-    eyebrow: asks
-      ? (lead.figures?.[0]?.text?.replace(/[−־]/g, '-') ?? 'הבוקר בשוק')
-      : undefined,
-    headline: asks ? askCover(lead, seed) : lead.headline,
-    stand: asks ? lead.headline : lead.stand,
-    source: lead.source,
-    photo: PHOTO_COVERS.has(coverType) ? lead.photo : null });
-
-  // 02 · hero — "a sentence carrying four or more figures is a table
-  // read aloud and is skipped; a hero number needs a claim attached."
-  const hero = take(p => p.figures.length && p.figureCount < 4);
-  if (hero) {
-    const f = hero.figures[0];
-    const sentence = `${hero.headline} ${hero.stand ?? ''}`;
-    slides.push({ type: 'hero', figure: f.text.replace(/[−־]/g, '-'),
-      dir: direction(f.text, sentence), photo: hero.photo,
-      quote: hero.stand || hero.headline, source: hero.source });
-  }
-
-  // 03 · interpretation — present in 63% of windows.
-  //
-  // §04 says a story may not appear on both the cover and a card, and
-  // scoring makes an interpretation worth 4 - so the note-bearing
-  // message almost always wins the cover and was then consumed,
-  // leaving 3 of 73 decks with a note slide. That reading is too
-  // strict: the headline and the 💡 line are different CONTENT from
-  // one message, not the same story told twice. So the lead may
-  // donate its interpretation, and only a different message's
-  // headline is barred from reappearing.
-  const noted = lead.note ? lead : take(p => p.note);
-  // On a digest the interpretation is HIS board — same content, but
-  // presented by the character rather than set as an anonymous pull
-  // quote. A feed of headlines is a utility and utilities get muted;
-  // a character is a reason to follow. Stories keep the plain note:
-  // three seconds is not long enough to introduce anyone.
-  if (noted) slides.push({ type: 'voice', about: noted.headline,
-    text: noted.note, source: noted.source });
-
-  // 04 · chart — "three real data points minimum. Fewer becomes a
-  // hero figure instead."
-  if (quotes.length >= 3) slides.push({ type: 'chart', series: quotes, stamp });
-
-  // 05 · item slides — ONE SLIDE PER STORY. This is the rule: every
-  // distinct story in the window gets its own slide, photo or not.
-  // Lists exist only as overflow when a window runs past the cap.
-  //
-  // It used to give a slide only to photo-bearing stories and pack the
-  // rest three-to-a-list — so a 12-message window with no harvested
-  // photos collapsed to 5 slides. Wrong: dedupe decides what counts as
-  // a story, and after that nothing gets merged.
-  const rest = pool.filter(p => !used.has(p.tg_id));
-  // Every deck now closes on a board that asks for something — the
-  // Telegram card in the evening, the ask on the other two — so the
-  // slot is reserved unconditionally. It used to be reserved only for
-  // the evening, which would have let a busy window fill to the cap
-  // and drop the ask silently on exactly the days most people saw it.
-  const room = cap - slides.length - 1;
-
-  // Reserve one slot for a list only if there is genuine overflow.
-  const overflow = rest.length > room;
-  const solo = overflow ? Math.max(0, room - 1) : rest.length;
-
-  rest.slice(0, solo).forEach(p => {
-    used.add(p.tg_id);
-    slides.push({ type: 'item', n: slides.length + 1, headline: p.headline,
-      photo: p.photo, body: p.stand, source: p.source,
-      stat: p.figures.length && p.figureCount < 4
-        ? p.figures[0].text.replace(/[−־]/g, '-') : null });
-  });
-
-  // 06 · list — only the tail that would not fit.
-  const tail = rest.slice(solo);
-  if (tail.length) {
-    tail.forEach(p => used.add(p.tg_id));
-    slides.push({ type: 'list', title: 'עוד מהחלון הזה',
-      rows: tail.slice(0, 4).map((p, j) => ({ n: solo + j + 1,
-        headline: p.headline, source: p.source })) });
-  }
-
-  // 07 · the ask — every deck except the evening one, which already
-  // closes on the Telegram card and must not close on two asks.
-  //
-  // The deck has never asked for anything at all. Saves and shares
-  // are what the ranking rewards and what puts the account in front
-  // of someone who has not seen it, and a reader who is not asked
-  // does neither. The wording is specific about WHY — "save it, the
-  // numbers are here" beats "save this post", which reads as begging
-  // and is ignored.
-  //
-  // One board, last, after the news is delivered and the reader owes
-  // nothing. Rotates so the same three lines are not repeated twice a
-  // day for a month.
-  // The closing board lives in closingBoard() now, shared with the
-  // lesson format — and it reads the schedule off DIGEST_HOURS instead
-  // of hard-coding it, because it had gone on promising a 15:00 post
-  // for days after the 15:00 post was switched off.
-  if (isCta || slides.length < cap) slides.push(closingBoard(slot, seed, hour));
-
-  // Instagram needs >=2 images for a carousel, and a one-slide deck
-  // is a window that had nothing to say. 7% of windows land here.
-  // One slide is a post. The old floor of two threw away whole hours
-  // of the channel for being quiet, which is not the agent's call to
-  // make — if there is anything at all to say, say it.
-  if (slides.length < MIN_DECK) return { ...nothing('thin'), slides };
-
-  return {
-    key: w.key,
-    template,
-    window: span(w),
-    date: ddmmyy(w.end),
-    stamp, quotes,
-    slides: slides.slice(0, cap),
-    caption: caption(parsed, w),
-    consumed: all.map(p => p.tg_id),   // dropped duplicates are consumed too, or they resurface next window
-    carry: nextCarry,
-  };
-}
-
-// ── the account's real rhythm ────────────────────────────────
-//
-// Read from the SAME variable run.js gates the digest on. The closing
-// board and the Telegram card used to carry the schedule as literals
-// ("the next one is at 15:00", "three a day"), and when the cadence
-// changed to two posts a day the one board whose whole job is to make
-// a promise went on making one the agent no longer kept.
-function digestHours() {
-  const h = (process.env.DIGEST_HOURS || '8,21').split(',')
-    .map(x => Number(x.trim())).filter(Number.isFinite).sort((a, b) => a - b);
-  return h.length ? h : [8, 21];
-}
-const SLOT_LABEL = h => (h < 12 ? 'סקירת בוקר' : h < 19 ? 'טרום־פתיחה' : 'סיכום יום');
-const clock = h => `${String(h).padStart(2, '0')}:00`;
-const PER_DAY = { 1: 'סקירה אחת', 2: 'שתי סקירות', 3: 'שלוש סקירות', 4: 'ארבע סקירות' };
-
-/** The last board: the Telegram card in the evening, an ask otherwise. */
-function closingBoard(slot, seed, hour) {
-  const hs = digestHours();
-  if (slot === 'evening') return { type: 'telegram', big: 'חמ״ל שוק ההון', link: TG_LINK,
-    schedule: hs.map(h => ({ time: clock(h), label: SLOT_LABEL(h) })) };
-  const next = hs.find(h => h > hour) ?? hs[0];
-  const perDay = PER_DAY[hs.length] ?? `${hs.length} סקירות`;
-  // One board, last, after the news is delivered and the reader owes
-  // nothing. Specific about WHY — "save it, the numbers are here"
-  // beats "save this post", which reads as begging and is ignored.
-  const ASKS = [
-    { big: 'שומרים את זה למחר', foot: `הסקירה הבאה ב־${clock(next)}`,
-      acts: [{ mark: '↓', label: 'שמרו — ההסבר כאן כשתצטרכו אותו' },
-             { mark: '↗', label: 'שלחו למי שמתחיל להתעניין בשוק' },
-             { mark: '@', label: `עוקבים — ${perDay} ביום, בעברית פשוטה` }] },
-    { big: 'מה פספסנו היום?', foot: 'עונים לכל תגובה',
-      acts: [{ mark: '✎', label: 'כתבו בתגובות מה עוד לא ברור' },
-             { mark: '↓', label: 'שמרו — לחזור לזה לפני הפתיחה' },
-             { mark: '↗', label: 'שלחו לחבר שמסתכל על השוק האמריקאי' }] },
-    { big: 'הסקירה הזאת שווה שיתוף אחד', foot: 'תודה שאתם כאן',
-      acts: [{ mark: '↗', label: 'שלחו את זה הלאה — ככה החשבון גדל' },
-             { mark: '↓', label: 'שמרו לפני שזה נעלם בפיד' },
-             { mark: '@', label: 'עוקבים ל־@marketalert.il' }] },
-  ];
-  return { type: 'ask', ...ASKS[Math.abs(seed) % ASKS.length] };
-}
-
-/**
- * The lesson deck: ONE story, told so a non-trader understands it.
- *
- *   cover   the story
- *   number  its figure, if it has a clean one
- *   meaning the channel's own 💡 line, presented by Ron
- *   lesson  the mechanism behind it, as three steps (lessons.js)
- *   brief   two other things worth knowing, one line of meaning each
- *   close   the ask, or the Telegram card in the evening
- *
- * Six boards, three stories. The old deck was ten boards and seven
- * stories, and only one of the seven ever said what it meant.
- *
- * The lead is chosen for what it can TEACH, not for size alone: a
- * story carrying the channel's meaning line, and one that maps onto a
- * lesson, outranks a slightly bigger headline that explains nothing.
- * Freshness still counts, for the reason compose() gives.
- */
-/**
- * "The Kobeissi Letter: US and China agreed…" — the speaker is a
- * credit, not a headline. It moves to the footer, where the source is
- * already credited.
- *
- * Only a LATIN prefix is moved. Two reasons: an English name inside a
- * Hebrew line is exactly what the bidi algorithm scrambles (the cover
- * printed ":Letter Kobeissi The"), and a Hebrew prefix is usually the
- * topic — "הפד: …" is not a byline and must stay.
- */
-function unSpeak(p) {
-  const m = /^\s*([^:]{2,40}):\s+(.{12,})$/u.exec(p.headline ?? '');
-  if (!m || !/[A-Za-z]/.test(m[1]) || /[א-ת]/.test(m[1])) return p;
-  return { ...p, headline: m[2].trim(), source: p.source ?? m[1].trim() };
-}
-
-/**
- * Less text on a board: cut at the end of a sentence, else a comma or
- * dash, else a word, and never past `max`. A board is read at arm's
- * length; the caption and the drill-down keep the full line.
- */
-export function brevity(t, max = 80) {
-  const x = String(t ?? '').replace(/\s+/g, ' ').trim();
-  if (x.length <= max) return x;
-  const head = x.slice(0, max);
-  const stop = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '));
-  if (stop > max * 0.5) return head.slice(0, stop + 1);
-  const soft = Math.max(head.lastIndexOf(', '), head.lastIndexOf(' — '), head.lastIndexOf(': '));
-  if (soft > max * 0.55) return head.slice(0, soft).replace(/[,:—\s]+$/, '');
-  return head.slice(0, head.lastIndexOf(' ')).replace(/[,:—\s]+$/, '') + '…';
-}
-
-/** A one-line row for the brief: never a bare label like "מחר בשוק". */
-function briefLine(p) {
-  const h = p.headline ?? '';
-  return h.replace(/[^\p{L}\p{N}]/gu, '').length < 14 && p.stand ? p.stand : h;
-}
-
-// ── what a beginner needs first ──────────────────────────────
-//
-// The deck is read in the order a newcomer needs it, not the order
-// the channel wrote it: the one thing that matters and what it means
-// for them, then the two other things worth knowing, then what it may
-// move. Everything after that is for whoever wants to go deeper — the
-// mechanism, and the story's own details — and says so on the board.
-// A reader who stops after the cover still leaves with the news AND
-// its meaning; the old deck made them swipe to slide two for that.
-
-// Agenda lines, commentators and the channel's own boards are useful,
-// but none of them is "the most important thing that happened".
-const AGENDA = /^(?:היום|מחר|הערב)(?:\s|[ -]?ב[- ]?\d)|צפוי(?:ים|ה|ות)? (?:להודיע|לפרסם|להופיע)|מה על השולחן|^יום (?:ראשון|שני|שלישי|רביעי|חמישי|שישי)[ ,]|לוח (?:ה)?(?:שבוע|אירועים)/;
-const BOARD = /^\s*(?:📋|📊|🗓|📅)|לוח (?:המניות|קריפטו)|^לוח /u;
-const VOICE = /^\s*🗣/u;
-// What makes a story matter to someone who is not watching the tape:
-// a name they know, the Fed, oil, or a record.
-const BIG = /אנבידיה|Nvidia|NVDA|אפל|Apple|מיקרוסופט|Microsoft|אמזון|Amazon|טסלה|Tesla|גוגל|Alphabet|מטא|Meta|הפד|ריבית|נפט|אינפלציה|מכסים|S&P ?500|נאסד"?ק|וול סטריט|ביטקוין/i;
-const RECORD = /השיא ההיסטורי|שיא (?:כל הזמנים|היסטורי)|הגדול(?:ה)? ביותר|לראשונה מאז|הנמוך ביותר מאז|הגבוה ביותר מאז/;
-
-// A US account: another economy's data is context, not the lead.
-const ABROAD = /אוסטרליה|יפן|סין|אירופ|בריטניה|גרמניה|קנדה|הודו|קוריאה|ברזיל/;
-
-/**
- * How much a story matters to a reader who is NOT watching the tape.
- *
- * The digest's own score() rewards what makes a good trader's board —
- * a 💡 line, a figure, a source — and on that scale "Australian CPI
- * 4.0%" beat "Nvidia's record $150bn buyback", because the first came
- * with a meaning line and the second did not. For a newcomer the
- * second is the story. The meaning line still counts; it no longer
- * decides.
- */
-function importance(p) {
-  const h = stripLeadEmoji(p.headline ?? '');
-  let s = 0;
-  if (p.figures?.length) s += 1;
-  if (p.source) s += 0.5;
-  if (p.note) s += 2;
-  if (BIG.test(p.headline)) s += 4;
-  if (RECORD.test(`${p.headline} ${p.stand ?? ''}`)) s += 2.5;
-  if (ABROAD.test(h) && !/ארה"?ב|ארה״ב|וול סטריט|הפד/.test(h)) s -= 3;
-  if (AGENDA.test(h)) s -= 3;
-  if (VOICE.test(p.headline)) s -= 2.5;
-  return s;
-}
-
-// "ה-^NDX עולה 0.3% וה-^GSPC כמעט ללא שינוי" — wire symbols a beginner
-// cannot read. Only the caret and futures forms: a plain ticker like
-// NVDA is how the market names the company, and it stays.
-const SYMBOL = { '^NDX': 'נאסד״ק 100', '^GSPC': 'S&P 500', '^SPX': 'S&P 500', '^DJI': 'דאו ג׳ונס',
-  '^RUT': 'ראסל 2000', '^VIX': 'מדד הפחד', 'CL=F': 'חוזי הנפט', 'GC=F': 'חוזי הזהב', 'NQ=F': 'חוזי הנאסד״ק',
-  'ES=F': 'חוזי ה-S&P 500' };
-const plain = t => t == null ? t : stripLeadEmoji(String(t))
-  .replace(/(ה-)?(\^[A-Z]{2,5}|[A-Z]{2}=F)(?![A-Za-z])/g, (m, he, sym) => {
-    const name = SYMBOL[sym];
-    if (!name) return m;
-    if (!he) return name;
-    // "ה-^NDX" → "הנאסד״ק 100"; "ה-CL=F" → "חוזי הנפט"; "ה-^GSPC" → "ה-S&P 500"
-    return /^חוזי/.test(name) ? name : /^[A-Za-z]/.test(name) ? `ה-${name}` : `ה${name}`;
-  });
-
-/** One plain line under the headline: what it means, never the wire copy. */
-function whyLine(p) {
-  if (p.note) return plain(p.note);
-  // The standfirst, cut at its first sentence and with the channel's
-  // parenthetical glosses taken out — the glossary line explains the
-  // word, and the cover is not the place for a bracket inside a bracket.
-  const s = String(p.stand ?? '').replace(/\s*\([^)]{3,120}\)/g, '');
-  const first = s.split(/(?<=[.!?])\s+/)[0] ?? '';
-  const one = plain(first);
-  return one.length > 170 ? one.slice(0, one.lastIndexOf(' ', 165)) + '…' : one || null;
-}
-
-/**
- * The story's own facts, for the drill-down board: one sentence per
- * line of the message, never the paragraph. A board of three
- * paragraphs is the wire copy again, set smaller.
- */
-function factsOf(p, { cap = 190 } = {}) {
-  return (p.reporting ?? []).map(clean).map(l => stripLeadEmoji(l).trim())
-    .filter(l => l && !/^#/.test(l) && !/^💡/u.test(l))
-    .map(l => l.replace(/\s*#\S+/g, '').trim())
-    .map(l => plain(l.split(/(?<=[.!?])\s+(?=[^\d])/)[0]))
-    .map(l => l.length > cap ? l.slice(0, l.lastIndexOf(' ', cap - 4)) + '…' : l)
-    .filter(Boolean).slice(0, 3);
-}
-
-/** The deck's caption, in the same order as the boards. */
-/** One caption line for the analyst note. Attributed, never ours. */
-export function analystLine(n) {
-  const p = plainNote(n);
-  return p ? `🏦 ${p.line}. (${p.hint})` : '';
-}
-
-function lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystNote = null, day = null }) {
-  const LIMIT = 2120;
-  const topics = topicsIn(parsed);
-  const named = topics.slice(0, 4).map(t => t.word).join(' · ');
-  const tags = ['שוקההון', 'מסחר', ...topics.slice(0, 3).map(t => t.tag)]
-    .filter((t, i, a) => a.indexOf(t) === i).slice(0, 5).map(t => '#' + t).join(' ');
-  const head = [
-    `${SERIES.digest} | ${named || 'שוק ההון האמריקאי'}`, '',
-    `🔑 הכי חשוב: ${plain(lead.headline)}`,
-    why ? `למה זה חשוב: ${why}` : null,
-    day?.money ? `💰 ${day.money} (${day.note})` : null,
-    day?.ron ? `🧑 ${day.ron}` : null, '',
-    ...(others.length ? ['עוד שכדאי לדעת:', ...others.map(p =>
-      `▪ ${plain(briefLine(p))}${p.note ? `\n   💡 ${plain(p.note)}` : ''}`), ''] : []),
-    outlook ? outlookLine(outlook) : null,
-    analystNote ? analystLine(analystNote) : null,
-    lesson ? `📘 השיעור: ${lesson.takeaway}` : null,
-  ].filter(x => x !== null).join('\n');
-  const ask = askLine(Math.floor(w.start / 3600));
-  const foot = `\n${ask ? `${ask}\n\n` : ''}${SCHEDULE}\nעדכון ${span(w)} · @marketalert.il\n${tags}`;
-  // The deep part goes last and is the part that gives way: a caption
-  // that runs long loses details, never the news or its meaning.
-  let deep = ['', '', '📖 לעומק:', ...factsOf(lead), lead.source ? `מקור: ${lead.source}` : null]
-    .filter(x => x !== null).join('\n');
-  while (deep && (head + deep + foot).length > LIMIT) {
-    const k = deep.lastIndexOf('\n');
-    deep = k > 12 ? deep.slice(0, k) : '';
-  }
-  return (head + deep + foot).slice(0, LIMIT);
-}
-
-function composeLesson({ rows, all, parsed, w, quotes, stamp, nextCarry, template, now, analysts = null }) {
-  const at = now ?? Math.floor(Date.now() / 1000);
-  const hour = Number(fmt(at, { hour: '2-digit' }));
-  const slot = hour < 12 ? 'morning' : hour < 19 ? 'afternoon' : 'evening';
-  const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const decay = Number(process.env.SCORE_DECAY_HOURS || 4);
-  const age = p => (w.end - p.ts) / 3600 / decay;
-  const rank = p => importance(p) + (lessonFor(p) ? 1 : 0) - age(p);
-  // The channel's own boards (hot-stocks table, crypto board) are
-  // lists, not stories; they feed the outlook through `rows` but never
-  // lead or fill the brief.
-  const stories = parsed.filter(p => !BOARD.test(p.headline ?? ''));
-  const pool = [...(stories.length ? stories : parsed)]
-    .sort((a, b) => rank(b) - rank(a) || b.ts - a.ts).map(unSpeak);
-
-  const lead = pool[0];
-  const lesson = lessonFor(lead) ?? pool.map(lessonFor).find(Boolean) ?? null;
-  // Two more, meaning first, and never a second agenda line or a
-  // second commentator when a real story is available.
-  const others = pool.slice(1, 3);
-
-  const fig = lead.figures?.length && lead.figureCount < 4
-    ? lead.figures[0].text.replace(/[−־]/g, '-') : null;
-
-  const tpl = template ? byId(template) : null;
-  const PHOTO_COVERS = new Set(['cover', 'coverFramed', 'coverBand']);
-  let coverType = tpl?.cover ?? (lead.photo ? 'coverFramed' : 'cover');
-  if (!lead.photo && coverType === 'coverFramed') coverType = 'coverRule';
-
-  const outlook = process.env.DIGEST_OUTLOOK === '0' ? null : outlookFor(rows);
-  const seen = new Set();                    // each word explained once per deck
-  // The cover's second line is what the story MEANS. The channel's 💡
-  // line when it wrote one; otherwise the lesson's takeaway when the
-  // lesson is about this very story (a record buyback came with no 💡,
-  // and its standfirst only restated the headline); only then the
-  // standfirst itself.
-  // Only a lesson about the event itself (see lessons.js), and only
-  // one the HEADLINE names: "מלאי הנפט האסטרטגי בשפל" matched the oil
-  // lesson, and its takeaway ("נפט יקר … מגיע לריבית") was about a
-  // different story.
-  const own = lessonFor({ headline: lead.headline });
-  const why = lead.note ? whyLine(lead) : own?.event ? own.takeaway : whyLine(lead);
-
-  // The analysts' word on the lead story, or the week's, labelled as such.
-  const analystNote = analysts?.length && process.env.ANALYST_NOTE !== '0'
-    ? noteFor(`${lead.headline} ${lead.stand ?? ''}`, analysts, { skip: lead.tg_id, seed }) : null;
-
-  // The day in the reader's money and in Ron's voice (day.js), and an
-  // eyebrow that asks the question the cover answers. The topic word
-  // comes from the same table the caption tags use — nothing invented.
-  const day = dayLines(quotes, seed);
-  const topic = TOPICS.find(t => t.re.test(`${lead.headline} ${lead.stand ?? ''}`))?.word;
-  const hook = topic ? `למה כולם מדברים על ${topic}` : 'הכי חשוב עכשיו';
-
-  const slides = [];
-  // 1 · the one thing, and what it means for you
-  slides.push({ type: coverType, index: hhmm(w.end).slice(0, 2), figure: fig,
-    eyebrow: hook, headline: brevity(plain(lead.headline), 90), stand: brevity(why, 90), source: lead.source, day,
-    gloss: glossFor(`${lead.headline} ${why ?? ''}`, { max: 1, seen }),
-    swipe: 'החליקו — עוד מה שחשוב, ומה זה אומר',
-    photo: PHOTO_COVERS.has(coverType) ? lead.photo : null });
-  // 2 · the two other things worth knowing
-  if (others.length) {
-    const brows = others.map((p, i) => ({ n: i + 1, headline: brevity(plain(briefLine(p)), 70),
-      // A meaning, or nothing. The standfirst under a headline only
-      // restates it, and it was being shown under the 💡 as if it
-      // explained something.
-      meaning: brevity(p.note ? whyLine(p) : lessonFor({ headline: p.headline })?.event ? lessonFor({ headline: p.headline }).takeaway : null, 80) || null, source: p.source }));
-    slides.push({ type: 'brief', eyebrow: 'בקצרה',
-      title: others.length === 1 ? 'עוד דבר אחד שכדאי לדעת' : 'עוד שני דברים שכדאי לדעת',
-      rows: brows, swipe: 'החליקו — לאן זה יכול להזיז את השוק',
-      gloss: glossFor(brows.map(r => `${r.headline} ${r.meaning ?? ''}`).join(' '), { max: 1, seen }) });
-  }
-  // 3 · what it may move, and how fast
-  const short = rs => rs.map(r => ({ ...r, why: brevity(r.why, 55) }));
-  if (outlook) slides.push({ type: 'outlook', up: short(outlook.up), dn: short(outlook.dn),
-    swipe: 'להמשך — למה זה קורה' });
-  // 3b · the analysts' word, on a board of its own
-  if (analystNote) slides.push({ type: 'analystNote', note: analystNote, swipe: 'להמשך — למה זה קורה' });
-  // 4 · deeper: the mechanism
-  if (lesson) slides.push({ type: 'lesson', eyebrow: 'לעומק · למה זה קורה', title: lesson.title,
-    steps: lesson.steps, takeaway: lesson.takeaway });
-  // 5 · deeper: the story's own details
-  const facts = factsOf(lead, { cap: 95 });
-  if (facts.length) slides.push({ type: 'detail', eyebrow: 'לעומק · הפרטים',
-    title: brevity(plain(lead.headline), 70), facts, figure: fig, source: lead.source,
-    gloss: glossFor(facts.join(' '), { max: 2, seen }) });
-  slides.push(closingBoard(slot, seed, hour));
-
-  return {
-    key: w.key, template, window: span(w), date: ddmmyy(w.end), stamp, quotes,
-    slides, caption: lessonCaption({ lead, why, others, outlook, lesson, w, parsed, analystNote, day }),
-    // Everything in the window is spent, shown or not.
-    consumed: all.map(p => p.tg_id), carry: nextCarry,
-    format: 'lesson', lesson: lesson?.id ?? null,
-    outlook: outlook ? [...outlook.up, ...outlook.dn].map(({ name, dir, basis, speed, symbol }) =>
-      ({ name, dir, basis, speed, symbol: symbol ?? null })) : null,
-  };
-}
-
-/**
- * A reel: five boards, twelve seconds, built to be watched by someone
- * who has never heard of this account.
- *
- * The shape is fixed, unlike a digest, because retention is the whole
- * ranking signal and retention is a property of PACING. A viewer
- * decides in about two seconds, so board one is a single number at
- * the size of the screen; then three beats of one story each, short
- * enough that nothing is ever still; then the ask.
- *
- * It deliberately carries LESS than a digest. A carousel is read at
- * the reader's pace and can hold ten slides; a reel is watched at the
- * video's pace and every extra second is a chance to scroll away.
- */
-/**
- * The accented word.
- *
- * At under two seconds a viewer does not read a headline, they land
- * on it — so one word carries the colour and the eye goes there
- * first. It is chosen, never invented: the figure if the line has
- * one, otherwise the instrument or company the line is about, drawn
- * from the same topic table the caption uses. If neither is present
- * nothing is accented, because guessing which word matters is how a
- * headline gets editorialised.
- */
-function markWord(headline, figures) {
-  const fig = figures?.[0]?.text;
-  const cands = [];
-  if (fig) cands.push(fig);
-  for (const t of TOPICS) { const m = t.re.exec(headline); if (m) cands.push(m[0]); }
-  for (const c of cands) {
-    const at = headline.indexOf(c);
-    if (at < 0) continue;
-    return esc(headline.slice(0, at)) + '<em>' + esc(c) + '</em>' + esc(headline.slice(at + c.length));
-  }
-  return esc(headline);
-}
-
-// ─────────────────────────────────────────────────────────────
-// The narration.
-//
-// English, over Hebrew boards. The audience for the cards is Israeli;
-// the audience for a reel is whoever Instagram decides to show it to,
-// and that is the only reason this account has any reach beyond the
-// people already following it.
-//
-// It does NOT translate. Nothing here reads a Hebrew sentence and
-// says an English one — that would need a model, and a model that
-// paraphrases a financial headline is a machine for inventing numbers
-// that were never quoted. This account already published SPX +46.06%
-// once, from four stale carry rows and a comma read as a decimal
-// point, and the fix was to make every number traceable to something
-// the parser actually matched.
-//
-// So the voice says only what is already structured: the instrument
-// the topic table matched, the figure the parser extracted, and the
-// direction the board is ALREADY drawing behind him. A scene the
-// parser could not describe is narrated by nobody — silence over a
-// card is honest, and a bed is still playing under it.
-// ─────────────────────────────────────────────────────────────
-
-/** Futures symbols, said out loud rather than spelled.
- *
- * Short forms, because these are spoken on card one and card one is
- * where a viewer decides. "Nasdaq futures down one point three three
- * percent" is four seconds; "Nasdaq down one point three three" is
- * two, and the strip on screen already says they are futures. */
-/** HTML-escape, module scope: markWord had its own and composeReel
- *  now needs one too. */
 const esc = t => String(t ?? '').replace(/[&<>]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
-/** The same instruments, in Hebrew, for a card rather than a voice. */
-const SAY_SYM_HE = {
-  NQ: 'נאסד״ק', ES: 'S&P 500', YM: 'דאו ג׳ונס',
-  SPX: 'S&P 500', NDX: 'נאסד״ק 100', RTY: 'ראסל 2000',
-};
-
-const SAY_SYM = {
-  NQ: 'Nasdaq', ES: 'S and P', YM: 'the Dow',
-  SPX: 'the S and P', NDX: 'the Nasdaq 100', RTY: 'the Russell',
-};
-
-const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
-  'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen',
-  'sixteen', 'seventeen', 'eighteen', 'nineteen'];
-const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy',
-  'eighty', 'ninety'];
-
-/** 0-999 in words. Beyond that is a level, not a percentage, and
- *  nothing narrated here is ever a level. */
-function intWords(n) {
-  if (n < 20) return ONES[n];
-  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? `-${ONES[n % 10]}` : '');
-  return `${ONES[Math.floor(n / 100)]} hundred`
-    + (n % 100 ? ` ${intWords(n % 100)}` : '');
-}
-
-/**
- * "1.33" -> "one point three three".
- *
- * Digit by digit after the point, the way a person reads a percentage
- * aloud — "one point thirty-three" is a different number to some ears
- * and this is not the place to be ambiguous. Returns null for
- * anything that is not a plain number, so a malformed figure is
- * silent rather than mispronounced.
- */
-export function sayNum(text) {
-  const t = String(text ?? '').replace(/[−־]/g, '-').replace('%', '').trim();
-  // A leading + is normal on a figure and must not make the line
-  // silent. The decimal part is capped at two digits on purpose: with
-  // three, "46,061" — a LEVEL with a thousands separator, which is
-  // exactly how SPX came to be published as +46.06% — parses happily
-  // as a decimal and gets read aloud as a percentage. Two digits is
-  // how a percentage is quoted; anything else is not one, and is
-  // better said by nobody.
-  const m = /^[+-]?(\d{1,3})(?:[.,](\d{1,2}))?$/.exec(t);
-  if (!m) return null;
-  const whole = intWords(Number(m[1]));
-  if (!m[2]) return whole;
-  return `${whole} point ${[...m[2]].map(d => ONES[Number(d)]).join(' ')}`;
-}
-
-/**
- * The tape, read short. Exact, or absent.
- *
- * ONE quote by default, not two. Two ran the opening line to eight
- * seconds of speech — past the hold cap, so the last word would have
- * been cut, on the one card where a viewer is deciding whether to
- * stay. The second index is on the strip for anyone who wants it.
- */
-function sayTape(quotes) {
-  const n = Number(process.env.REEL_SAY_QUOTES || 1);
-  const said = [];
-  for (const q of (quotes ?? []).slice(0, n)) {
-    const name = SAY_SYM[q.sym]; if (!name) continue;
-    const num = sayNum(q.chg); if (num == null) continue;
-    const way = Number(String(q.chg).replace(/[−־]/g, '-').replace(',', '.')) < 0
-      ? 'down' : 'up';
-    said.push(`${name} ${way} ${num} percent.`);
-  }
-  return said.join(' ');
-}
-
-/**
- * One scene, one line — or nothing.
- *
- * The direction word is the same one the background already draws: if
- * the candles behind him fall, the voice says down. They cannot
- * disagree, because they read the same field.
- */
-function sayScene(p, dir) {
-  const hay = `${p.headline} ${p.stand ?? ''}`;
-  const topic = TOPICS.find(t => t.re.test(hay))?.en ?? null;
-  const fig = p.figures?.length && p.figureCount < 4 ? p.figures[0].text : null;
-  const n = fig ? sayNum(fig) : null;
-  const way = dir === 'up' ? 'up' : dir === 'dn' ? 'down' : null;
-  if (topic && n && way) return `${cap(topic)}, ${way} ${n} percent.`;
-  if (topic && n) return `${cap(topic)}. ${cap(sayNum(fig))} percent.`;
-  if (n && way) return `${cap(way)} ${n} percent.`;
-  // A topic and nothing else used to return "Crypto." — one word,
-  // said out loud, in the middle of a summary. It was thin when the
-  // narration was a list of fragments and it is broken now that the
-  // narration is a telling: the listener hears a sentence, a sentence,
-  // then a noun. Silence over the card is better, and the bed is
-  // still playing under it.
-  return null;
-}
-
-const cap = t => String(t ?? '').charAt(0).toUpperCase() + String(t ?? '').slice(1);
-
-/**
- * The words that turn five sentences into one bulletin.
- *
- * Read aloud, isolated clauses land as a list — "Oil down two point
- * one percent." "Nvidia jumps three point seven five percent." — and
- * a list is not a summary of anything. One connective in front of
- * each beat after the first is the whole difference between a feed
- * and somebody telling you about the day.
- *
- * Fixed and rotating, never chosen by a model: a connective is a
- * claim about how two stories relate, and "because" or "despite"
- * would be inventing a link the source never drew. These only say
- * "and there was also this", which is the only relationship the
- * pipeline actually knows to be true.
- */
-const JOIN = ['', 'Also, ', 'Meanwhile, ', 'And ', 'On top of that, '];
-
-/**
- * The close: a reason to forward it, not a request to follow.
- *
- * Sends per reach is what the ranking pays for and a follow is not,
- * so the last card names a KIND OF PERSON the viewer knows rather
- * than asking for something on the account's behalf. Deliberately not
- * "שתפו" and never a number of friends — bait phrasing of that shape
- * is separately down-ranked, and it reads like every other account.
- *
- * Three of them, rotating on the day, so a daily reel does not close
- * on the identical sentence every afternoon.
- */
-// ── the comment ask ──────────────────────────────────────────
-// A comment is the strongest signal a post can earn, and the account
-// has had none. One plain question at the end of every caption, never a
-// question about what to buy or sell. Rotates by window, so the same
-// line does not sit under every post.
-export const ASKS = [
-  'מה לדעתכם יקרה מחר? כתבו בתגובות: עולה או יורד',
-  'מה הכי הפתיע אתכם היום? כתבו בתגובות',
-  'על איזו חברה תרצו שנסביר מחר? כתבו בתגובות',
-  'היה ברור, או שצריך הסבר? כתבו בתגובות',
-];
-export const askLine = (seed = 0) => process.env.CAPTION_ASK === '0' ? ''
-  : `💬 ${ASKS[Math.abs(Math.floor(seed)) % ASKS.length]}`;
-/** The reel's last card: the same ask, short enough for a moving card. */
-export const REEL_ASK = 'עולה או יורד מחר? כתבו בתגובות';
-
-const SEND = [
-  'שלחו לחבר שעוקב אחרי השוק',
-  'מכירים מישהו שמשקיע? שלחו לו',
-  'שלחו את זה למי שמחזיק מניות',
-];
-export const connective = i => JOIN[Math.min(i, JOIN.length - 1)];
-
-/**
- * A headline short enough to be read off a moving card.
- *
- * Nine words is the cap, and the order of preference matters more
- * than the number: take the first clause if the sentence has one,
- * because a clause is a complete thought and a truncation is not.
- * Only when there is no clause boundary does it cut, and it cuts from
- * the END — Hebrew puts its negations early (לא, אין, ללא), so the
- * front of the line is where the meaning lives and dropping the tail
- * of a list is survivable in a way that dropping a "not" is not.
- *
- * The untrimmed headline still goes in the caption. Nothing is lost,
- * it is just not all on the card.
- */
 const CARD_WORDS = Number(process.env.REEL_CARD_WORDS || 9);
 export function fitCard(headline) {
   const t = String(headline ?? '').replace(/\s+/g, ' ').trim();
@@ -1016,385 +185,6 @@ function trimTail(words) {
   return out;
 }
 
-/**
- * The number the reel opens on.
- *
- * The biggest move of the day, not the first story of the day and not
- * the account's own name. Magnitude across the beats, because a stock
- * jumping 3.75% stops a scroll and an index moving 1.33% does not,
- * and it falls back to the tape when no story carried a figure at all.
- *
- * Plausibility-bounded like everything else here: a "move" outside
- * TAPE_MAX_PCT is a level that got parsed as a percentage, which is
- * the exact shape of the bug that put SPX +46.06% on this account.
- */
-const LEAD_MAX_PCT = Number(process.env.TAPE_MAX_PCT || 25);
-export function leadFigure(beats, quotes) {
-  const num = t => Math.abs(parseFloat(String(t).replace(/[−־]/g, '-')
-    .replace(/,(\d{3})(?!\d)/g, '$1').replace(',', '.').replace('%', '')));
-  let best = null;
-  for (const p of beats) {
-    if (!p.figures?.length || p.figureCount >= 4) continue;
-    const f = p.figures[0], v = num(f.text);
-    if (!Number.isFinite(v) || v > LEAD_MAX_PCT || v === 0) continue;
-    // It has to be a MOVE, not merely a number.
-    //
-    // The first build of this card opened on "מכסים 25%" — a tariff
-    // RATE, the largest figure in the window and not a market move at
-    // all. A reel that opens by presenting a level as the day's
-    // biggest change is lying in exactly the register this account
-    // exists not to lie in. If direction() cannot say which way it
-    // went, it is not the day's move.
-    const d = direction(f.text, `${p.headline} ${p.stand ?? ''}`);
-    if (d !== 'up' && d !== 'dn') continue;
-    if (!best || v > best.v) best = { v, dir: d, text: f.text.replace(/[−־]/g, '-'), story: p };
-  }
-  if (best) return best;
-  for (const q of quotes ?? []) {
-    const v = num(q.chg);
-    if (!Number.isFinite(v) || v > LEAD_MAX_PCT || v === 0) continue;
-    if (!best || v > best.v) best = { v, text: String(q.chg).replace(/[−־]/g, '-'), sym: q.sym };
-  }
-  return best;
-}
-
-/** Which way the story points — the scene and his hands both follow it. */
-const GEST = { up: 'yes', dn: 'pause', '': 'explain' };
-
-/**
- * A reel: six scenes, twelve seconds, built to be watched by someone
- * who has never heard of this account.
- *
- * It is not a deck of boards with motion added. Every other archetype
- * here is a PAGE — text laid on a field, read at the reader's pace.
- * A reel scene is a FRAME: he stands inside a market that is visibly
- * doing something, one short line sits over it, and the viewer has
- * under two seconds to take it in before deciding whether to keep
- * watching. That is why the headline is short and enormous, why one
- * word carries the accent, and why the masthead, the tape and the
- * footer are all suppressed — at 1.9 seconds a masthead is noise.
- *
- * The scene, his gesture and his wardrobe all follow the story's
- * direction rather than a rotation, so a fall looks like a fall.
- */
-function composeReelRaw(rows, { carry = {}, endTs = null, template = null } = {}) {
-  const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
-  const nothing = reason => ({ skip: reason, slides: [], consumed: all.map(p => p.tg_id) });
-  if (!all.length) return nothing('empty');
-
-  const parsed = dedupe(all.filter(p => !isSnapshot(p)));
-  if (!parsed.length) return nothing('snapshots-only');
-
-  const w0 = windowOf(parsed[0].ts);
-  const w = endTs && endTs > w0.end ? { ...w0, end: endTs } : w0;
-  const { quotes, carry: nextCarry, stamp } = tape(all, carry);
-
-  const decay = Number(process.env.SCORE_DECAY_HOURS || 4);
-  const freshness = p => p.score - (w.end - p.ts) / 3600 / decay;
-  // With three beats there is no room for a card that only says who
-  // spoke ("🗣️ The Kobeissi Letter") or a channel table: the speaker's
-  // line goes on the card instead, and boards stay in the caption.
-  const stories = parsed.filter(p => !BOARD.test(p.headline ?? '') && !AGENDA.test(p.headline ?? '')
-    && (p.headline ?? '').replace(/[^\p{L}\p{N}]/gu, '').length >= 14);
-  const pool = [...(stories.length >= 2 ? stories : parsed)]
-    .sort((a, b) => freshness(b) - freshness(a) || b.ts - a.ts).map(unSpeak);
-  const beats = pool.slice(0, Number(process.env.REEL_BEATS || 4));
-  if (beats.length < 2) return nothing('thin');
-
-  const tpl = template ? byId(template) : null;
-  const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const DARK = ['ink', 'deep', 'midnight', 'abyss', 'basalt', 'navy'];
-  const ground = i => DARK[(seed + i) % DARK.length];
-
-  const scene = (p, i) => {
-    const fig = p.figures?.length && p.figureCount < 4
-      ? p.figures[0].text.replace(/[−־]/g, '-') : null;
-    const dir = fig ? direction(p.figures[0].text, `${p.headline} ${p.stand ?? ''}`) : '';
-    // Nine words on the card; the whole sentence still goes in the
-    // caption, so nothing is lost, it is just not all on screen.
-    const fit = fitCard(p.headline);
-    const marked = markWord(fit.text, p.figures);
-    return { type: 'scene', headline: fit.text, full: p.headline, trimmed: fit.trimmed,
-      marked, say: sayScene(p, dir),
-      // The figure goes UNDER the line only when the line does not
-      // already contain it. Printing 1.33% in the headline and again
-      // beneath it is the board stuttering.
-      sub: fig && !marked.includes(`<em>${fig}`) ? fig : null,
-      dir, gesture: GEST[dir] ?? 'explain', seed: seed + i * 7,
-      // The photo the message actually carried, when it carried one.
-      //
-      // A picture of the thing being reported beats a drawn candle
-      // wall, and it is the only kind of image this account can put on
-      // a board honestly: it came with the story. Nothing here
-      // generates or searches for an image — an illustration that
-      // merely looks like the news is a claim about the news.
-      photo: p.photo ?? null,
-      palette: ground(i), source: p.source };
-  };
-
-  // 01 · the number.
-  //
-  // This was a masthead — "היום בשוק" over the tape strip — and a
-  // masthead spends the highest-leverage second of the reel telling a
-  // stranger the account name that Instagram is already drawing above
-  // the video. It opens on the biggest move of the day instead, at
-  // the size of the screen, and the story behind that number is
-  // promoted to the first beat so the hook is paid off immediately
-  // rather than four cards later.
-  const lead = leadFigure(beats, quotes);
-  const order = lead?.story
-    ? [lead.story, ...beats.filter(b => b !== lead.story)]
-    : beats;
-  // The direction the parser found, not one re-derived from a minus
-  // sign — the tape's chg for a fall does not always carry one.
-  const leadDir = lead?.dir
-    ?? (lead ? (String(lead.text).trim().startsWith('-') ? 'dn' : 'up') : '');
-  const leadSubject = lead?.story
-    ? (TOPICS.find(t => t.re.test(`${lead.story.headline} ${lead.story.stand ?? ''}`))?.word ?? null)
-    : (lead?.sym ? SAY_SYM_HE[lead.sym] ?? null : null);
-
-  const slides = [lead
-    ? { type: 'scene', lead: true, headline: leadSubject ?? 'היום בשוק',
-        marked: leadSubject ? esc(leadSubject) : 'היום ב<em>שוק</em>',
-        big: lead.text, sub: 'הנה למה', dir: leadDir,
-        gesture: GEST[leadDir] ?? 'explain', seed, palette: ground(0), own: true,
-        say: `Here's the U S market today. ${sayTape(quotes)}`.trim() }
-    // No plausible figure in the whole window is rare and is not worth
-    // inventing a hook over. The old card stands, honestly thin.
-    : { type: 'scene', headline: 'היום בשוק', marked: 'היום ב<em>שוק</em>',
-        sub: hhmm(w.end), dir: '', gesture: 'welcome', seed,
-        palette: ground(0), own: true,
-        say: `Here's the U S market today. ${sayTape(quotes)}`.trim() }];
-
-  // 02-06 · the news, one story a scene, biggest first.
-  order.forEach((p, i) => slides.push(scene(p, i + 1)));
-
-  // 06 · the ask. A stranger who watched to the end is the only
-  // person on this platform worth asking for anything.
-  // The last card asks for a comment, the strongest signal a reel can
-  // earn; the forward ask moves to the caption, where it costs no card.
-  const ask = process.env.REEL_CLOSE_ASK || 'עולה או יורד מחר?';
-  slides.push({ type: 'scene', headline: ask, marked: markWord(ask, null),
-    sub: 'כתבו בתגובות', dir: '', gesture: 'point', seed: seed + 99,
-    palette: ground(beats.length + 1), own: true,
-    say: process.env.REEL_SAY_CLOSE || "That's the day. Send it to someone who trades." });
-
-  return {
-    key: `R:${w.key}`, template, window: span(w), date: ddmmyy(w.end),
-    stamp, quotes, slides,
-    caption: (() => {
-      const day = dayLines(quotes, seed);
-      const c = caption(parsed, w).replace(/\n💬 [^\n]*\n/, `\n💬 ${REEL_ASK}\n📩 ${process.env.REEL_SEND_ASK || SEND[seed % SEND.length]}\n`);
-      const extra = [day?.money ? `💰 ${day.money} (${day.note})` : null, day?.ron ? `🧑 ${day.ron}` : null].filter(Boolean).join('\n');
-      if (!extra) return c;
-      const at = c.indexOf('\n\n');
-      return at < 0 ? `${extra}\n\n${c}` : `${c.slice(0, at)}\n\n${extra}${c.slice(at)}`;
-    })(),
-    consumed: all.map(p => p.tg_id), carry: nextCarry,
-  };
-}
-
-const MAX_STORIES = Number(process.env.MAX_STORIES || 3);
-
-/** The channel the account points at, in one place. */
-// One home for the address, because it moves. It moved on 6 September
-// — the channel renamed from nq_es_hunters to hamal_shukhahon — and
-// every board that prints it, the story strip and the evening card
-// alike, reads this constant.
-export const TG_LINK = 't.me/hamal_shukhahon';
-
-/**
- * The same hour, told as stories instead of summarised as a post.
- *
- * A digest answers "what happened between 15:15 and 21:15"; a story
- * answers "what just happened". So this does not summarise: it takes
- * the few highest-scoring updates of the window and gives each one a
- * whole board. Up to three, because a viewer taps through stories and
- * the fourth is where they leave.
- *
- * It reads the same messages as compose() and marks them on a
- * separate cursor, so telling an hour as stories never costs the
- * digest that will later summarise it.
- */
-function composeStoriesRaw(rows, { carry = {}, endTs = null, template = null, tally = 0, catchup = false, story = null, palette = null, analysts = null } = {}) {
-  const all = rows.map(parse).filter(Boolean).map(p => ({ ...p, score: score(p) }));
-  const w0 = all.length ? windowOf(all[0].ts) : null;
-  const nothing = reason => ({ key: w0?.key ?? null, skip: reason, slides: [],
-    consumed: all.map(p => p.tg_id), carry: tape(all, carry).carry });
-  if (!all.length) return nothing('empty');
-
-  const parsed = dedupe(all.filter(p => !isSnapshot(p)));
-  if (!parsed.length) return nothing('snapshots-only');
-
-  const w0m = windowOf(parsed[0].ts);
-  const w = endTs && endTs > w0m.end ? { ...w0m, end: endTs } : w0m;
-  const { quotes, carry: nextCarry, stamp } = tape(all, carry);
-
-  const picks = [...parsed].sort((a, b) => b.score - a.score || b.ts - a.ts)
-    .slice(0, MAX_STORIES);
-
-  // Which board an update gets.
-  //
-  // THE HEADLINE LEADS. This list used to open with the figure and the
-  // interpretation and leave the news last, which was survivable while
-  // a set was three boards — you got a number, a meaning and a
-  // headline, and the mix read as an hour's work. At ONE board a set
-  // the order stopped being a preference and became a verdict, and it
-  // always fell the same way: a note is worth four of the seven points
-  // a message can score, so the top-scored update almost always
-  // carries one, and every story on the account came out
-  // MEANING · משמעות. Four in a row, and no news at all.
-  //
-  // So the news board is the default and the other two are seasoning:
-  // two hours of headlines, then one that reads the number or the
-  // meaning behind it. The turn comes from the hour itself, so it
-  // advances without anything having to be remembered between runs.
-  const hourNo = Math.floor(w.start / 3600);
-  const seasoned = hourNo % 3 === 2;
-  // Among the seasoned hours, alternate which one it is. Preferring
-  // the figure every time would bury the meaning board again — most
-  // updates carry a number, so it would always win and the
-  // interpretation would show up about as often as it did before,
-  // which is to say never.
-  const prefersFigure = Math.floor(hourNo / 3) % 2 === 0;
-
-  const options = p => {
-    const out = [];
-    const fig = p.figures?.[0];
-    // A board told at the time says "now"; a board told late says the
-    // hour it is about. The masthead carries the span either way, but
-    // the eyebrow is the word a reader takes on trust, and a catch-up
-    // that still says "now" is the one thing that would make the
-    // track dishonest rather than merely late.
-    const news = { type: 'cover', eyebrow: catchup ? hhmm(p.ts) : 'עכשיו',
-      headline: brevity(p.headline, 100), stand: brevity(p.stand, 100), source: p.source, photo: p.photo };
-    if (!seasoned) out.push(news);
-    const hero = fig && p.figureCount < 4
-      ? { type: 'hero', figure: fig.text.replace(/[−־]/g, '-'),
-          dir: direction(fig.text, `${p.headline} ${p.stand ?? ''}`),
-          quote: p.stand || p.headline, source: p.source }
-      : null;
-    if (hero && prefersFigure) out.push(hero);
-    // Even the meaning board names the story it is about. It has always
-    // had the slot for it and was never given one, so a reader who met
-    // the account on an interpretation board got a verdict about news
-    // they had never been told.
-    // The board shows its working. A verdict with nothing under it is
-    // an opinion; the same verdict with the reported facts above it is
-    // an argument the reader can check and disagree with. Everything
-    // here comes from the message itself — the headline it is about,
-    // the reporting lines beneath it, and the figure if the update
-    // carried a clean one. Nothing is inferred.
-    if (p.note) {
-      const basis = p.reporting.slice(0, 2);
-      const fg = p.figures.length && p.figureCount < 4
-        ? p.figures[0].text.replace(/[−־]/g, '-') : null;
-      // Pulled out only when it is not already sitting in the line
-      // underneath it — otherwise the board says 41% twice, once big
-      // and once mid-sentence, and reads as a stutter rather than a
-      // headline number.
-      const stat = fg && !basis.some(b => b.includes(fg)) ? fg : null;
-      out.push({ type: 'note', about: p.headline, text: p.note,
-        basis, stat, source: p.source });
-    }
-    if (hero && !prefersFigure) out.push(hero);
-    // Always last as well, so a seasoned hour with neither a figure
-    // nor a note still has news to fall back on.
-    if (seasoned) out.push(news);
-    return out;
-  };
-
-  // Archetypes AND grounds rotate down the set: an hour whose three
-  // updates all happen to be plain headlines should still look like
-  // three boards, not one board three times. The two grounds come
-  // from the template, so a set is recognisably one hour's work while
-  // the next hour looks different.
-  const tpl = template ? byId(template) : null;
-  const seed = [...w.key].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const DARK = ['ink', 'deep', 'slate'];
-
-  const slides = [];
-  let prev = null;
-  for (const [i, p] of picks.entries()) {
-    const opts = options(p);
-    const pick = opts.find(o => o.type !== prev) ?? opts[0];
-    // The cover's photo bleeds behind a scrim mixed for a dark ground.
-    // On paper or on a colour field that scrim is a smear, so a board
-    // carrying a picture keeps a dark one.
-    // A story is one board, so it has one ground — the template's —
-    // rather than a post's alternating pair. A board carrying a
-    // picture still overrides to a dark world, because the scrim is
-    // mixed for one.
-    const pal = pick.photo
-      ? DARK[(seed + i) % DARK.length]
-      : (palette ?? (tpl ? (i % 2 ? tpl.b : tpl.a) : DARK[(seed + i) % DARK.length]));
-    slides.push({ ...pick, palette: pal, story });
-    // The analysts' word gets a board of its own, and only when a bank
-    // actually covered THIS company: a story set is one board an hour
-    // and a second one that is not about the story is filler.
-    const an = analysts?.length && process.env.ANALYST_NOTE !== '0' && process.env.STORY_ANALYST !== '0'
-      ? noteFor(`${p.headline} ${p.stand ?? ''}`, analysts, { skip: p.tg_id, seed: seed + i }) : null;
-    if (an?.about === 'story') slides.push({ type: 'analystNote', note: an, palette: pal, story });
-    prev = pick.type;
-  }
-
-  if (!slides.length) return { ...nothing('thin'), slides };
-
-  // ── the Telegram strip, every sixth board ─────────────────
-  //
-  // Not a board of its own — the ask was for it ON the story — and
-  // not a link sticker either, because Instagram's publishing API has
-  // no parameter for one. Link stickers, polls and countdowns are all
-  // app-only; nothing written here can make a published story tappable.
-  // So the strip is the address, printed on the news board itself,
-  // where the tappable route is the profile and the bio link under it.
-  //
-  // `tally` is how many boards have been told since the last strip and
-  // it survives between runs in Postgres: a set is two or three boards,
-  // so a rule counted inside one set would fire either never or every
-  // single time.
-  const every = Number(process.env.STORY_CTA_EVERY || 6);
-
-  const told = [];
-  let t = tally;
-  for (const s of slides) {
-    t++;
-    told.push(t >= every ? { ...s, tgStrip: TG_LINK } : s);
-    if (t >= every) t = 0;
-  }
-
-  return {
-    key: `S:${w.key}`,
-    template,
-    tally: t,
-    window: span(w),
-    date: ddmmyy(w.end),
-    stamp, quotes, slides: told,
-    // Every message in the window is marked, not just the three that
-    // were told — otherwise the two that lost would resurface as the
-    // "latest" news an hour after they stopped being it.
-    consumed: all.map(p => p.tg_id),
-    carry: nextCarry,
-  };
-}
-
-/**
- * §07: "Slides carry headlines and figures. The reporting lives in
- * the caption, where it is searchable." So the caption is the full
- * text — emoji kept, unlike on the slides.
- */
-/**
- * What this window is ABOUT, in the words people search.
- *
- * Instagram now ranks on keywords rather than hashtags, and Google
- * indexes captions — so the terms have to appear in the prose, near
- * the top, phrased like a sentence. The tags at the end are for
- * categorisation, three to five of them; thirty reads as spam and has
- * not driven discovery for years.
- *
- * Detection is deterministic, like everything else here: a term is in
- * the caption because the window actually mentioned it.
- */
 const TOPICS = [
   { re: /נאסד|nasdaq|NQ\b/i,                    word: 'נאסד״ק',        tag: 'נאסדק',    en: 'the Nasdaq' },
   { re: /S&P|אס אנד פי|ES\b/i,                  word: 'S&P 500',       tag: 'SP500',    en: 'the S and P 500' },
@@ -1411,504 +201,216 @@ const TOPICS = [
   { re: /דוחות|earnings|רווחי/i,                 word: 'עונת הדוחות',   tag: 'דוחות',    en: 'earnings' },
 ];
 
-/** The topics this window genuinely touches, most-mentioned first. */
-function topicsIn(parsed) {
-  const hay = parsed.map(p => `${p.headline} ${p.stand ?? ''} ${p.note ?? ''}`).join(' ');
-  return TOPICS.filter(t => t.re.test(hay));
-}
+// ── the comment ask ──────────────────────────────────────────
+// A comment is the strongest signal a post can earn, and the account
+// has had none. One plain question at the end of every caption, never a
+// question about what to buy or sell. Rotates by window, so the same
+// line does not sit under every post.
+export const ASKS = [
+  'מה לדעתכם יקרה מחר? כתבו בתגובות: עולה או יורד',
+  'מה הכי הפתיע אתכם היום? כתבו בתגובות',
+  'על איזו חברה תרצו שנסביר מחר? כתבו בתגובות',
+  'היה ברור, או שצריך הסבר? כתבו בתגובות',
+];
+export const askLine = (seed = 0) => process.env.CAPTION_ASK === '0' ? ''
+  : `💬 ${ASKS[Math.abs(Math.floor(seed)) % ASKS.length]}`;
+/** The reel's last card: the same ask, short enough for a moving card. */
+export const REEL_ASK = 'עולה או יורד מחר? כתבו בתגובות';
 
-export function caption(parsed, w) {
-  // Instagram's ceiling is 2200. Sit under it: Meta counts its own way
-  // (an emoji is not one character to everyone) and a caption that is
-  // four characters over costs the entire window — 36004/2207010, at
-  // the very last call, after eight slides have already been rendered
-  // and uploaded.
-  const LIMIT = 2120;
-  // The "+N in telegram" line is written AFTER the loop that decides
-  // what fits, so its length has to be reserved before it exists. Not
-  // reserving it is exactly how a caption lands a few chars over.
-  const RESERVE = 48;
-
-  // Keywords first, because that is where search looks and where a
-  // reader decides. One natural line naming what the window is about,
-  // then the lead headline.
-  const topics = topicsIn(parsed);
-  const named = topics.slice(0, 4).map(t => t.word).join(' · ');
-  const opener = named
-    ? `שוק ההון האמריקאי | ${named}\n\n`
-    : 'שוק ההון האמריקאי | עדכון מהמסחר\n\n';
-
-  // Three to five, and only ones the window earned. The two standing
-  // tags are what the account itself is, so it stays findable on days
-  // when nothing else matches.
-  const tags = ['שוקההון', 'מסחר', ...topics.slice(0, 3).map(t => t.tag)]
-    .filter((t, i, a) => a.indexOf(t) === i).slice(0, 5)
-    .map(t => '#' + t).join(' ');
-
-  const ask = askLine(Math.floor(w.start / 3600));
-  const foot = `\n${ask ? `${ask}\n\n` : ''}עדכון ${span(w)} · @marketalert.il\n${tags}`;
-  const head = opener + parsed[0].headline + '\n';
-
-  // Whole stories, never a half one. Slicing at 2200 cut mid-word on
-  // every busy window; dropping the tail story is the honest version.
-  let body = '', dropped = 0;
-  for (const [i, p] of parsed.entries()) {
-    // The lead's headline is already the line above; repeating it as
-    // the first bullet spent the two most valuable lines of the
-    // caption saying the same thing twice.
-    const block = [i === 0 ? null : `▪ ${p.headline}`, ...p.reporting.map(clean),
-      p.note ? `💡 ${p.note}` : null, p.source ? `מקור: ${p.source}` : null, '']
-      .filter(Boolean).join('\n') + '\n';
-    if (head.length + body.length + block.length + foot.length + RESERVE > LIMIT) { dropped++; continue; }
-    body += block;
-  }
-  const more = dropped ? `(+${dropped} עדכונים בטלגרם)\n` : '';
-  let out = head + body + more + foot;
-
-  // Belt and braces. Everything above is arithmetic on estimates; this
-  // is the only line that guarantees the result. Whole lines go, never
-  // half a word.
-  if (out.length > LIMIT) {
-    const lines = (head + body).split('\n');
-    while (lines.length > 1 && lines.join('\n').length + more.length + foot.length > LIMIT) lines.pop();
-    out = lines.join('\n') + '\n' + more + foot;
-  }
-  return out;
-}
-
-// ── the callback deck ────────────────────────────────────────
-//
-// One board, built from one settled claim. Everything on it is a
-// fact the database can produce: the date we published, the headline
-// we published, the close before it and the close after. No adjective
-// is added anywhere in this function — if the move was small, the
-// board says a small number, and the rule that let it get this far
-// (callback.js) is where the size is judged.
-
-/** "יומיים", not "2 ימים" — Hebrew has a dual and using it matters. */
-function sessions(n) {
-  if (n <= 1) return 'יום מסחר אחד';
-  if (n === 2) return 'יומיים';
-  return `${n} ימי מסחר`;
-}
-
-const cut = (t, max = 96) => {
-  const s = String(t ?? '').replace(/\s+/g, ' ').trim();
-  if (s.length <= max) return s;
-  const at = s.lastIndexOf(' ', max);
-  return `${s.slice(0, at > 40 ? at : max)}…`;
-};
-
-/** A close, written the way a trader reads it. */
-function px(v, klass) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return '—';
-  const dp = klass === 'stock' ? 2 : (Math.abs(n) >= 1000 ? 0 : 2);
-  return n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
-}
-
-/** Postgres hands a `date` back as a Date; a fixture hands a string. */
-function dayOf(v) {
-  if (!v) return '';
-  const iso = v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10);
-  const [, m, d] = iso.split('-');
-  return `${d}.${m}`;
-}
-
-// Three ways to say one true thing.
-//
-// A proof board that looks identical every time stops being read
-// after the second one, and this is the format the account most needs
-// people to keep reading. The variant comes from the claim's own id,
-// so a rerun reproduces the board it reran and two boards in a day
-// are never the same shape.
-const PROOF_VARIANTS = ['proofCert', 'proofVerdict'];
+// ── the card ─────────────────────────────────────────────────
+const TOPIC_OF = s => TOPICS.find(t => t.re.test(`${s.headline} ${s.lead ?? ''}`))?.word ?? null;
 
 /**
- * One settled claim as one board.
- *
- * "אמרנו" is only ever printed over a post that actually made the
- * claim. A follow-up — we covered this, here is what happened since —
- * says exactly that instead, on the same three layouts.
+ * One story as one card. `label`/`mean` is the single line under the
+ * headline: the channel's 💡 line when it wrote one ("מה זה אומר"),
+ * else where the indices stand ("איפה אנחנו"), else its first
+ * reported sentence ("מה קרה").
  */
-export function proofSlide(claim, { palette = null, variant = null } = {}) {
-  const move = Number(claim.move_pct);
-  const dir = move >= 0 ? 'up' : 'dn';
-  const forecast = claim.kind === 'forecast';
-  const figure = `${move > 0 ? '+' : ''}${move.toFixed(1)}%`;
-  const said = cut(claim.headline, 72);
-  const sub = `${claim.asset} · ${sessions(Number(claim.days_after) || 1)} אחרי`;
-  const type = variant ?? PROOF_VARIANTS[Number(claim.id ?? 0) % PROOF_VARIANTS.length];
-  const path = Array.isArray(claim.path) ? claim.path : null;
+// A figure is printed with its sign. The channel often writes "יורד
+// 2.6%" with a bare number; the card says -2.6% in red, never a bare
+// figure in a colour the reader has to decode.
+export const signed = (fig, dir) => !fig ? null
+  : /^[+-]/.test(fig) ? fig : dir === 'dn' ? `-${fig}` : dir === 'up' ? `+${fig}` : fig;
 
-  // The middle link. Without it the board says "we were right" and
-  // stops, which is a coincidence told loudly; with it the board says
-  // why we thought so, which is the only version worth publishing.
-  // It is the channel's own interpretation line, never ours.
-  const why = cut(claim.reason ?? '', 100) || null;
-
-  const base = { palette, dir, figure, said, sub, type, path, why,
-    fromPx: px(claim.base_px, claim.klass), toPx: px(claim.out_px, claim.klass),
-    fromLabel: `לפני הפוסט · ${dayOf(claim.base_date)}`,
-    toLabel: `אחרי · ${dayOf(claim.out_date)}`,
-    tag: forecast ? 'אומת' : 'מעקב',
-    method: 'נמדד ממחיר הסגירה שלפני הפוסט' };
-
-  // The seal says what was actually verified. A forecast that landed
-  // may say so; a follow-up says what it is, on the same sheet.
-  // The loudest line on the board, and the only one that is about
-  // the account rather than the news. Two words, so it can be set at
-  // display size without wrapping: what we did, and what happened.
-  const stamp = forecast ? 'אמרנו. והתממש.' : 'סיקרנו. והמשיך.';
-  const when = `פורסם ${dmy(Number(claim.posted_at))} · אומת ${dayOf(claim.out_date)}`;
-  if (type === 'proofVerdict') return { ...base, stamp, when };
-  return { ...base, stamp, when };
+export function cardOf(s, { eyebrow = null, day = null, story = null, palette = null } = {}) {
+  const [label, mean] = s.meaning ? ['מה זה אומר', s.meaning]
+    : s.where ? ['איפה אנחנו', s.where]
+    : s.lead ? ['מה קרה', s.lead] : [null, null];
+  return {
+    type: 'card', eyebrow: eyebrow ?? TOPIC_OF(s) ?? (s.kind === 'flash' ? 'מבזק' : 'וול סטריט'),
+    headline: s.headline, label, mean,
+    figure: signed(s.figure, s.dir), dir: s.dir,
+    photo: s.image?.url ? { src: s.image.url } : null,
+    credit: s.image?.credit ?? null,
+    day, story, palette, tg_id: s.tg_id,
+  };
 }
 
-/** One board, for the story track. */
-function composeCallbackRaw(claim, { palette = null, now = null, variant = null } = {}) {
+/** The tape (index moves) from the old-format levels, for the ₪ line. */
+function tapeOf(rows, carry, now) {
+  const parsed = rows.map(parse).filter(Boolean);
+  return tape(parsed, carry, now);
+}
+
+// ── 21:00 · השוק בערב ────────────────────────────────────────
+/**
+ * Three cards. The first is THE DAY: the channel's latest market read
+ * (its 🧭 post, which carries "📊 איפה אנחנו"), or the top story when
+ * it wrote none. Then the two biggest stories, never the same story
+ * twice. The first card carries the reader's money.
+ */
+function composeEveningRaw(rows, { now = null, carry = {}, cards = 3 } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
-  return {
-    key: `C:${localDay(at)}T${hhmm(at)}`,
-    window: `${dmy(Number(claim.posted_at))}\u2013${dmy(at)}`,
-    date: ddmmyy(at),
-    stamp: '', quotes: [],
-    slides: [proofSlide(claim, { palette, variant })],
-    claimId: claim.id,
-  };
+  const consumed = (rows ?? []).map(r => Number(r.tg_id));
+  const stories = storiesOf(rows, { now: at });
+  const { quotes, carry: nextCarry, stamp } = tapeOf(rows ?? [], carry, at);
+  if (!stories.length) return { key: `E:${localDay(at)}`, skip: 'no story', slides: [], consumed, carry: nextCarry };
+
+  const read = stories.filter(s => s.kind === 'read').sort((a, b) => b.ts - a.ts)[0] ?? null;
+  const lead = read ?? stories[0];
+  const rest = stories.filter(s => s !== lead && s.kind !== 'read').slice(0, cards - 1);
+  const seed = Math.floor(at / 86400);
+  const day = dayLines(quotes, seed);
+  const slides = [
+    cardOf(lead, { eyebrow: SERIES.digest, day }),
+    ...rest.map(s => cardOf(s)),
+  ];
+
+  const lines = [lead, ...rest].map((s, i) => {
+    const c = slides[i];
+    return `${['1️⃣', '2️⃣', '3️⃣'][i] ?? '▪'} ${s.headline}${c.mean ? `\n${c.mean}` : ''}`;
+  }).join('\n\n');
+  const credits = slides.map(c => c.credit).filter(Boolean);
+  const caption = [
+    `${SERIES.digest} | ${ddmmyy(at)}`, '',
+    lines, '',
+    day?.money ? `💰 ${day.money} (${day.note})` : null,
+    day?.ron ? `🧑 ${day.ron}` : null,
+    askLine(seed), '',
+    SCHEDULE,
+    credits.length ? credits.join(' · ') : null,
+    '@marketalert.il',
+    tagsOf(stories),
+  ].filter(x => x !== null).join('\n').replace(/\n{3,}/g, '\n\n').slice(0, 2120);
+
+  return { key: `E:${localDay(at)}`, template: null, window: ddmmyy(at), date: ddmmyy(at),
+    stamp, quotes, slides, caption, consumed, carry: nextCarry, format: 'cards' };
 }
 
-// ── the proof post ───────────────────────────────────────────
-//
-// The stories reach followers. This is the one that reaches the grid,
-// where a stranger decides in two seconds whether an account is worth
-// following — and "here is what we said and here is what the market
-// did, twice, with the closes" is the strongest two seconds this
-// account has.
-//
-// It is never a single call. One proven call is a story; a post has
-// to be a RECORD, which is why it needs two and ends on the method.
+function tagsOf(stories) {
+  const hay = stories.map(s => `${s.headline} ${s.lead ?? ''}`).join(' ');
+  const t = TOPICS.filter(x => x.re.test(hay)).slice(0, 3).map(x => x.tag);
+  return ['שוקההון', 'וולסטריט', ...t].filter((v, i, a) => a.indexOf(v) === i).slice(0, 5).map(x => `#${x}`).join(' ');
+}
 
-const PROOF_GROUNDS = ['deep', 'ink', 'slate'];
+// ── stories ──────────────────────────────────────────────────
+const MAX_STORIES = Number(process.env.MAX_STORIES || 1);
+export const TG_LINK = 't.me/hamal_shukhahon';
 
 /**
- * The record board's rows: the strongest hits and the worst misses.
- *
- * Ten hits and half as many misses, both ranked by size and neither
- * chosen by us: a hit by how far the market went our way, a miss by how
- * far it went against us. A board of only the best would be the same
- * lie as a count with no denominator.
+ * The hour as story cards: the top story(ies) of the window, one card
+ * each, the Telegram address printed every sixth board. Same return
+ * shape the story runner has always read.
  */
-export function rankRecord(rows, { hits = 10, misses = 5 } = {}) {
-  const isHit = r => ['hit', 'shown'].includes(r.status);
-  const move = r => Number(r.move_pct) || 0;
-  const wrong = r => (r.dir === 'up' ? -move(r) : move(r));   // how far against the call
-  return {
-    hits: dedupeCalls((rows ?? []).filter(isHit).sort((a, b) => Math.abs(move(b)) - Math.abs(move(a)))).slice(0, hits),
-    misses: dedupeCalls((rows ?? []).filter(r => r.status === 'miss').sort((a, b) => wrong(b) - wrong(a))).slice(0, misses),
-  };
-}
+function composeStoriesRaw(rows, { carry = {}, endTs = null, tally = 0, catchup = false } = {}) {
+  const consumed = (rows ?? []).map(r => Number(r.tg_id));
+  const first = Math.min(...(rows ?? []).map(r => Number(r.ts)).filter(Boolean));
+  const w0 = Number.isFinite(first) ? windowOf(first) : null;
+  const w = w0 && endTs && endTs > w0.end ? { ...w0, end: endTs } : w0;
+  const { quotes, carry: nextCarry, stamp } = tapeOf(rows ?? [], carry, w?.end ?? null);
+  const nothing = reason => ({ key: w ? `S:${w.key}` : null, skip: reason, slides: [], consumed, carry: nextCarry });
+  if (!w) return nothing('empty');
+  const stories = storiesOf(rows, { now: w.end }).filter(s => s.kind !== 'read' || rows.length < 3);
+  if (!stories.length) return nothing('thin');
 
-/** The post that made a call, as it ran. */
-export function originalSlide(claim) {
-  return { type: 'proofOrig', palette: null, tag: 'המקור',
-    eyebrow: `הפוסט המקורי · ${dmy(Number(claim.posted_at))}`,
-    src: claim.src_url,
-    caption: 'ככה זה פורסם, לפני התנועה.' };
-}
-
-/** One call per instrument, direction and market day. */
-export function dedupeCalls(rows) {
-  const seen = new Set();
-  return (rows ?? []).filter(c => {
-    const k = `${c.symbol}|${c.dir ?? ''}|${localDay(Number(c.posted_at))}`;
-    if (seen.has(k)) return false;
-    seen.add(k); return true;
+  const every = Number(process.env.STORY_CTA_EVERY || 6);
+  let t = tally;
+  const slides = stories.slice(0, MAX_STORIES).map(s => {
+    const c = cardOf(s, { eyebrow: catchup ? hhmm(s.ts) : (TOPIC_OF(s) ?? 'עכשיו') });
+    t++;
+    if (t >= every) { t = 0; return { ...c, tgStrip: TG_LINK }; }
+    return c;
   });
+  return { key: `S:${w.key}`, template: null, tally: t, window: span(w), date: ddmmyy(w.end),
+    stamp, quotes, slides, consumed, carry: nextCarry };
 }
+
+// ── Sunday · השבוע בדקה — the week's only reel ────────────────
+const GEST = { up: 'yes', dn: 'pause', '': 'explain' };
+const DARK = ['ink', 'deep', 'midnight', 'abyss', 'basalt', 'navy'];
 
 /**
- * "49 out of 119", said plainly. `score` is { hit, miss }; a record
- * that only knows its hits cannot be written, so without `miss` the
- * caller gets null and falls back to wording that claims no rate.
+ * Six scenes, ~15 seconds: the week's biggest move, its three biggest
+ * stories, how many of the week's calls came true, and the question.
+ * Ron opens and closes; the middle is the news.
  */
-function ratio(score) {
-  if (!score || typeof score.miss !== 'number') return null;
-  const hit = Number(score.hit) || 0, tot = hit + score.miss;
-  return tot ? { hit, tot, pct: Math.round(hit / tot * 100) } : null;
-}
-
-function composeCallbackPostRaw(hits, { now = null, score = null, recent = null, board = null } = {}) {
+function composeWeekReelRaw(rows, { now = null, score = null } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
-  if (!hits?.length) return { skip: 'nothing proven' };
+  const stories = storiesOf(rows, { now: at, decayHours: 72 }).filter(s => s.kind !== 'read');
+  if (stories.length < 3) return { skip: 'thin week', slides: [] };
+  const top = stories.slice(0, 3);
+  const seed = Math.floor(at / 86400);
+  const ground = i => DARK[(seed + i) % DARK.length];
+  const big = [...stories].filter(s => s.figure && (s.dir === 'up' || s.dir === 'dn'))
+    .sort((a, b) => Math.abs(parseFloat(b.figure)) - Math.abs(parseFloat(a.figure)))[0] ?? null;
 
-  // The grounds come from the archetype now — paper for the
-  // receipts, the accent field for the verdict — so the cards only
-  // have to alternate SHAPE, which they do by variant.
-  // A call with its original post gets two boards: the post as it ran,
-  // then what the market did. A claim is only as good as the proof that
-  // it was made before the move, and that proof is the post itself.
-  // An Instagram carousel holds ten, so the originals stop when the
-  // cover, the record and the verdicts no longer leave room for them.
-  const LIMIT = 10;
-  const rowsOf = (list, title, ok) => {
-    const out = [];
-    for (let i = 0; i < list.length; i += 5) out.push({
-      type: 'recordRows', palette: null, tag: 'השיא',
-      eyebrow: list.length > 5 ? `${title} · ${i / 5 + 1} מתוך ${Math.ceil(list.length / 5)}` : title,
-      title,
-      items: list.slice(i, i + 5).map(h => ({
-        asset: h.asset, when: dmy(Number(h.posted_at)),
-        move: `${Number(h.move_pct) > 0 ? '+' : ''}${Number(h.move_pct).toFixed(1)}%`,
-        dir: Number(h.move_pct) >= 0 ? 'up' : 'dn', ok,
-        said: cut(h.headline, 48) })),
-      note: ok ? 'מדורגות לפי גודל התנועה לכיוון שאמרנו.'
-               : 'מדורגים לפי גודל התנועה נגד מה שאמרנו. אלה הפספוסים הגדולים, לא נבחרו.',
-    });
-    return out;
+  // A reel card is read in two seconds: the parenthetical "(לפני שנה
+  // $2.87)" goes, the rest is cut at a clause.
+  const short = h => String(h).replace(/\s*\([^)]{1,40}\)/g, '').trim();
+  const scene = (s, i) => {
+    const fit = fitCard(short(s.headline));
+    return { type: 'scene', headline: fit.text, marked: markWord(fit.text, s.figure ? [{ text: s.figure }] : null),
+      sub: signed(s.figure, s.dir), dir: s.dir || '', gesture: GEST[s.dir || ''], seed: seed + i * 7,
+      photo: s.image?.url ? { src: s.image.url } : null, palette: ground(i), ron: null };
   };
-  const extra = board ? [...rowsOf(board.hits, `${board.hits.length} הקריאות החזקות ביותר`, true),
-    ...rowsOf(board.misses, `${board.misses.length} הפספוסים הגדולים`, false)] : [];
-  let spare = LIMIT - 2 - extra.length - hits.length;
-  const cards = hits.flatMap((h, i) => {
-    const card = proofSlide(h, { palette: null, variant: PROOF_VARIANTS[i % PROOF_VARIANTS.length] });
-    if (h.src_url && spare > 0) { spare--; return [originalSlide(h), card]; }
-    return [card];
-  });
+  const tot = score ? (Number(score.hit) || 0) + (Number(score.miss) || 0) : 0;
+  const slides = [
+    big ? { type: 'scene', lead: true, headline: TOPIC_OF(big) ?? fitCard(big.headline).text,
+        marked: esc(TOPIC_OF(big) ?? ''), big: signed(big.figure, big.dir), sub: 'השבוע בדקה', dir: big.dir,
+        gesture: GEST[big.dir], seed, palette: ground(0), own: true }
+      : { type: 'scene', headline: 'השבוע בשוק', marked: 'השבוע ב<em>שוק</em>', sub: 'השבוע בדקה',
+        dir: '', gesture: 'welcome', seed, palette: ground(0), own: true },
+    ...top.map((s, i) => scene(s, i + 1)),
+    ...(tot ? [{ type: 'scene', headline: `צדקנו ${score.hit} מתוך ${tot}`, marked: `צדקנו <em>${score.hit}</em> מתוך ${tot}`,
+      sub: 'התחזיות של השבוע', dir: '', gesture: 'explain', seed: seed + 50, palette: ground(4), own: true, ron: null }] : []),
+    { type: 'scene', headline: 'עולה או יורד השבוע?', marked: 'עולה או יורד <em>השבוע</em>?', sub: 'כתבו בתגובות',
+      dir: '', gesture: 'point', seed: seed + 99, palette: ground(5), own: true },
+  ];
+  const caption = [
+    `השבוע בדקה | ${dmy(at - 6 * 86400)}–${dmy(at)}`, '',
+    ...top.map((s, i) => `${['1️⃣', '2️⃣', '3️⃣'][i]} ${s.headline}`), '',
+    tot ? `🎯 צדקנו ${score.hit} מתוך ${tot} תחזיות השבוע. גם הפספוסים נספרים.` : null,
+    `💬 ${WEEK_ASK}`, '',
+    SCHEDULE, '@marketalert.il', tagsOf(stories),
+  ].filter(x => x !== null).join('\n').slice(0, 2120);
+  return { key: `R:${localDay(at)}`, window: dmy(at), date: ddmmyy(at), stamp: '', quotes: [],
+    slides, caption, week: true };
+}
+export const WEEK_ASK = 'עולה או יורד השבוע? כתבו בתגובות';
 
-  const n = hits.length;
-  const cover = {
-    type: 'coverProof', palette: null, tag: 'אומת',
-    method: 'כל מספר נמדד ממחירי סגירה',
-    eyebrow: `${SERIES.proof} · כל חמישי`,
-    headline: 'אמרנו. וזה מה שקרה.',
-    stand: `${n === 1 ? 'עדכון אחד' : `${n} עדכונים`} מהשבוע האחרון, `
-         + 'והמספרים שהגיעו אחריהם.',
-  };
+/** Kept for the voice path in run.js (off by default). */
+export const connective = i => ['', 'Also, ', 'Meanwhile, ', 'And '][Math.min(i, 3)];
 
-  // The record board, and the only place the method is written down.
-  // A hit rate with nothing under it is a number anybody can print, and
-  // a hit COUNT with no denominator is worse: it is the same number
-  // with the part that matters taken out. So the board says "N of M",
-  // and its rows are the latest settled forecasts, misses included.
-  const rt = ratio(score);
-  const shown = board ? [] : dedupeCalls(recent?.length ? recent : hits).slice(0, 5);
-  const items = shown.map(h => ({
-    asset: h.asset,
-    when: dmy(Number(h.posted_at)),
-    move: `${Number(h.move_pct) > 0 ? '+' : ''}${Number(h.move_pct).toFixed(1)}%`,
-    dir: Number(h.move_pct) >= 0 ? 'up' : 'dn',
-    ok: rt ? ['hit', 'shown'].includes(h.status) : undefined,
-  }));
-  const hit30 = rt ? rt.hit : (score?.hit ?? n);
-  const rec = {
-    type: 'record', palette: null, tag: 'השיא', method: 'ללא בחירת תאריכים בדיעבד',
-    eyebrow: rt ? 'תחזיות · 30 הימים האחרונים' : '30 הימים האחרונים',
-    count: String(hit30),
-    of: rt ? `מתוך ${rt.tot} תחזיות התממשו` : (hit30 === 1 ? 'עדכון שהשוק אישר' : 'עדכונים שהשוק אישר'),
-    items,
-    note: (rt ? 'כולל מה שלא התממש. ' : '')
-        + 'נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
-        + 'עד שלושה ימי מסחר. בלי בחירת תאריכים בדיעבד.',
-  };
-
-  const lines = hits.map(h =>
-    `▪ ${dmy(Number(h.posted_at))} · ${h.asset} — ${h.headline ?? ''}\n`
-    + `   ${Number(h.move_pct) > 0 ? '+' : ''}${Number(h.move_pct).toFixed(1)}% `
-    + `תוך ${sessions(Number(h.days_after) || 1)}`).join('\n');
-  const caption = `${SERIES.proof} | מה שאמרנו · ומה שקרה\n\n`
-    + `${lines}\n\n`
-    + (rt ? `הרשומה המלאה: ${rt.hit} מתוך ${rt.tot} תחזיות התממשו ב-30 הימים האחרונים (${rt.pct}%). `
-          + 'השאר לא התממשו, והן נספרות.\n' : '')
-    + (board ? `בשקפים האחרונים: ${board.hits.length} הקריאות החזקות ביותר, ו-${board.misses.length} הפספוסים הגדולים.\n` : '')
-    + 'כל מספר כאן נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
-    + 'עד שלושה ימי מסחר, בלי לבחור תאריכים בדיעבד.\n'
-    + `\n💬 איזו תחזית שלנו הכי הפתיעה אתכם? כתבו בתגובות\n\n`
-    + `עדכונים שוטפים · @marketalert.il\n`
-    + '#שוקההון #מסחר #וולסטריט';
-
-  return {
-    key: `CP:${localDay(at)}T${hhmm(at)}`,
-    window: `${dmy(Number(hits[hits.length - 1].posted_at))}\u2013${dmy(at)}`,
-    date: ddmmyy(at),
-    stamp: '', quotes: [],
-    slides: [cover, ...cards, rec, ...extra],
-    caption,
-    claimIds: hits.map(h => h.id),
-  };
+function markWord(headline, figures) {
+  const fig = figures?.[0]?.text;
+  const cands = [];
+  if (fig) cands.push(fig);
+  for (const t of TOPICS) { const m = t.re.exec(headline); if (m) cands.push(m[0]); }
+  for (const c of cands) {
+    const at = headline.indexOf(c);
+    if (at < 0) continue;
+    return esc(headline.slice(0, at)) + '<em>' + esc(c) + '</em>' + esc(headline.slice(at + c.length));
+  }
+  return esc(headline);
 }
 
-/**
- * The words somebody types into Instagram's search box.
- *
- * Search is a real discovery surface now and this account is invisible
- * in it: the captions were written for a reader who had already found
- * the post. These are the terms a person actually types in Hebrew when
- * they want to know what the market did — put in the caption prose as
- * well as the tags, because the index reads both and a reader only
- * reads one.
- */
+/** The words people type into Instagram search. */
 export function searchLine() {
   return 'שוק ההון האמריקאי · מה קרה היום בשוק · חדשות וול סטריט\n'
        + '#שוקההון #וולסטריט #מסחר #בורסה #השקעות #נאסדק #מניות';
 }
 
-// ── the proof reel ───────────────────────────────────────────
-//
-// Six beats, and the sequence is the argument: the claim, the date,
-// the reasoning, the evidence, the verdict, the record. A reel is
-// watched with the sound off at arm's length, so each beat is one
-// idea at one size, and the only one that repeats is the colour.
-function composeProofReelRaw(claim, { now = null, score = null } = {}) {
-  const at = now ?? Math.floor(Date.now() / 1000);
-  const move = Number(claim.move_pct);
-  const dir = move >= 0 ? 'up' : 'dn';
-  const forecast = claim.kind === 'forecast';
-  const figure = `${move > 0 ? '+' : ''}${move.toFixed(1)}%`;
-  const days = sessions(Number(claim.days_after) || 1);
-  const why = cut(claim.reason ?? '', 130);
-  const path = Array.isArray(claim.path) ? claim.path : null;
-
-  // He opens the film and then gets out of the way. On the evidence
-  // beats the chart and the number ARE the subject, and a mascot
-  // standing in front of them is two subjects fighting.
-  const S = (beat, o) => ({ type: 'sceneProof', beat, dir, ron: beat === 'hook' ? undefined : null, ...o });
-  const slides = [
-    S('hook', { palette: null, ground: 'verd',
-      headline: forecast ? 'אמרנו.\nוהתממש.' : 'סיקרנו.\nוהמשיך.',
-      sub: `${claim.asset} · ${dmy(Number(claim.posted_at))}` }),
-    S('said', { ground: 'sheet',
-      eyebrow: forecast ? `מה אמרנו · ${dmy(Number(claim.posted_at))}`
-                        : `מה סיקרנו · ${dmy(Number(claim.posted_at))}`,
-      headline: cut(claim.headline, 78) }),
-    ...(why ? [S('why', { ground: 'sheet', eyebrow: 'למה', headline: why })] : []),
-    S('chart', { ground: 'sheet', eyebrow: 'ומה קרה', path,
-      fromPx: px(claim.base_px, claim.klass), toPx: px(claim.out_px, claim.klass),
-      // Written in words, not with an arrow: an arrow between two
-      // dates on an RTL line is reordered by the bidi algorithm and
-      // the range comes out backwards — which on this board would be
-      // a false statement about when the move happened.
-      sub: `מהסגירה ב-${dayOf(claim.base_date)} עד הסגירה ב-${dayOf(claim.out_date)}` }),
-    S('number', { ground: 'verd', eyebrow: claim.asset, big: figure,
-      sub: `${days} אחרי הפוסט` }),
-    S('record', { ground: 'sheet', eyebrow: '30 הימים האחרונים',
-      big: String(ratio(score)?.hit ?? score?.hit ?? 1),
-      headline: ratio(score) ? `מתוך ${ratio(score).tot} תחזיות התממשו` : 'קריאות שהשוק אישר',
-      sub: 'נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו. בלי בחירת תאריכים בדיעבד.' }),
-  ];
-
-  const caption = `${forecast ? 'אמרנו. והתממש.' : 'סיקרנו. והמשיך.'}\n\n`
-    + `${claim.headline ?? ''}\n`
-    + `פורסם ${dmy(Number(claim.posted_at))} · ${claim.asset} ${figure} תוך ${days}\n`
-    + (why ? `למה: ${why}\n` : '')
-    + `\nכל מספר נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, `
-    + `בלי לבחור תאריכים בדיעבד.\n\n💬 ציפיתם לזה? כתבו בתגובות\n\n${searchLine()}\n@marketalert.il`;
-
-  return { key: `R:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
-    stamp: '', quotes: [], slides, caption, claimId: claim.id, proof: true };
-}
-
-// ── the scoreboard reel ──────────────────────────────────────
-//
-// Once a week, the record itself as the film. Not a call — the
-// COLUMN of calls, which is the only thing that answers the question
-// a stranger actually has about a finance account: does this one
-// know what it is talking about, and how would I know.
-//
-// It runs on a Sunday, when the US market is shut and there is no
-// news worth a bulletin — the emptiest slot in the week, given to the
-// piece with the longest shelf life.
-function composeScoreboardReelRaw(hits, { now = null, score = null, days = 30, rows = 3 } = {}) {
-  const at = now ?? Math.floor(Date.now() / 1000);
-  if (!hits?.length) return { skip: 'nothing proven' };
-  const rt = ratio(score);
-  const n = rt ? rt.hit : (score?.hit ?? hits.length);
-
-  const row = h => {
-    const move = Number(h.move_pct);
-    return {
-      type: 'sceneProof', beat: 'row', ron: null, ground: 'sheet',
-      dir: move >= 0 ? 'up' : 'dn',
-      eyebrow: `${h.asset} · ${dmy(Number(h.posted_at))}`,
-      big: `${move > 0 ? '+' : ''}${move.toFixed(1)}%`,
-      headline: cut(h.headline, 60),
-      sub: `${sessions(Number(h.days_after) || 1)} אחרי הפוסט`,
-    };
-  };
-
-  const slides = [
-    { type: 'sceneProof', beat: 'hook', ground: 'verd',
-      headline: rt ? `${n} מתוך\n${rt.tot}\nתחזיות התממשו.` : `${n}\nקריאות.\nהשוק אישר.`,
-      sub: `${SERIES.scoreboard} · כל שני` },
-    ...hits.slice(0, rows).map(row),
-    { type: 'sceneProof', beat: 'record', ron: null, ground: 'sheet',
-      eyebrow: 'איך זה נמדד', big: String(n),
-      headline: rt ? `מתוך ${rt.tot} תחזיות. גם הפספוסים נספרים` : 'קריאות שהשוק אישר',
-      sub: 'ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, עד שלושה ימי מסחר. '
-         + 'בלי בחירת תאריכים בדיעבד.' },
-  ];
-
-  // The film shows the strongest few; the caption is the whole record.
-  const lines = hits.map(h =>
-    `▪ ${dmy(Number(h.posted_at))} · ${h.asset} ${Number(h.move_pct) > 0 ? '+' : ''}`
-    + `${Number(h.move_pct).toFixed(1)}% — ${h.headline ?? ''}`).join('\n');
-  const caption = (rt ? `${n} מתוך ${rt.tot} תחזיות התממשו ב-${days} הימים האחרונים (${rt.pct}%). השאר לא התממשו, והן נספרות.\n\nהקריאות שהתממשו:\n`
-    : `${n} קריאות שהשוק אישר ב-${days} הימים האחרונים\n\n`) + `${lines}\n\n`
-    + 'כל מספר נמדד ממחיר הסגירה שלפני הפוסט ועד הסגירה שאחריו, '
-    + 'עד שלושה ימי מסחר, בלי לבחור תאריכים בדיעבד.\n'
-    + `💬 איזו מהן ראיתם מגיעה? כתבו בתגובות\n\n${searchLine()}\n@marketalert.il`;
-
-  return { key: `R:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
-    stamp: '', quotes: [], slides, caption, scoreboard: true, claimIds: hits.map(h => h.id) };
-}
-
-
-// ── the analysts post ────────────────────────────────────────
-//
-// Once a week, what the investment banks said, with their names on it.
-// It is the account's answer to "what do you recommend", and the answer
-// is: here is what the firms that are licensed to recommend said, and
-// here is what we are not saying. Nothing on it is our view, and the
-// words "לא המלצה שלנו" are on the cover, every board and the caption.
-export const ANALYST_DISCLAIMER = 'דעות של בתי השקעות כפי שדווחו בערוץ. לא המלצה שלנו ולא ייעוץ השקעות.';
-
-function composeAnalystsRaw(rows, { now = null, perBoard = 3, boards = 3, min = 4 } = {}) {
-  const at = now ?? Math.floor(Date.now() / 1000);
-  const calls = analystsFrom(rows, { max: perBoard * boards });
-  if (calls.length < min) return { skip: `only ${calls.length} attributed analyst move(s) (need ${min})` };
-
-  const cover = {
-    type: 'cover', palette: null,
-    eyebrow: `${SERIES.analysts} · כל רביעי`,
-    headline: 'מה בתי ההשקעות אומרים השבוע',
-    stand: `${calls.length} דעות, כל אחת עם שם הבית שאמר אותה. לא ההמלצה שלנו.`,
-  };
-  const slides = [cover];
-  for (let i = 0; i < calls.length; i += perBoard) {
-    slides.push({ type: 'analysts', palette: null, eyebrow: 'דעות בתי ההשקעות · לא המלצה שלנו',
-      rows: calls.slice(i, i + perBoard), hint: TARGET_HINT, note: ANALYST_DISCLAIMER });
-  }
-  const lines = calls.map(c =>
-    `▪ ${c.firm} ${c.label}${c.target ? ` · יעד ${c.target}` : ''}\n   ${c.text}`).join('\n');
-  const caption = `${SERIES.analysts} | מה בתי ההשקעות אמרו השבוע\n\n`
-    + `${lines}\n\n${TARGET_HINT}.\n${ANALYST_DISCLAIMER}\n`
-    + 'החשבון הזה אינו יועץ השקעות מורשה. המידע לצורכי עניין בלבד.\n\n'
-    + `💬 איזה מהבתים האלה אתם הכי סומכים עליו? כתבו בתגובות\n\n`
-    + `${searchLine()}\n@marketalert.il`;
-  return { key: `AN:${localDay(at)}T${hhmm(at)}`, window: dmy(at), date: ddmmyy(at),
-    stamp: '', quotes: [], slides, caption, analysts: true, callIds: calls.map(c => c.tg_id) };
-}
-
-
-// ── the budget ───────────────────────────────────────────────
-// Every deck leaves this file inside the word budget in budget.js,
-// whichever function built it. Nothing below composes anything: it
-// is the one door all the composers go out through.
-export const compose = (...a) => budgeted(composeRaw(...a));
-export const composeReel = (...a) => budgeted(composeReelRaw(...a));
+// ── the budget: every deck goes out through it ────────────────
+export const composeEvening = (...a) => budgeted(composeEveningRaw(...a));
 export const composeStories = (...a) => budgeted(composeStoriesRaw(...a));
-export const composeCallback = (...a) => budgeted(composeCallbackRaw(...a));
-export const composeCallbackPost = (...a) => budgeted(composeCallbackPostRaw(...a));
-export const composeProofReel = (...a) => budgeted(composeProofReelRaw(...a));
-export const composeScoreboardReel = (...a) => budgeted(composeScoreboardReelRaw(...a));
-export const composeAnalysts = (...a) => budgeted(composeAnalystsRaw(...a));
+export const composeWeekReel = (...a) => budgeted(composeWeekReelRaw(...a));
