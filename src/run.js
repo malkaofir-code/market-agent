@@ -1404,8 +1404,23 @@ async function main() {
 
   await upsertWindow(w.key, w.start, w.end);
   if (!w.rows.length) { say(`SKIP — ${w.key} has no unconsumed messages`); return; }
+  // THE TEN-DAY OUTAGE (29 Oct – 8 Nov 2026)
+  //
+  // A photo-only message (tg 3933: an image, no text) sat in the
+  // 09:15 window of 28 Oct. parse() drops a message with no text, so
+  // the deck's `consumed` never named it, the window was posted and
+  // the message stayed unconsumed. Every tick after that picked the
+  // OLDEST unconsumed message — that one — landed on a window already
+  // marked posted, said "already posted" and went home. 137 messages
+  // and ten evenings went unposted, with nothing in the log but a
+  // skip. So: everything in a window is consumed when the window is
+  // done with, whether or not the parser could read it; and a window
+  // that is already posted consumes its leftovers before returning.
+  const everyRow = w.rows.map(r => Number(r.tg_id));
   if (!w.replay && (await getWindow(w.key))?.status === 'posted') {
-    say('SKIP —', w.key, 'already posted'); return;
+    say('SKIP —', w.key, `already posted — consuming ${everyRow.length} leftover message(s)`);
+    await markConsumed(w.key, everyRow);
+    return;
   }
 
   const carry = (await getState(CARRY_KEY)) ?? {};
@@ -1413,7 +1428,7 @@ async function main() {
   const deck = compose(w.rows, { carry, endTs: w.end, template: tpl.id, analysts: await analystsNow() });
   if (deck.carry) await setState(CARRY_KEY, deck.carry);
 
-  const consumed = deck.consumed.map(Number);
+  const consumed = [...new Set([...everyRow, ...deck.consumed.map(Number)])];
   if (deck.skip) {
     say('SKIP —', w.key, `(${deck.skip})`);
     if (!w.replay) {
