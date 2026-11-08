@@ -41,7 +41,18 @@ check('evening: opens on the day', types[0], 'dayCover');
 check('evening: 6–8 slides (under 5 underperforms)', types.length >= 6 && types.length <= 8, true);
 check('evening: the numbers board', types.includes('board'), true);
 check('evening: three stories', types.filter(t => t === 'card').length, 3);
-check('evening: the chart of the day', types.includes('chart'), true);
+check('evening: the chart of the day, as the cover or its own slide', types.includes('chart') || e.slides[0].variant === 'chart', true);
+check('evening: 7 slides at most', types.length <= 7, true);
+check('evening: the cover variant is recorded', ['chart', 'number'].includes(e.cover), true);
+for (const v of ['chart', 'number']) {
+  process.env.COVER_VARIANT = v;
+  const ev = composeEvening(rows, { now, series: { sym: '^NDX', points: pts } });
+  check(`evening (${v} cover): the chart is said once`, ev.slides.filter(s => s.type === 'chart' || s.chart).length, 1);
+  check(`evening (${v} cover): inside every budget`, ev.slides.flatMap(overBudget).length, 0);
+}
+delete process.env.COVER_VARIANT;
+check('evening: no card ends in "…"', e.slides.filter(s => s.type === 'card').every(s => !/…$/.test(s.mean ?? '') && !/…$/.test(s.headline)), true);
+check('evening: a card line is one glance (≤12 words)', e.slides.filter(s => s.type === 'card').every(s => !s.mean || s.mean.split(/\s+/).length <= 12), true);
 check('evening: ends on the send prompt', types.at(-1), 'close');
 check('evening: the cover is the channel\'s read', e.slides[0].headline, 'המכירה מרוכזת בטכנולוגיה, לא בכל השוק');
 check('evening: the cover carries the index move', e.slides[0].big?.value, '-1.4%');
@@ -60,6 +71,18 @@ check('evening: no mascot on any slide', e.slides.every(sl => !buildSlide(sl, { 
 const empty = composeEvening([by(3933)], { now });
 check('evening: nothing but a photo is a skip that still consumes', `${!!empty.skip}:${empty.consumed.length}`, 'true:1');
 
+// ── one line, or none ──
+const { oneLine } = await import('../src/compose.js');
+check('oneLine: a short sentence stays', oneLine('הפד השאיר את הריבית. והשוק עלה.'), 'הפד השאיר את הריבית');
+check('oneLine: a long sentence falls back to its clause', oneLine('תחזית AWS החלשה אכזבה את המשקיעים בצורה ברורה, אחרי צמיחת ענן חזקה אצל Google ו-Microsoft שהגבירה ציפיות'), 'תחזית AWS החלשה אכזבה את המשקיעים בצורה ברורה');
+check('oneLine: nothing fits, nothing printed', oneLine('א ב ג ד ה ו ז ח ט י כ ל מ נ ס ע פ צ ק ר'), null);
+
+// ── the midweek reel ──
+const mid = composeWeekReel(rows, { now, span: 'days' });
+check('midweek reel: called השוק בדקה', mid.skip ? true : mid.caption.startsWith('השוק בדקה'), true);
+check('midweek reel: ends on tomorrow', mid.skip ? true : mid.slides.at(-1).headline, mid.skip ? true : 'עולה או יורד מחר?');
+check('midweek reel: no week record scene', mid.skip ? true : mid.slides.every(s => !/צדקנו/.test(s.headline)), true);
+
 // ── the chart's headline is computed, and true ──
 const lowIns = insightOf(pts, '^NDX');
 check('chart: a 10-session fall to the low says so', lowIns.headline.startsWith('הנאסד״ק 100: הסגירה הנמוכה'), true);
@@ -67,6 +90,8 @@ const up = pts.map((p, i) => ({ ...p, c: 100 + i }));
 check('chart: a new high says so', insightOf(up, '^SPX').headline.includes('הגבוהה'), true);
 const flat = pts.map((p, i) => ({ ...p, c: 100 + Math.sin(i) }));
 check('chart: otherwise the change over the period', /ב-3 חודשים: [+-]/.test(insightOf(flat, '^SPX').headline), true);
+const fall = pts.map((p, i) => ({ ...p, c: i < 40 ? 100 + i : 140 - (i - 40) * 0.6 + (i % 2 ? 2 : 0) }));
+check('chart: a fall from the peak says how far', /מהשיא של \d\d\.\d\d/.test(insightOf(fall, '^NDX').headline), true);
 check('chart: too few sessions is no chart', insightOf(pts.slice(0, 10), '^SPX'), null);
 check('chart: the day about the Nasdaq charts the Nasdaq', chartSymbolFor('📊 נאסד״ק 100 ירד 1.4%, S&P 500 ירד 0.3%'), '^NDX');
 

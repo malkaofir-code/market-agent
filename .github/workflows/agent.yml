@@ -286,8 +286,9 @@ jobs:
           # its own hour and its own day so it never takes a news slot
           # — run.js adds one to the daily cap for it.
           REEL_SCOREBOARD: '0'
-          # One reel a week, Sunday 19:00 local: "השבוע בדקה" (owner, 8 Nov 2026).
-          REEL_DAY: 'Sun'
+          # Three reels a week, 19:00 local: Sun "השבוע בדקה", Tue+Thu "השוק בדקה" (owner, 9 Nov 2026).
+          REEL_DAYS: 'Sun,Tue,Thu'
+          REEL_DAY_WEEK: 'Sun'
           REEL_SCORE_HOURS: '9'
           REEL_SCORE_DAY: 'Mon'
           SCORE_REEL_MIN: '3'

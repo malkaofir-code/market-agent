@@ -233,10 +233,31 @@ const TOPIC_OF = s => TOPICS.find(t => t.re.test(`${s.headline} ${s.lead ?? ''}`
 export const signed = (fig, dir) => !fig ? null
   : /^[+-]/.test(fig) ? fig : dir === 'dn' ? `-${fig}` : dir === 'up' ? `+${fig}` : fig;
 
+/**
+ * One line a reader takes in at a glance: the first sentence, else its
+ * first clause, when it is 3–12 words. Otherwise nothing — a card with
+ * a headline only beats a card that ends in "…".
+ */
+export function oneLine(text, max = 12) {
+  const t = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  const n = x => x.split(' ').filter(Boolean).length;
+  const ok = (x, lo = 3) => n(x) >= lo && n(x) <= max;
+  const sentence = (t.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? t).replace(/[.]$/, '').trim();
+  if (ok(sentence)) return sentence;
+  // A clause only when it still says something: "תחזית AWS החלשה" is
+  // a subject without its verb.
+  const clause = sentence.split(/\s*[—–;:]\s*|,\s+(?=\D)/)[0].trim();
+  if (ok(clause, 5)) return clause;
+  return null;
+}
+
 export function cardOf(s, { eyebrow = null, day = null, story = null, palette = null } = {}) {
-  const [label, mean] = s.meaning ? ['מה זה אומר', s.meaning]
-    : s.where ? ['איפה אנחנו', s.where]
-    : s.lead ? ['מה קרה', s.lead] : [null, null];
+  // The line under the headline: what it means, else what happened —
+  // one sentence. Never the 📊 numbers: the board slide carries those.
+  const cands = [['מה זה אומר', s.meaning], ['מה קרה', s.lead], ['מה קרה', s.bullets?.[0]]];
+  let label = null, mean = null;
+  for (const [l, t] of cands) { const one = oneLine(t); if (one && one !== s.headline) { label = l; mean = one; break; } }
   return {
     type: 'card', eyebrow: eyebrow ?? TOPIC_OF(s) ?? (s.kind === 'flash' ? 'מבזק' : 'וול סטריט'),
     headline: s.headline, label, mean,
@@ -303,25 +324,39 @@ function composeEveningRaw(rows, { now = null, carry = {}, series = null } = {})
   }
   const headline = board.find(r => r.pct && r.dir) ?? null;
 
-  const slides = [{
-    type: 'dayCover', eyebrow: `${SERIES.digest} · ${dmy(at)}`,
-    headline: lead.headline, line: lead.meaning ?? lead.lead ?? null,
-    big: headline ? { value: headline.value, name: headline.name, dir: headline.dir } : null,
-    spark: chart ? { points: chart.points.slice(-22), dir: chart.dir } : null,
-    day, swipe: 'החליקו: המספרים, הסיפורים והגרף',
-  }];
-  if (board.length >= 2) slides.push({ type: 'board', eyebrow: 'המספרים של היום', title: 'איפה השוק עומד',
-    rows: board.slice(0, 5), source: boardSrc });
-  top.forEach((s, i) => slides.push({ ...cardOf(s), eyebrow: `${i + 1} מתוך ${top.length} · ${TOPIC_OF(s) ?? (s.kind === 'flash' ? 'מבזק' : 'וול סטריט')}`,
-    source: s.image?.credit ?? null, credit: null }));
-  if (chart) slides.push({ type: 'chart', eyebrow: 'הגרף של היום', ...chart,
-    source: `מקור: Yahoo Finance / Stooq · סגירה ${chart.lastDate}` });
   // What is coming: the calendar lines of the day's messages, newest
-  // first, each said once. One line is a caption line, not a slide.
+  // first, each said once.
   const nextItems = [];
   for (const st of [...stories].sort((a, b) => b.ts - a.ts))
     for (const t of st.nextItems ?? []) if (nextItems.length < 3 && !nextItems.some(x => x.slice(0, 18) === t.slice(0, 18))) nextItems.push(t);
-  if (nextItems.length >= 2) slides.push({ type: 'next', eyebrow: 'שמרו את זה', title: 'מה מחכה לנו', items: nextItems });
+
+  // The cover, two ways, alternated by day so two weeks of posts say
+  // which stops more thumbs (the choice is recorded with the post):
+  //   chart   the chart IS the cover (Chartr): the channel's read over
+  //           three months of the index, its computed insight on the line
+  //   number  the index move set huge, a month's sparkline under it;
+  //           the chart then gets its own slide further in
+  const variant = !chart ? 'number' : (process.env.COVER_VARIANT || (seed % 2 ? 'chart' : 'number'));
+  const src = chart ? `מקור: Yahoo Finance / Stooq · סגירה ${chart.lastDate}` : null;
+  const big = headline ? { value: headline.value, name: headline.name, dir: headline.dir } : null;
+  const slides = [variant === 'chart' ? {
+    type: 'dayCover', variant, eyebrow: `${SERIES.digest} · ${dmy(at)}`, headline: lead.headline, big,
+    chart: { points: chart.points, dir: chart.dir, insight: chart.headline, last: chart.last, source: src },
+    day: day ? { ...day, ron: null } : null, swipe: 'החליקו: המספרים והסיפורים של היום',
+  } : {
+    type: 'dayCover', variant, eyebrow: `${SERIES.digest} · ${dmy(at)}`,
+    headline: lead.headline, line: oneLine(lead.meaning ?? lead.lead, 14), big,
+    spark: chart ? { points: chart.points.slice(-22), dir: chart.dir } : null,
+    day: day ? { ...day, ron: null } : null, swipe: 'החליקו: המספרים והסיפורים של היום',
+  }];
+  // Numbers and what is coming share one board: one slide to save.
+  const boardNext = board.length >= 2 ? nextItems.slice(0, 2) : [];
+  if (board.length >= 2) slides.push({ type: 'board', eyebrow: 'המספרים של היום', title: 'איפה השוק עומד',
+    rows: board.slice(0, boardNext.length ? 4 : 5), next: boardNext.length ? boardNext : null, source: boardSrc });
+  top.forEach((s, i) => slides.push({ ...cardOf(s), eyebrow: `${i + 1} מתוך ${top.length} · ${TOPIC_OF(s) ?? (s.kind === 'flash' ? 'מבזק' : 'וול סטריט')}`,
+    source: s.image?.credit ?? null, credit: null }));
+  if (chart && variant !== 'chart') slides.push({ type: 'chart', eyebrow: 'הגרף של היום', ...chart, source: src });
+  if (!boardNext.length && nextItems.length >= 2) slides.push({ type: 'next', eyebrow: 'שמרו את זה', title: 'מה מחכה לנו', items: nextItems });
   slides.push({ type: 'close', eyebrow: 'לפני שממשיכים', headline: sendLine([lead, ...top]),
     sub: 'שלחו לו את הפוסט הזה', ask: ASKS[Math.abs(seed) % ASKS.length], foot: 'כל ערב ב-21:00 · @marketalert.il' });
 
@@ -344,7 +379,7 @@ function composeEveningRaw(rows, { now = null, carry = {}, series = null } = {})
   ].filter(x => x !== null).join('\n').replace(/\n{3,}/g, '\n\n').slice(0, 2120);
 
   return { key: `E:${localDay(at)}`, template: null, window: ddmmyy(at), date: ddmmyy(at),
-    stamp, quotes, slides, caption, consumed, carry: nextCarry, format: 'cards-v2', chartSym: series?.sym ?? null };
+    stamp, quotes, slides, caption, consumed, carry: nextCarry, format: 'cards-v2', chartSym: series?.sym ?? null, cover: slides[0].variant };
 }
 
 function tagsOf(stories) {
@@ -394,10 +429,14 @@ const DARK = ['ink', 'deep', 'midnight', 'abyss', 'basalt', 'navy'];
  * stories, how many of the week's calls came true, and the question.
  * Ron opens and closes; the middle is the news.
  */
-function composeWeekReelRaw(rows, { now = null, score = null } = {}) {
+function composeWeekReelRaw(rows, { now = null, score = null, span: kind = 'week' } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
-  const stories = storiesOf(rows, { now: at, decayHours: 72 }).filter(s => s.kind !== 'read');
-  if (stories.length < 3) return { skip: 'thin week', slides: [] };
+  // 'week' is Sunday's השבוע בדקה; 'days' is the midweek השוק בדקה —
+  // the same six scenes over the last two days, ending on tomorrow.
+  const wk = kind === 'week';
+  const title = wk ? SERIES.week : SERIES.minute;
+  const stories = storiesOf(rows, { now: at, decayHours: wk ? 72 : 24 }).filter(s => s.kind !== 'read');
+  if (stories.length < 3) return { skip: wk ? 'thin week' : 'thin days', slides: [] };
   const top = stories.slice(0, 3);
   const seed = Math.floor(at / 86400);
   const ground = i => DARK[(seed + i) % DARK.length];
@@ -416,25 +455,25 @@ function composeWeekReelRaw(rows, { now = null, score = null } = {}) {
   const tot = score ? (Number(score.hit) || 0) + (Number(score.miss) || 0) : 0;
   const slides = [
     big ? { type: 'scene', lead: true, headline: TOPIC_OF(big) ?? fitCard(big.headline).text,
-        marked: esc(TOPIC_OF(big) ?? ''), big: signed(big.figure, big.dir), sub: 'השבוע בדקה', dir: big.dir,
+        marked: esc(TOPIC_OF(big) ?? ''), big: signed(big.figure, big.dir), sub: title, dir: big.dir,
         gesture: GEST[big.dir], seed, palette: ground(0), own: true }
-      : { type: 'scene', headline: 'השבוע בשוק', marked: 'השבוע ב<em>שוק</em>', sub: 'השבוע בדקה',
+      : { type: 'scene', headline: wk ? 'השבוע בשוק' : 'מה קרה בשוק', marked: wk ? 'השבוע ב<em>שוק</em>' : 'מה קרה ב<em>שוק</em>', sub: title,
         dir: '', gesture: 'welcome', seed, palette: ground(0), own: true },
     ...top.map((s, i) => scene(s, i + 1)),
-    ...(tot ? [{ type: 'scene', headline: `צדקנו ${score.hit} מתוך ${tot}`, marked: `צדקנו <em>${score.hit}</em> מתוך ${tot}`,
+    ...(wk && tot ? [{ type: 'scene', headline: `צדקנו ${score.hit} מתוך ${tot}`, marked: `צדקנו <em>${score.hit}</em> מתוך ${tot}`,
       sub: 'התחזיות של השבוע', dir: '', gesture: 'explain', seed: seed + 50, palette: ground(4), own: true, ron: null }] : []),
-    { type: 'scene', headline: 'עולה או יורד השבוע?', marked: 'עולה או יורד <em>השבוע</em>?', sub: 'כתבו בתגובות',
+    { type: 'scene', headline: wk ? 'עולה או יורד השבוע?' : 'עולה או יורד מחר?', marked: wk ? 'עולה או יורד <em>השבוע</em>?' : 'עולה או יורד <em>מחר</em>?', sub: 'כתבו בתגובות',
       dir: '', gesture: 'point', seed: seed + 99, palette: ground(5), own: true },
   ];
   const caption = [
-    `השבוע בדקה | ${dmy(at - 6 * 86400)}–${dmy(at)}`, '',
+    wk ? `${title} | ${dmy(at - 6 * 86400)}–${dmy(at)}` : `${title} | ${dmy(at)}`, '',
     ...top.map((s, i) => `${['1️⃣', '2️⃣', '3️⃣'][i]} ${s.headline}`), '',
-    tot ? `🎯 צדקנו ${score.hit} מתוך ${tot} תחזיות השבוע. גם הפספוסים נספרים.` : null,
-    `💬 ${WEEK_ASK}`, '',
+    wk && tot ? `🎯 צדקנו ${score.hit} מתוך ${tot} תחזיות השבוע. גם הפספוסים נספרים.` : null,
+    `💬 ${wk ? WEEK_ASK : REEL_ASK}`, '',
     SCHEDULE, '@marketalert.il', tagsOf(stories),
   ].filter(x => x !== null).join('\n').slice(0, 2120);
   return { key: `R:${localDay(at)}`, window: dmy(at), date: ddmmyy(at), stamp: '', quotes: [],
-    slides, caption, week: true };
+    slides, caption, week: wk };
 }
 export const WEEK_ASK = 'עולה או יורד השבוע? כתבו בתגובות';
 

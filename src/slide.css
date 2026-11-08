@@ -434,6 +434,21 @@ html,body{margin:0;padding:0;background:var(--bg)}
 .a-cl .cl-q{font-size:40px;line-height:1.35;margin:18px 0 0;color:var(--dim2);border-top:2px solid var(--rule);padding-top:28px}
 .a-cl .cl-f{font-family:var(--f-mono);font-size:30px;color:var(--dim);margin:0}
 
+/* chart cover: the chart is the cover */
+.a-dc.dc-chart{gap:20px}
+.a-dc.dc-chart .dc-h{font-size:74px}
+.a-dc .dc-big-s .dc-v{font-size:84px}
+.a-dc .dc-big-s .dc-n{font-size:34px}
+.a-dc .dc-cbox{position:relative;height:430px;margin-top:4px}
+.a-dc .dc-ins{margin:0;font-size:36px;font-weight:800;color:var(--acc-ink,var(--acc));line-height:1.25}
+.a-dc .dc-cbox .ch-last{position:absolute;right:0;transform:translate(8px,-140%);margin:0;font-family:var(--f-mono);
+  font-size:34px;font-weight:700;color:var(--fg);direction:ltr;background:var(--bg);padding:2px 10px;border-radius:4px}
+.a-dc .dc-src{font-family:var(--f-mono);font-size:28px;color:var(--dim);margin:0}
+/* board: what is coming, under the numbers */
+.a-bd .bd-nx{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.a-bd .bd-nl{font-family:var(--f-mono);font-size:30px;font-weight:700;color:var(--acc-ink,var(--acc));margin:0;letter-spacing:.04em}
+.a-bd .bd-ni{font-size:38px;font-weight:700;line-height:1.3;margin:0}
+
 /* ── the day strip: your money, and Ron ── */
 .day-strip{display:flex;flex-direction:column;gap:6px;margin-top:12px;padding:16px 0 0;
   border-top:2px solid var(--rule);position:relative;z-index:4;color:var(--fg)}

@@ -219,7 +219,14 @@ const ARCHETYPES = {
 
   // ── the evening explainer (v2, Nov 2026) ─────────────────────
   // 1 · the day: its insight, the index move, a month of the index.
-  dayCover: s => `<div class="a-dc">
+  dayCover: s => s.variant === 'chart' ? `<div class="a-dc dc-chart">
+    <p class="eyeb">${bidi(s.eyebrow || '')}</p>
+    <h1 class="dc-h">${bidi(s.headline)}</h1>
+    ${s.big ? `<div class="dc-big dc-big-s"><b class="dc-v ${esc(s.big.dir || '')}" data-protect="the figure">${esc(s.big.value)}</b><span class="dc-n">${bidi(s.big.name)} ${bidi('היום')}</span></div>` : ''}
+    <p class="dc-ins">${bidi(s.chart.insight)}</p>
+    <div class="dc-cbox" data-protect="the chart">${chartSvg(s.chart.points, s.chart.dir, { w: 960, h: 430, label: s.chart.last })}</div>
+    <p class="dc-src">${bidi(s.chart.source || '')}</p>
+  </div>` : `<div class="a-dc">
     <p class="eyeb">${bidi(s.eyebrow || '')}</p>
     ${s.big ? `<div class="dc-big"><b class="dc-v ${esc(s.big.dir || '')}" data-protect="the figure">${esc(s.big.value)}</b><span class="dc-n">${bidi(s.big.name)}</span></div>` : ''}
     <h1 class="dc-h">${bidi(s.headline)}</h1>
@@ -229,7 +236,8 @@ const ARCHETYPES = {
 
   // 2 · the numbers: a stat board, each row one instrument.
   board: s => `<div class="a-bd"><p class="eyeb">${bidi(s.eyebrow || '')}</p><h2 class="bd-t">${bidi(s.title)}</h2>
-    <ul class="bd-rows">${(s.rows ?? []).map(r => `<li><span class="bd-n">${bidi(r.name)}</span><b class="bd-v ${esc(r.dir || '')}">${esc(r.value)}</b></li>`).join('')}</ul></div>`,
+    <ul class="bd-rows">${(s.rows ?? []).map(r => `<li><span class="bd-n">${bidi(r.name)}</span><b class="bd-v ${esc(r.dir || '')}">${esc(r.value)}</b></li>`).join('')}</ul>
+    ${s.next?.length ? `<div class="bd-nx"><p class="bd-nl">${bidi('מה מחכה לנו')}</p>${s.next.map(t => `<p class="bd-ni"><span>${bidi(t)}</span></p>`).join('')}</div>` : ''}</div>`,
 
   // 6 · the chart of the day — the headline is computed from the line.
   chart: s => `<div class="a-ch2"><p class="eyeb">${bidi(s.eyebrow || '')}</p>
@@ -412,6 +420,10 @@ const GROUND = {
   recordRows:   'sheet',
   analysts:     'doc',
   analystNote:  'deep',
+  // The evening's rhythm: dark cover and stories, the numbers on
+  // paper, the send-it-on board in the accent — three looks in a swipe.
+  board:        'doc',
+  close:        'flare',
 };
 
 // Which pose suits which board. The wardrobe rotates on top of this —

@@ -22,7 +22,7 @@ import {
   putClaims, bestHit, markClaimShown, claimScore, claimRecord, settledForecasts, settledForecastsAll, analystPostsSince, callbacksToday, publishedMessages,
   provenSince, markClaimsPosted, callbackPostsToday, provenForReel, markClaimReeled,
   provenLately,
-  logRun, getState, setState, getToken, setToken, close,
+  logRun, getState, setState, getToken, setToken, close, putPrices, closesFor,
 } from './db.js';
 import { composeEvening, composeStories, composeWeekReel, windowOf, WIN } from './compose.js';
 import { composeCallback, composeCallbackPost, rankRecord } from './proof.js';
@@ -742,13 +742,24 @@ async function runEvening() {
 
   // The chart of the day: closes for the index the day is about. Soft:
   // no quotes means no chart slide, never no post.
+  // Live quotes first (and kept in agent.prices); when the quote
+  // sources are down, the closes already stored there.
   let series = null;
+  const reads = rows.filter(r => /🧭|📊/u.test(String(r.text ?? ''))).map(r => r.text).join(' ');
+  const sym = chartSymbolFor(reads || rows.map(r => r.text).join(' '));
   try {
     const { closes } = await import('./quotes.js');
-    const reads = rows.filter(r => /🧭|📊/u.test(String(r.text ?? ''))).map(r => r.text).join(' ');
-    const sym = chartSymbolFor(reads || rows.map(r => r.text).join(' '));
     series = { sym, points: (await closes(sym)).slice(-90) };
-  } catch (e) { say('chart skipped —', e.message); }
+    if (!DRY) await putPrices(sym, series.points.slice(-10)).catch(e => say('prices not stored —', e.message));
+  } catch (e) {
+    say('live closes failed —', e.message);
+    try {
+      const from = new Date((now - 140 * 86400) * 1000).toISOString().slice(0, 10);
+      const pts = await closesFor(sym, from);
+      if (pts.length >= 20) series = { sym, points: pts.slice(-90) };
+      else say('chart skipped — only', pts.length, 'stored closes');
+    } catch (e2) { say('chart skipped —', e2.message); }
+  }
 
   const carry = (await getState(CARRY_KEY)) ?? {};
   const deck = composeEvening(rows, { now, carry, series });
@@ -801,7 +812,8 @@ async function runEvening() {
   }
   await setWindow({ key, status: 'posted', slides: files.length, shed, posted_at: Math.floor(Date.now() / 1000) });
   await setPublished(key, { media_id: result.id ?? null, permalink: result.permalink ?? null,
-    choices: { kind: 'evening', types: deck.slides.map(c => (c.photo ? 'card-img' : 'card')) } });
+    choices: { kind: 'evening', cover: deck.cover ?? null, slides: deck.slides.length,
+      types: deck.slides.map(c => (c.photo ? 'card-img' : c.type)) } });
   await recordClaims(rows, deck, { wkey: key, media_id: result.id, permalink: result.permalink ?? null,
     posted_at: Math.floor(Date.now() / 1000) }, files);
   await logRun(key, 'publish', true, result.permalink ?? result.id);
@@ -969,20 +981,23 @@ async function runReel() {
   const back = Number(process.env.REEL_LOOKBACK_HOURS || 24) * 3600;
   const floor = (!forced && last && last > day) ? Number(last)
     : Math.min(day, now - back);
-  // ── the week's only reel ─────────────────────────────────
-  // One reel a week (owner, 8 Nov 2026): Sunday, "השבוע בדקה". The
-  // daily summary film, the single-call proof film and the Monday
-  // scoreboard are gone; the week's record is one scene inside it.
-  const reelDay = (process.env.REEL_DAY || 'Sun').trim();
-  if (!forced && !DRY && localDayName() !== reelDay) {
-    say(`SKIP — the reel is weekly, on ${reelDay}`); return;
+  // ── three reels a week ───────────────────────────────────
+  // Sunday "השבוע בדקה" over the week; Tuesday and Thursday "השוק
+  // בדקה" over the last two days (owner, 9 Nov 2026: Reels are the
+  // reach format at this size). Never two within 36 hours.
+  const reelDays = (process.env.REEL_DAYS || process.env.REEL_DAY || 'Sun').split(',').map(x => x.trim()).filter(Boolean);
+  const weekDay = (process.env.REEL_DAY_WEEK || 'Sun').trim();
+  const today = localDayName();
+  if (!forced && !DRY && !reelDays.includes(today)) {
+    say(`SKIP — reels go out on ${reelDays.join(', ')}`); return;
   }
-  if (!forced && !DRY && last && now - Number(last) < 6 * 86400) {
-    say('SKIP — this week\'s reel already went out'); return;
+  if (!forced && !DRY && last && now - Number(last) < 36 * 3600) {
+    say('SKIP — a reel went out in the last 36 hours'); return;
   }
-  let rows = await messagesInAll(now - 7 * 86400, now), tpl = null, tplRecent = null, proofHit = null;
-  const weekScore = await claimRecord(7);
-  let deck = composeWeekReel(rows, { now, score: weekScore });
+  const wk = today === weekDay || process.env.REEL_SPAN === 'week';
+  let rows = await messagesInAll(now - (wk ? 7 : 2) * 86400, now), tpl = null, tplRecent = null, proofHit = null;
+  const weekScore = wk ? await claimRecord(7) : null;
+  let deck = composeWeekReel(rows, { now, score: weekScore, span: wk ? 'week' : 'days' });
   if (deck.skip) { say('SKIP — reel', `(${deck.skip})`); return; }
 
   // One row per reel, not one row per day.

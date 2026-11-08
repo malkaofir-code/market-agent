@@ -22,9 +22,9 @@
 export const BUDGET = {
   // The one design (Nov 2026). Headline is the channel's, the line
   // under it one sentence.
-  card:         { eyebrow: 6, headline: 12, mean: 20 },
-  dayCover:     { headline: 12, line: 20 },
-  board:        { title: 5 },
+  card:         { eyebrow: 6, headline: 12, mean: 12 },
+  dayCover:     { headline: 12, line: 14, insight: 10 },
+  board:        { title: 5, next: [2, 12] },
   chart:        { headline: 10 },
   next:         { title: 5, items: [3, 14] },
   close:        { headline: 8, sub: 6, ask: 10 },
@@ -52,7 +52,6 @@ export const BUDGET = {
   item:         { text: 20, headline: 12 },
   list:         { rows: { text: 12, headline: 12 } },
   watch:        { text: 20, headline: 12 },
-  chart:        { title: 10, text: 16 },
   // ── stories ──
   hero:         { quote: 18 },
   // The story that failed: a 7-line "what was reported" block. One

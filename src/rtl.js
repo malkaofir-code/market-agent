@@ -86,6 +86,8 @@ export function bidi(raw, { emoji = 'strip' } = {}) {
   // index below still lines up, and the deck stops mixing an ASCII
   // hyphen into Hebrew words while the masthead sets a proper maqaf.
   s = s.replace(/(?<=[\u0590-\u05FF])-(?=[$€£₪]?\d)/gu, '\u05BE');
+  // "רבעון 3 2026": a number and the year after it stay on one line.
+  s = s.replace(/(?<=\d) (?=(?:19|20)\d{2}\b)/g, '\u00A0');
 
   const taken = [];
   const free = (a, b) => !taken.some(t => a < t.end && b > t.start);
@@ -95,7 +97,7 @@ export function bidi(raw, { emoji = 'strip' } = {}) {
       if (free(start, end)) taken.push({ start, end, cls, text: m[0] });
     }
   };
-  collect(LATNUM, 'lat');
+  collect(LATNUM, 'latn');
   collect(RANGE, 'range');
   collect(NRANGE, 'range');
   collect(SINGLE, 'num');
@@ -110,6 +112,7 @@ export function bidi(raw, { emoji = 'strip' } = {}) {
     // renders 21:00–21:15 backwards.
     out += t.cls === 'range'
       ? `<span class="num">${esc(t.text).replace(SINGLE, n => `<span class="num">${n}</span>`)}</span>`
+      : t.cls === 'latn' ? `<span class="lat">${esc(t.text).replace(/ /g, '\u00A0')}</span>`
       : `<span class="${t.cls}">${esc(t.text)}</span>`;
     pos = t.end;
   }

@@ -42,10 +42,18 @@ export function insightOf(points, sym, { days = 63 } = {}) {
   const back = at => pts.length - 1 - at;
   let headline;
   if (last.c < Math.min(...prior.map(p => p.c)) && (lo.at < 0 || back(lo.at) >= 20))
-    headline = lo.d ? `${name}: הסגירה הנמוכה מאז ${dm(lo.d)}` : `${name}: הסגירה הנמוכה בתקופה`;
+    headline = lo.d ? `${name}: הסגירה הנמוכה מאז ${dm(lo.d)}` : `${name}: הסגירה הנמוכה ב-3 חודשים`;
   else if (last.c > Math.max(...prior.map(p => p.c)) && (hi.at < 0 || back(hi.at) >= 20))
-    headline = hi.d ? `${name}: הסגירה הגבוהה מאז ${dm(hi.d)}` : `${name}: הסגירה הגבוהה בתקופה`;
-  else headline = `${name} ב-3 חודשים: ${fmtPct(change)}`;
+    headline = hi.d ? `${name}: הסגירה הגבוהה מאז ${dm(hi.d)}` : `${name}: הסגירה הגבוהה ב-3 חודשים`;
+  else {
+    // How far from the period's peak (or off its low) — the number a
+    // reader feels, when it is big enough to be the story.
+    const peak = win.reduce((a, b) => (b.c > a.c ? b : a)), low = win.reduce((a, b) => (b.c < a.c ? b : a));
+    const fromPeak = pct(peak.c, last.c), fromLow = pct(low.c, last.c);
+    if (peak !== last && fromPeak <= -5) headline = `${name}: ${fmtPct(fromPeak)} מהשיא של ${dm(peak.d)}`;
+    else if (low !== last && fromLow >= 5) headline = `${name}: ${fmtPct(fromLow)} מהשפל של ${dm(low.d)}`;
+    else headline = `${name} ב-3 חודשים: ${fmtPct(change)}`;
+  }
   return {
     headline, sym, name,
     sub: `סגירות יומיות · ${dm(first.d)}–${dm(last.d)}`,
