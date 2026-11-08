@@ -22,7 +22,12 @@
 export const BUDGET = {
   // The one design (Nov 2026). Headline is the channel's, the line
   // under it one sentence.
-  card:         { eyebrow: 4, headline: 12, mean: 20 },
+  card:         { eyebrow: 6, headline: 12, mean: 20 },
+  dayCover:     { headline: 12, line: 20 },
+  board:        { title: 5 },
+  chart:        { headline: 10 },
+  next:         { title: 5, items: [3, 14] },
+  close:        { headline: 8, sub: 6, ask: 10 },
   // The day strip rides on any board that carries it (day.js).
   _day:         { money: 12, ron: 14 },
   // ── digests ──

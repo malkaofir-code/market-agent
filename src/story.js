@@ -68,6 +68,48 @@ export function imageOf(row, lines = linesOf(row.text)) {
   return { url: ok ? row.media_url : null, credit: ok ? `תמונה: ${cred}` : null, raw: cred };
 }
 
+// ── the channel's "📊 איפה אנחנו" line, as a board ────────────
+// "נאסד״ק 100 ירד 1.4%, S&P 500 ירד 0.3%, VIX 17.2, תשואת 10 שנים 4.99%"
+// Each comma item is read only when it is SHORT and SIMPLE: a name the
+// table knows, at most a verb, then one number. "נסגר אתמול ב-1.38%-
+// ל-29,402 נקודות וחוזיו יורדים כעת 2.6%" says two things about two
+// moments and is dropped — a board must not pick one of them for us.
+const INSTR = [
+  [/נאסד["״']?ק\s*100|נאסד["״']?ק/u, 'נאסד״ק 100'], [/S&P\s*500|S&P/, 'S&P 500'], [/דאו/, 'דאו ג׳ונס'],
+  [/ראסל/, 'ראסל 2000'], [/VIX|מדד הפחד/, 'VIX · מדד הפחד'], [/תשוא\S*\s*(?:ל-?)?10/, 'תשואה ל-10 שנים'],
+  [/נפט|ברנט/, 'נפט'], [/זהב/, 'זהב'], [/ביטקוין|Bitcoin/i, 'ביטקוין'],
+];
+const UPW = /(?:^|\s)(?:עולה|עלה|עלתה|מוסיף|מוסיפה|הוסיף|מטפס|טיפס|קופץ|זינק|מזנק)(?:\s|$)/;
+const DNW = /(?:^|\s)(?:יורד|ירד|ירדה|מאבד|איבד|צונח|צנח|נופל|נפל|נחלש)(?:\s|$)/;
+export function boardOf(where) {
+  if (!where) return [];
+  const rows = [];
+  for (const raw of String(where).split(/[,،]\s*/)) {
+    const item = raw.replace(/[\u200e\u200f]/g, '').trim();
+    const ins = INSTR.find(([re]) => re.test(item));
+    if (!ins) continue;
+    // The number is read AFTER the name ("S&P 500" carries a 500 of its
+    // own), and a hyphen glued to a Hebrew letter ("ב-18.64") is a
+    // prefix, not a minus.
+    const after = item.slice(item.search(ins[0]) + (item.match(ins[0])?.[0].length ?? 0))
+      .replace(/(?<=[\u0590-\u05FF])-/g, ' ').trim();
+    if (after.split(/\s+/).filter(Boolean).length > 3) continue;   // too much going on
+    if (/\(/.test(after)) continue;                                  // a second figure in brackets
+    const num = after.match(/([+\-−]?\d[\d,]*(?:\.\d+)?)(%?)(-?)/);
+    if (!num) continue;
+    let v = num[1].replace('−', '-');
+    const pct = num[2] === '%';
+    if (num[3] === '-' && !v.startsWith('-')) v = `-${v}`;
+    let dir = /^-/.test(v) ? 'dn' : /^\+/.test(v) ? 'up' : '';
+    if (!dir && pct) dir = DNW.test(` ${after} `) ? 'dn' : UPW.test(` ${after} `) ? 'up' : '';
+    if (pct && dir === 'dn' && !v.startsWith('-')) v = `-${v}`;
+    if (pct && dir === 'up' && !v.startsWith('+')) v = `+${v}`;
+    if (rows.some(r => r.name === ins[1])) continue;
+    rows.push({ name: ins[1], value: `${v}${pct ? '%' : ''}`, dir: pct ? dir : '', pct });
+  }
+  return rows;
+}
+
 const firstSentence = s => (String(s ?? '').match(/^.*?[.!?](?=\s|$)/)?.[0] ?? String(s ?? '')).trim();
 
 /** One message as one story, or null when it says nothing (photo only). */
@@ -77,16 +119,20 @@ export function storyOf(row) {
   if (!headline || headline.length < 8) return null;
   const rest = lines.slice(lines.findIndex(l => stripLeadEmoji(l).replace(/^מבזק\s*:\s*/, '').trim() === headline) + 1);
 
-  let meaning = null, opinion = null, where = null, next = null;
-  const bullets = [], prose = [];
+  let meaning = null, opinion = null, where = null, next = null, inNext = false;
+  const bullets = [], prose = [], nextItems = [];
   for (const l of rest) {
-    if (MEANING.test(l)) meaning = l.replace(MEANING, '').trim();
-    else if (OPINION.test(l)) opinion = l.replace(OPINION, '').trim();
-    else if (WHERE.test(l)) where = l.replace(WHERE, '').trim();
-    else if (NEXT.test(l)) next = l.replace(NEXT, '').trim();
+    if (MEANING.test(l)) { meaning = l.replace(MEANING, '').trim(); inNext = false; }
+    else if (OPINION.test(l)) { opinion = l.replace(OPINION, '').trim(); inNext = false; }
+    else if (WHERE.test(l)) { where = l.replace(WHERE, '').trim(); inNext = false; }
+    else if (NEXT.test(l)) {
+      next = l.replace(NEXT, '').trim() || null;
+      if (next) nextItems.push(next);
+      inNext = true;            // "⏭ הבא בתור:" may be a header over bullets
+    }
     else if (CREDIT.test(l)) continue;
-    else if (BULLET.test(l)) bullets.push(l.replace(BULLET, '').trim());
-    else prose.push(l);
+    else if (BULLET.test(l)) (inNext ? nextItems : bullets).push(l.replace(BULLET, '').trim());
+    else { prose.push(l); inNext = false; }
   }
   const flash = /🔴\s*מבזק/u.test(String(row.text ?? ''));
   const read = /^\s*‏?\s*🧭/u.test(String(row.text ?? '')) || !!where;
@@ -98,7 +144,7 @@ export function storyOf(row) {
   return {
     tg_id: Number(row.tg_id), ts: Number(row.ts ?? 0), kind, headline,
     lead: prose[0] ? firstSentence(prose[0]) : null,
-    bullets, meaning, opinion, where, next,
+    bullets, meaning, opinion, where, next, nextItems, board: boardOf(where),
     figure: fig && figureCount(headline) < 4 ? fig.text.replace(/[−־]/g, '-') : null,
     dir, image: imageOf(row, lines),
     text: lines.join('\n'),

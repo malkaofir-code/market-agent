@@ -27,6 +27,7 @@ import {
 import { composeEvening, composeStories, composeWeekReel, windowOf, WIN } from './compose.js';
 import { composeCallback, composeCallbackPost, rankRecord } from './proof.js';
 import { headlineOf } from './story.js';
+import { chartSymbolFor } from './chart.js';
 import { pickTemplate, pickStoryTemplate, remember, byId } from './templates.js';
 import { renderDeck } from './render.js';
 import { connect, alert, deliver } from './tg.js';
@@ -739,8 +740,18 @@ async function runEvening() {
   const ids = rows.map(r => Number(r.tg_id));
   if (!rows.length) { say('SKIP — no new messages since the last evening post'); return; }
 
+  // The chart of the day: closes for the index the day is about. Soft:
+  // no quotes means no chart slide, never no post.
+  let series = null;
+  try {
+    const { closes } = await import('./quotes.js');
+    const reads = rows.filter(r => /🧭|📊/u.test(String(r.text ?? ''))).map(r => r.text).join(' ');
+    const sym = chartSymbolFor(reads || rows.map(r => r.text).join(' '));
+    series = { sym, points: (await closes(sym)).slice(-90) };
+  } catch (e) { say('chart skipped —', e.message); }
+
   const carry = (await getState(CARRY_KEY)) ?? {};
-  const deck = composeEvening(rows, { now, carry });
+  const deck = composeEvening(rows, { now, carry, series });
   if (deck.carry) await setState(CARRY_KEY, deck.carry);
   await upsertWindow(key, now - back, now);
   if (deck.skip) {

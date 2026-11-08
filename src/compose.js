@@ -23,6 +23,7 @@ import { clean, stripLeadEmoji } from './rtl.js';
 import { budgeted } from './budget.js';
 import { dayOf as dayLines, SERIES, SCHEDULE } from './day.js';
 import { storiesOf } from './story.js';
+import { insightOf } from './chart.js';
 import 'dotenv/config';
 
 
@@ -252,40 +253,89 @@ function tapeOf(rows, carry, now) {
   return tape(parsed, carry, now);
 }
 
-// ── 21:00 · השוק בערב ────────────────────────────────────────
-/**
- * Three cards. The first is THE DAY: the channel's latest market read
- * (its 🧭 post, which carries "📊 איפה אנחנו"), or the top story when
- * it wrote none. Then the two biggest stories, never the same story
- * twice. The first card carries the reader's money.
- */
-function composeEveningRaw(rows, { now = null, carry = {}, cards = 3 } = {}) {
+// ── 21:00 · השוק בערב — the day as one explainer ──────────────
+//
+// Built from what the best market pages do (research, 9 Nov 2026): a
+// carousel of 6–8 slides read as ONE explainer of the day, one idea a
+// slide, the headline stating it; numbers as stat cards; a real chart
+// whose headline is computed from the line; what is coming next; and a
+// last slide asking to send it on. Under five slides a carousel
+// underperforms; three unrelated tiles was the old design's mistake.
+//
+//   1 cover    the day's insight (the channel's read), the index move,
+//              a month of the index as a sparkline, the reader's money
+//   2 board    "איפה השוק עומד" — the channel's 📊 numbers
+//   3–5 card   the day's three biggest stories
+//   6 chart    the chart of the day (chart.js), when closes are given
+//   7 next     "מה מחכה לנו" — the channel's ⏭ calendar
+//   8 close    send it to someone + one question
+const TAPE_NAME = { SPX: 'S&P 500', ES: 'חוזי ה-S&P 500', NQ: 'חוזי הנאסד״ק', NDX: 'נאסד״ק 100', YM: 'חוזי הדאו', RTY: 'חוזי הראסל' };
+
+function sendLine(stories) {
+  const hay = stories.map(s => s.headline).join(' ');
+  if (/נאסד/.test(hay)) return 'מכירים מישהו שמחזיק נאסד״ק?';
+  if (/S&P/.test(hay)) return 'מכירים מישהו עם קרן על ה-S&P 500?';
+  return 'מכירים מישהו שמשקיע בשוק האמריקאי?';
+}
+
+function composeEveningRaw(rows, { now = null, carry = {}, series = null } = {}) {
   const at = now ?? Math.floor(Date.now() / 1000);
   const consumed = (rows ?? []).map(r => Number(r.tg_id));
   const stories = storiesOf(rows, { now: at });
   const { quotes, carry: nextCarry, stamp } = tapeOf(rows ?? [], carry, at);
   if (!stories.length) return { key: `E:${localDay(at)}`, skip: 'no story', slides: [], consumed, carry: nextCarry };
 
-  const read = stories.filter(s => s.kind === 'read').sort((a, b) => b.ts - a.ts)[0] ?? null;
-  const lead = read ?? stories[0];
-  const rest = stories.filter(s => s !== lead && s.kind !== 'read').slice(0, cards - 1);
+  const reads = stories.filter(s => s.kind === 'read').sort((a, b) => b.ts - a.ts);
+  const lead = reads[0] ?? stories[0];
+  const top = stories.filter(s => s !== lead && s.kind !== 'read').slice(0, 3);
   const seed = Math.floor(at / 86400);
   const day = dayLines(quotes, seed);
-  const slides = [
-    cardOf(lead, { eyebrow: SERIES.digest, day }),
-    ...rest.map(s => cardOf(s)),
-  ];
+  const chart = series ? insightOf(series.points, series.sym) : null;
 
-  const lines = [lead, ...rest].map((s, i) => {
-    const c = slides[i];
-    return `${['1️⃣', '2️⃣', '3️⃣'][i] ?? '▪'} ${s.headline}${c.mean ? `\n${c.mean}` : ''}`;
-  }).join('\n\n');
-  const credits = slides.map(c => c.credit).filter(Boolean);
+  // The numbers: the channel's own 📊 line first (newest read that has
+  // one), else the tape it quoted. Never both mixed on one board.
+  let board = (reads.find(r => r.board.length >= 2)?.board) ?? [];
+  let boardSrc = 'לפי עדכון הערוץ';
+  if (board.length < 2) {
+    board = quotes.map(q => ({ name: TAPE_NAME[q.sym] ?? q.sym,
+      value: `${q.chg > 0 ? '+' : ''}${Number(q.chg).toFixed(2)}%`, dir: q.chg > 0 ? 'up' : q.chg < 0 ? 'dn' : '', pct: true }));
+    boardSrc = `לפי הערוץ · ${stamp}`;
+  }
+  const headline = board.find(r => r.pct && r.dir) ?? null;
+
+  const slides = [{
+    type: 'dayCover', eyebrow: `${SERIES.digest} · ${dmy(at)}`,
+    headline: lead.headline, line: lead.meaning ?? lead.lead ?? null,
+    big: headline ? { value: headline.value, name: headline.name, dir: headline.dir } : null,
+    spark: chart ? { points: chart.points.slice(-22), dir: chart.dir } : null,
+    day, swipe: 'החליקו: המספרים, הסיפורים והגרף',
+  }];
+  if (board.length >= 2) slides.push({ type: 'board', eyebrow: 'המספרים של היום', title: 'איפה השוק עומד',
+    rows: board.slice(0, 5), source: boardSrc });
+  top.forEach((s, i) => slides.push({ ...cardOf(s), eyebrow: `${i + 1} מתוך ${top.length} · ${TOPIC_OF(s) ?? (s.kind === 'flash' ? 'מבזק' : 'וול סטריט')}`,
+    source: s.image?.credit ?? null, credit: null }));
+  if (chart) slides.push({ type: 'chart', eyebrow: 'הגרף של היום', ...chart,
+    source: `מקור: Yahoo Finance / Stooq · סגירה ${chart.lastDate}` });
+  // What is coming: the calendar lines of the day's messages, newest
+  // first, each said once. One line is a caption line, not a slide.
+  const nextItems = [];
+  for (const st of [...stories].sort((a, b) => b.ts - a.ts))
+    for (const t of st.nextItems ?? []) if (nextItems.length < 3 && !nextItems.some(x => x.slice(0, 18) === t.slice(0, 18))) nextItems.push(t);
+  if (nextItems.length >= 2) slides.push({ type: 'next', eyebrow: 'שמרו את זה', title: 'מה מחכה לנו', items: nextItems });
+  slides.push({ type: 'close', eyebrow: 'לפני שממשיכים', headline: sendLine([lead, ...top]),
+    sub: 'שלחו לו את הפוסט הזה', ask: ASKS[Math.abs(seed) % ASKS.length], foot: 'כל ערב ב-21:00 · @marketalert.il' });
+
+  const lines = top.map((s, i) => `${['1️⃣', '2️⃣', '3️⃣'][i]} ${s.headline}${s.meaning ? `\n${s.meaning}` : ''}`).join('\n\n');
+  const credits = top.map(s => s.image?.credit).filter(Boolean);
   const caption = [
     `${SERIES.digest} | ${ddmmyy(at)}`, '',
+    `📌 ${lead.headline}`,
+    lead.meaning || lead.where ? (lead.meaning ?? lead.where) : null, '',
     lines, '',
-    day?.money ? `💰 ${day.money} (${day.note})` : null,
-    day?.ron ? `🧑 ${day.ron}` : null,
+    chart ? `📈 ${chart.headline}` : null,
+    nextItems.length ? `⏭ ${nextItems[0]}` : null,
+    day?.money ? `💰 ${day.money} (${day.note})` : null, day?.ron ?? null, '',
+    `📩 ${sendLine([lead, ...top])} שלחו לו את הפוסט`,
     askLine(seed), '',
     SCHEDULE,
     credits.length ? credits.join(' · ') : null,
@@ -294,7 +344,7 @@ function composeEveningRaw(rows, { now = null, carry = {}, cards = 3 } = {}) {
   ].filter(x => x !== null).join('\n').replace(/\n{3,}/g, '\n\n').slice(0, 2120);
 
   return { key: `E:${localDay(at)}`, template: null, window: ddmmyy(at), date: ddmmyy(at),
-    stamp, quotes, slides, caption, consumed, carry: nextCarry, format: 'cards' };
+    stamp, quotes, slides, caption, consumed, carry: nextCarry, format: 'cards-v2', chartSym: series?.sym ?? null };
 }
 
 function tagsOf(stories) {

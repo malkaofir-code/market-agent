@@ -59,7 +59,10 @@ const SINGLE = /(?<![\w.])((?:(?<![֐-׿])[+\-−])?[$€£₪]?\d+(?:[.,:\/]\d+
 // else — so "Stitch Fix" printed as "Fix Stitch" and a byline came out
 // ":Letter Kobeissi The". One isolate per run keeps the words in the
 // order they were written. "S&P" still counts as one word.
-const LATIN = /\b([A-Za-z][A-Za-z0-9.'’]{1,15}(?:(?:\s+|\s*&\s*)[A-Za-z][A-Za-z0-9.'’]{0,15}){0,5})\b/gu;
+const LATIN = /\b([A-Za-z][A-Za-z0-9.'’&]{1,15}(?:(?:\s+|\s*&\s*)[A-Za-z][A-Za-z0-9.'’]{0,15}){0,5})\b/gu;
+// A Latin name that carries its own number — "S&P 500", "Russell 2000",
+// "Nasdaq 100" — is ONE island; split, the RTL line prints "500 S&P".
+const LATNUM = /(?<![\w&])([A-Za-z][A-Za-z&.]{1,15}(?:\s+[A-Za-z][A-Za-z&.]{1,15}){0,2}\s+\d{2,4})(?![\d,%\/]|[.:,]\d)/gu;
 
 // §07 — one leading decorative emoji is stripped from every slide
 // string. They stay in the caption.
@@ -92,6 +95,7 @@ export function bidi(raw, { emoji = 'strip' } = {}) {
       if (free(start, end)) taken.push({ start, end, cls, text: m[0] });
     }
   };
+  collect(LATNUM, 'lat');
   collect(RANGE, 'range');
   collect(NRANGE, 'range');
   collect(SINGLE, 'num');

@@ -29,24 +29,51 @@ const twice = [...rows, { ...by(3944), tg_id: 9944, ts: by(3944).ts + 600 }];
 check('a retold story appears once', storiesOf(twice).filter(s => /^Microsoft/.test(s.headline)).length, 1);
 check('…the newest telling wins', storiesOf(twice).find(s => /^Microsoft/.test(s.headline)).tg_id, 9944);
 
-// ── 21:00 ──
+// ── 21:00 · the explainer carousel (v2) ──
+import { insightOf, chartSymbolFor } from '../src/chart.js';
+import { boardOf } from '../src/story.js';
 const now = 1793306265 + 3600;
-const e = composeEvening(rows, { now, carry: { SPX: { sym: 'SPX', chg: -0.3, last: '7720', at: now } } });
-check('evening: three cards', e.slides.length, 3);
-check('evening: every board is a card', e.slides.every(s => s.type === 'card'), true);
-check('evening: the first card is the day (the channel\'s read)', e.slides[0].tg_id, 3970);
-check('evening: the first card carries the money', !!e.slides[0].day?.money, true);
-check('evening: no story twice', new Set(e.slides.map(s => s.tg_id)).size, 3);
+const pts = []; let c = 100; const d0 = Date.parse('2026-08-03');
+for (let i = 0; i < 70; i++) { c *= i < 60 ? 1.002 : 0.98; pts.push({ d: new Date(d0 + i * 86400000).toISOString().slice(0, 10), c }); }
+const e = composeEvening(rows, { now, carry: { SPX: { sym: 'SPX', chg: -0.3, last: '7720', at: now } }, series: { sym: '^NDX', points: pts } });
+const types = e.slides.map(s => s.type);
+check('evening: opens on the day', types[0], 'dayCover');
+check('evening: 6–8 slides (under 5 underperforms)', types.length >= 6 && types.length <= 8, true);
+check('evening: the numbers board', types.includes('board'), true);
+check('evening: three stories', types.filter(t => t === 'card').length, 3);
+check('evening: the chart of the day', types.includes('chart'), true);
+check('evening: ends on the send prompt', types.at(-1), 'close');
+check('evening: the cover is the channel\'s read', e.slides[0].headline, 'המכירה מרוכזת בטכנולוגיה, לא בכל השוק');
+check('evening: the cover carries the index move', e.slides[0].big?.value, '-1.4%');
+check('evening: the cover carries the money', !!e.slides[0].day?.money, true);
+check('evening: no story twice', new Set(e.slides.filter(s => s.type === 'card').map(s => s.tg_id)).size, 3);
 check('evening: every board inside its budget', e.slides.flatMap(overBudget).length, 0);
 check('evening: a photo-only message is consumed too', e.consumed.includes(3933), true);
 check('evening: every message read is consumed', e.consumed.length, rows.length);
+check('evening caption: a send prompt', e.caption.includes('שלחו לו'), true);
 check('evening caption: the schedule', e.caption.includes('ראשון: השבוע בדקה'), true);
-check('evening caption: a question', e.caption.includes('כתבו בתגובות'), true);
 check('evening caption: under Instagram\'s limit', e.caption.length <= 2200, true);
+const noChart = composeEvening(rows, { now });
+check('evening: no closes, no chart slide — still a post', `${noChart.slides.some(s => s.type === 'chart')}:${noChart.slides.length >= 5}`, 'false:true');
 const { buildSlide } = await import('../src/builder.js');
-check('evening: no mascot on a card', buildSlide(e.slides[0], { poses: { welcome: ['x'], explain: ['x'], point: ['x'] }, quotes: [] }, 0, 3).includes('class="ron"'), false);
+check('evening: no mascot on any slide', e.slides.every(sl => !buildSlide(sl, { poses: { welcome: ['x'], explain: ['x'], point: ['x'], upward: ['x'] }, quotes: [] }, 0, 8).includes('class="ron"')), true);
 const empty = composeEvening([by(3933)], { now });
 check('evening: nothing but a photo is a skip that still consumes', `${!!empty.skip}:${empty.consumed.length}`, 'true:1');
+
+// ── the chart's headline is computed, and true ──
+const lowIns = insightOf(pts, '^NDX');
+check('chart: a 10-session fall to the low says so', lowIns.headline.startsWith('הנאסד״ק 100: הסגירה הנמוכה'), true);
+const up = pts.map((p, i) => ({ ...p, c: 100 + i }));
+check('chart: a new high says so', insightOf(up, '^SPX').headline.includes('הגבוהה'), true);
+const flat = pts.map((p, i) => ({ ...p, c: 100 + Math.sin(i) }));
+check('chart: otherwise the change over the period', /ב-3 חודשים: [+-]/.test(insightOf(flat, '^SPX').headline), true);
+check('chart: too few sessions is no chart', insightOf(pts.slice(0, 10), '^SPX'), null);
+check('chart: the day about the Nasdaq charts the Nasdaq', chartSymbolFor('📊 נאסד״ק 100 ירד 1.4%, S&P 500 ירד 0.3%'), '^NDX');
+
+// ── the channel's 📊 line as a board ──
+check('board: names and signed moves', JSON.stringify(boardOf('נאסד"ק 100 ירד 1.4%, S&P 500 ירד 0.3%, VIX 17.2').map(r => r.value)), '["-1.4%","-0.3%","17.2"]');
+check('board: "S&P 500" is not a 500 move', boardOf('S&P 500 +0.28%')[0].value, '+0.28%');
+check('board: an item saying two things is dropped', boardOf('נאסד״ק 100 נסגר אתמול ב-1.38%- ל-29,402 נקודות וחוזיו יורדים כעת 2.6%').length, 0);
 
 // ── stories ──
 const st = composeStories([by(3944), by(3945)], {});

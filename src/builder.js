@@ -3,6 +3,7 @@
 // Pure: deck plan in, HTML out. No I/O, no layout measurement.
 // (Overflow is measured in render.js, which owns a real browser.)
 // ─────────────────────────────────────────────────────────────
+import { pathOf } from './chart.js';
 import { bidi, esc } from './rtl.js';
 import { vars, byId } from './templates.js';
 
@@ -23,6 +24,21 @@ const MARK = `<svg class="hd-mark" viewBox="0 0 100 100"><g fill="currentColor">
 const pad2 = n => String(n).padStart(2, '0');
 const sign = v => (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
 const fmtPct = v => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
+
+// ── the chart of the day, drawn ──────────────────────────────
+// Chartr's rules: one story colour, grey for the rest, no gridlines,
+// no legend, one annotation (the last close), the source line below.
+function chartSvg(points, dir, { w = 960, h = 560, label = null, spark = false } = {}) {
+  if (!points?.length) return '';
+  const p = pathOf(points, w, h, spark ? 6 : 14);
+  const first = points[0].c, last = points.at(-1).c;
+  const base = h - (14 + (h - 28) * (p.hi === p.lo ? 0.5 : (first - p.lo) / (p.hi - p.lo)));
+  return `<svg class="${spark ? 'spark' : 'ch-svg'} ${esc(dir || '')}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+<line class="ch-base" x1="0" x2="${w}" y1="${base.toFixed(1)}" y2="${base.toFixed(1)}"/>
+<path class="ch-area" d="${p.area}"/><path class="ch-line" d="${p.d}"/>
+<circle class="ch-dot" cx="${p.end.x.toFixed(1)}" cy="${p.end.y.toFixed(1)}" r="${spark ? 9 : 13}"/></svg>${
+    label ? `<p class="ch-last" style="top:${(p.end.y / h * 100).toFixed(1)}%">${esc(label)}</p>` : ''}`;
+}
 
 // ── band A: masthead ─────────────────────────────────────────
 function masthead({ window: win, date }) {
@@ -192,7 +208,7 @@ const ARCHETYPES = {
   // 00 · THE CARD — the one design (Nov 2026). The channel's headline,
   // one line of what it means, the picture only when it is licensed.
   card: s => `<div class="a-cd${s.photo ? ' has-img' : ''}">
-    ${s.photo ? `<figure class="cd-img" data-protect="the photo"><img src="${esc(s.photo.src)}" alt=""></figure>` : ''}
+    ${s.photo ? `<figure class="cd-img" data-protect="the photo"><img src="${esc(s.photo.src)}" alt="" onerror="this.parentNode.remove()"></figure>` : ''}
     <div class="cd-txt">
       <p class="eyeb">${bidi(s.eyebrow || '')}</p>
       ${s.figure ? `<p class="cd-fig ${esc(s.dir || '')}" data-protect="the figure">${esc(s.figure)}</p>` : ''}
@@ -200,6 +216,35 @@ const ARCHETYPES = {
       ${s.mean ? `<div class="cd-m"><p class="cd-ml">${bidi(s.label || '')}</p><p class="cd-mt">${bidi(s.mean)}</p></div>` : ''}
       ${s.credit ? `<p class="cd-cr">${esc(s.credit)}</p>` : ''}
     </div></div>`,
+
+  // ── the evening explainer (v2, Nov 2026) ─────────────────────
+  // 1 · the day: its insight, the index move, a month of the index.
+  dayCover: s => `<div class="a-dc">
+    <p class="eyeb">${bidi(s.eyebrow || '')}</p>
+    ${s.big ? `<div class="dc-big"><b class="dc-v ${esc(s.big.dir || '')}" data-protect="the figure">${esc(s.big.value)}</b><span class="dc-n">${bidi(s.big.name)}</span></div>` : ''}
+    <h1 class="dc-h">${bidi(s.headline)}</h1>
+    ${s.line ? `<p class="dc-l">${bidi(s.line)}</p>` : ''}
+    ${s.spark ? `<div class="dc-spark">${chartSvg(s.spark.points, s.spark.dir, { w: 960, h: 170, spark: true })}<span class="dc-sl">${bidi('החודש האחרון')}</span></div>` : ''}
+  </div>`,
+
+  // 2 · the numbers: a stat board, each row one instrument.
+  board: s => `<div class="a-bd"><p class="eyeb">${bidi(s.eyebrow || '')}</p><h2 class="bd-t">${bidi(s.title)}</h2>
+    <ul class="bd-rows">${(s.rows ?? []).map(r => `<li><span class="bd-n">${bidi(r.name)}</span><b class="bd-v ${esc(r.dir || '')}">${esc(r.value)}</b></li>`).join('')}</ul></div>`,
+
+  // 6 · the chart of the day — the headline is computed from the line.
+  chart: s => `<div class="a-ch2"><p class="eyeb">${bidi(s.eyebrow || '')}</p>
+    <h2 class="ch-h">${bidi(s.headline)}</h2><p class="ch-sub">${bidi(s.sub || '')}</p>
+    <div class="ch-box" data-protect="the chart">${chartSvg(s.points, s.dir, { label: s.last })}</div>
+    <p class="ch-chg ${esc(s.dir || '')}"><b>${esc(s.change)}</b> ${bidi('בתקופה')}</p></div>`,
+
+  // 7 · what is coming — the slide people save.
+  next: s => `<div class="a-nx"><p class="eyeb">${bidi(s.eyebrow || '')}</p><h2 class="nx-t">${bidi(s.title)}</h2>
+    <ol class="nx-list">${(s.items ?? []).map(t => `<li><span class="nx-tx">${bidi(t)}</span></li>`).join('')}</ol></div>`,
+
+  // 8 · send it on: sends are what reach people who do not follow us.
+  close: s => `<div class="a-cl"><p class="eyeb">${bidi(s.eyebrow || '')}</p>
+    <h2 class="cl-h">${bidi(s.headline)}</h2><p class="cl-s">${bidi(s.sub || '')}</p>
+    <p class="cl-q">💬 ${bidi(s.ask || '')}</p><p class="cl-f">${bidi(s.foot || '')}</p></div>`,
 
   // 17 · the proof post's opening.
   coverProof: s => `<div class="a-pv">
@@ -352,8 +397,6 @@ const GROUND = {
   brief:       'slate',
   outlook:     'slate',
   detail:      'doc',
-  chart:       'doc',     // levels on paper
-  watch:       'flare',   // the one that shouts
   telegram:    'deep',    // the sign-off
   ask:         'deep',    // the one board that asks for something
   coverBleed:  'ink',     // a scrim is mixed for a dark ground
@@ -400,7 +443,7 @@ const NO_RON = new Set(['item', 'list', 'coverEdge', 'coverMargin', 'coverBleed'
   // steps, and he has just presented the meaning on the board before.
   'lesson', 'brief', 'outlook', 'detail',
   // The record is a table. He has nowhere to stand on it.
-  'record', 'proofOrig', 'recordRows', 'analysts', 'analystNote', 'card']);
+  'record', 'proofOrig', 'recordRows', 'analysts', 'analystNote', 'card', 'dayCover', 'board', 'chart', 'next', 'close']);
 
 /**
  * The mascot layer. `ctx.poses` is filled by render.js, which owns the
@@ -462,7 +505,7 @@ const SECONDARY = new Set(['item', 'list', 'chart', 'watch', 'telegram', 'record
 
 // The tape is the news board's signature row. A receipt has no tape.
 const NO_TAPE = new Set(['telegram', 'proofCert', 'proofVerdict', 'coverProof', 'record', 'proofOrig', 'recordRows',
-  'sceneProof']);
+  'sceneProof', 'board', 'chart', 'next', 'close', 'card']);
 const COVERS = new Set(['cover', 'coverFramed']);   // overlay grid
 const BLEED = new Set(['cover']);                  // photo escapes the band
 
