@@ -246,9 +246,9 @@ jobs:
           # ten boards carrying seven stories, which readers found too
           # much to follow.
           DIGEST_FORMAT: 'cards'
-          # Card rollout: until this local date the evening carousel and the
-          # stories render and go to the owner on Telegram, nothing is posted.
-          REVIEW_UNTIL: '2026-11-16'
+          # No review hold (owner, 13 Nov 2026): everything posts as soon as it
+          # is built. Set a local date (YYYY-MM-DD) to hold posts until then.
+          REVIEW_UNTIL: ''
           DIGEST_OUTLOOK: '1'
           # ── the reel track ───────────────────────────────
           # One a day, at 17:00 local. Was two; one film that is worth
