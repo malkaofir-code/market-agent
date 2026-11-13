@@ -53,19 +53,16 @@ export function headlineOf(text) {
 }
 
 /**
- * Whether the account may post this message's picture.
+ * The message's picture.
  *
- * Only an image the channel credits to Wikimedia Commons under a
- * Creative Commons licence — the licence line is printed with it.
- * Everything else (a "תמונה: CNBC" screenshot, an uncredited picture
- * that may be a screenshot of X or a chart) gets a text card. Decided
- * with the owner on 8 Nov 2026: most images are mixed, don't use them.
+ * Every picture the channel posts is used, with its credit line where
+ * the channel gave one (owner, 13 Nov 2026 — this replaces the 8 Nov
+ * rule of Wikimedia-CC only).
  */
 export function imageOf(row, lines = linesOf(row.text)) {
   const cred = lines.find(l => CREDIT.test(l))?.replace(CREDIT, '').trim() ?? null;
-  const ok = !!(row.media_url && row.has_media !== false && cred
-    && /wikimedia/i.test(cred) && /\bCC\b|creative commons|public domain/i.test(cred));
-  return { url: ok ? row.media_url : null, credit: ok ? `תמונה: ${cred}` : null, raw: cred };
+  const ok = !!(row.media_url && row.has_media !== false);
+  return { url: ok ? row.media_url : null, credit: ok && cred ? `תמונה: ${cred}` : null, raw: cred };
 }
 
 // ── the channel's "📊 איפה אנחנו" line, as a board ────────────

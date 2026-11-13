@@ -28,6 +28,15 @@ export const BUDGET = {
   chart:        { headline: 10 },
   next:         { title: 5, items: [3, 14] },
   close:        { headline: 8, sub: 6, ask: 10 },
+  // The brand (look.js)
+  kCover:       { headline: 12, line: 14 },
+  kBoard:       { title: 5, next: [2, 12] },
+  kStory:       { eyebrow: 6, headline: 12, mean: 12 },
+  kChart:       { headline: 10 },
+  kClose:       { headline: 8, sub: 6, ask: 12, foot: 12 },
+  kLesson:      { title: 8, hook: 14 },
+  kStep:        { text: 14 },
+  kTake:        { text: 18, foot: 12 },
   // The day strip rides on any board that carries it (day.js).
   _day:         { money: 12, ron: 14 },
   // ── digests ──

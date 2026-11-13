@@ -53,7 +53,7 @@ on:
       mode:
         description: 'digest = the carousel; stories = the hour as story boards; insights = read the account back, publish nothing; reel = one MP4 to the only surface strangers see; callback = check what we claimed against what the market did'
         type: choice
-        options: [digest, stories, insights, reel, callback]
+        options: [digest, stories, insights, reel, callback, academy]
         default: digest
       now:
         description: 'Ignore the digest schedule and post this one now'
@@ -80,7 +80,10 @@ jobs:
       # cold cache pulling a 60MB speech model or a translation model
       # whose only consumer was the speech. Set to '1' and both come
       # back on together.
-      REEL_VOICE: '0'
+      REEL_VOICE: '1'
+      # Hebrew, spoken by edge-tts (Nov 2026 rebrand): Ron hosts the reel in
+      # the language of the cards. 'en' brings Piper and the translator back.
+      REEL_VOICE_LANG: 'he'
     # 12 was right when a tick was a carousel. A reel installs ffmpeg
     # and python, pulls a voice model on a cold cache, renders twelve
     # boards in two passes and encodes seven video segments — run #368
@@ -134,7 +137,7 @@ jobs:
       # seconds. An absolute path that exists in every image needs no
       # expression to be translated correctly and cannot drift.
       - name: cache the voice
-        if: inputs.mode == 'reel' && env.REEL_VOICE != '0'
+        if: inputs.mode == 'reel' && env.REEL_VOICE != '0' && env.REEL_VOICE_LANG != 'he'
         uses: actions/cache@v4
         with:
           path: .piper
@@ -143,7 +146,7 @@ jobs:
       # The translation model, cached the same way and for the same
       # reason: it is downloaded once and then never again.
       - name: cache the translator
-        if: inputs.mode == 'reel' && env.REEL_VOICE != '0'
+        if: inputs.mode == 'reel' && env.REEL_VOICE != '0' && env.REEL_VOICE_LANG != 'he'
         uses: actions/cache@v4
         with:
           path: .mt
@@ -159,7 +162,7 @@ jobs:
       # Each stage now says what it did, and the last line is the
       # answer to "is there a voice on this runner or not".
       - name: piper
-        if: inputs.mode == 'reel' && env.REEL_VOICE != '0'
+        if: inputs.mode == 'reel' && env.REEL_VOICE != '0' && env.REEL_VOICE_LANG != 'he'
         timeout-minutes: 6
         run: |
           set +e
@@ -182,6 +185,18 @@ jobs:
           exit 0
         env:
           VOICE: en_US-lessac-medium
+
+      # The Hebrew narrator: a pip package, no model to download. Cannot
+      # fail the run — without it the reel goes out with the bed alone.
+      - name: hebrew voice
+        if: inputs.mode == 'reel' && env.REEL_VOICE != '0' && env.REEL_VOICE_LANG == 'he'
+        timeout-minutes: 3
+        run: |
+          set +e
+          python3 -m pip install --break-system-packages edge-tts 2>&1 | tail -2
+          python3 -c "import edge_tts; print('HEBREW VOICE READY')" \
+            || echo "NO HEBREW VOICE — the reel will go out with the bed alone"
+          exit 0
 
       - name: run
         env:
@@ -215,7 +230,7 @@ jobs:
           # into, and still blocks the duplicate firing it is for, which
           # arrives seconds apart rather than an hour.
           MIN_MINUTES_BETWEEN_STORIES: '75'
-          MAX_STORIES_PER_DAY: '4'
+          MAX_STORIES_PER_DAY: '1'
           # A story is about the hour it belongs to. More than two
           # windows behind and it is news, not "now".
           MAX_STORY_LAG_WINDOWS: '2'
@@ -233,7 +248,7 @@ jobs:
           DIGEST_FORMAT: 'cards'
           # Card rollout: until this local date the evening carousel and the
           # stories render and go to the owner on Telegram, nothing is posted.
-          REVIEW_UNTIL: '2026-11-11'
+          REVIEW_UNTIL: '2026-11-16'
           DIGEST_OUTLOOK: '1'
           # ── the reel track ───────────────────────────────
           # One a day, at 17:00 local. Was two; one film that is worth
@@ -286,9 +301,16 @@ jobs:
           # its own hour and its own day so it never takes a news slot
           # — run.js adds one to the daily cap for it.
           REEL_SCOREBOARD: '0'
-          # Three reels a week, 19:00 local: Sun "השבוע בדקה", Tue+Thu "השוק בדקה" (owner, 9 Nov 2026).
-          REEL_DAYS: 'Sun,Tue,Thu'
+          # One reel a day, 19:00 local: Sun "השבוע בדקה", Thu "צדקנו או טעינו?", otherwise "למה זה זז?" (owner, 13 Nov 2026).
+          REEL_DAYS: 'Sun,Mon,Tue,Wed,Thu,Fri,Sat'
           REEL_DAY_WEEK: 'Sun'
+          REEL_DAY_PROOF: 'Thu'
+          # האקדמיה של רון: three lessons a week, 13:00 local.
+          ACADEMY_DAYS: 'Mon,Wed,Fri'
+          ACADEMY_HOURS: '13'
+          # Every reel and lesson is also linked in the Telegram channel the
+          # news comes from. Soft: skipped when the session may not write there.
+          TG_SHARE_TARGET: 'hamal_shukhahon'
           REEL_SCORE_HOURS: '9'
           REEL_SCORE_DAY: 'Mon'
           SCORE_REEL_MIN: '3'

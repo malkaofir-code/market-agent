@@ -6,6 +6,7 @@
 import { pathOf } from './chart.js';
 import { bidi, esc } from './rtl.js';
 import { vars, byId } from './templates.js';
+import { K, KX, K_GROUND, K_POSE, kScene } from './look.js';
 
 export const CANVAS = { w: 1080, h: 1350, body: 1118 };
 // A story is the same board, taller, with the top and bottom quarters
@@ -541,8 +542,30 @@ function glossStrip(g) {
     `<p><b>${bidi(x.term)}</b><span>${bidi(x.says)}</span></p>`).join('')}</div>`;
 }
 
+// ── the Nov 2026 look (look.js): its own frame, Ron inside the body ──
+function kHead() {
+  return `<header class="sl-hd k-hd"><span class="k-brand">${MARK}<b>מרקט אלרט</b></span>
+<span class="k-tag">השוק בעברית פשוטה</span></header>`;
+}
+function kFoot(i, n, slide) {
+  const mid = i < n && slide.swipe ? `<span class="k-swipe">${bidi(slide.swipe)} ←</span>`
+    : `<span class="k-src">${slide.source ? bidi(slide.source) : ''}</span>`;
+  return `<footer class="sl-ft k-ft"><span class="k-ix">${i}/${n}</span>${mid}<span class="k-hdl">${HANDLE}</span></footer>`;
+}
+function buildK(slide, ctx, i, n, { story = false } = {}) {
+  const ground = slide.ground ?? K_GROUND[slide.type];
+  const wardrobe = ctx.poses?.[slide.gesture ?? K_POSE[slide.type]];
+  const ronSrc = slide.ron === null || !wardrobe?.length ? null
+    : wardrobe[((ctx.spin ?? 0) + i) % wardrobe.length];
+  const sq = slide.squeeze && slide.squeeze !== 1 ? ` style="--sq:${slide.squeeze}"` : '';
+  return `<div class="slide kx kx-${ground}${story ? ' slide--story' : ''}"${sq} data-type="${slide.type}">
+${kHead()}<main class="sl-bd">${K[slide.type]({ ...slide, ronSrc })}</main>
+${kFoot(i + 1, n, slide)}</div>`;
+}
+
 export function buildSlide(slide, ctx, i, n, { story = false, layer = null } = {}) {
-  const body = ARCHETYPES[slide.type];
+  if (KX.has(slide.type)) return buildK(slide, ctx, i, n, { story });
+  const body = slide.type === 'scene' && slide.k ? kScene : ARCHETYPES[slide.type];
   if (!body) throw new Error(`unknown archetype: ${slide.type}`);
   const cover = COVERS.has(slide.type);
   // render.js sets `squeeze` when a slide overruns its band: the body
@@ -602,7 +625,7 @@ export function buildSlide(slide, ctx, i, n, { story = false, layer = null } = {
   const isProof = PROOF.has(slide.type);
   const head = isProof ? proofHead(ctx, slide) : masthead(ctx);
   const tail = isProof ? proofFoot(slide) : foot(i + 1, n, slide.source, i + 1 < n ? slide.swipe : null);
-  return `<div class="slide${lay}${story && !reel ? ' slide--story' + alt : ''}${reel ? ' slide--reel' : ''}${cover ? ' slide--cover' : ''}${isProof ? ' slide--proof' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
+  return `<div class="slide${lay}${slide.k ? ' kx-reel' : ''}${story && !reel ? ' slide--story' + alt : ''}${reel ? ' slide--reel' : ''}${cover ? ' slide--cover' : ''}${isProof ? ' slide--proof' : ''}${g}${place}"${sq} data-type="${slide.type}"${slide.story ? ` data-story="${slide.story}"` : ''}${oa}><div class="bgm"></div>${coverLayer(slide)}
 ${head}<main class="sl-bd">${body({ ...slide, window: ctx.window, ronSide: side })}${glossStrip(slide.gloss)}${ronLayer(slide, ctx, i)}</main>${slide.tgStrip ? tgStrip(slide.tgStrip) : ''}${slide.day ? dayStrip(slide.day) : ''}${NO_TAPE.has(slide.type) ? '' : tape(ctx.quotes, ctx.stamp)}
 ${tail}</div>`;
 }
@@ -612,7 +635,7 @@ export function buildDeck(deck) {
   return slides.map((s, i) => buildSlide(s, ctx, i, slides.length));
 }
 
-export const FONTS = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Frank+Ruhl+Libre:wght@700;800&family=Assistant:wght@400;600;700;800&display=swap';
+export const FONTS = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Frank+Ruhl+Libre:wght@700;800&family=Assistant:wght@400;600;700;800&family=Heebo:wght@500;700;800;900&display=swap';
 
 export function page(slideHtml, css) {
   return `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">

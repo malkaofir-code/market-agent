@@ -26,7 +26,7 @@ const rows = JSON.parse(readFileSync(new URL('./fixture-cards.json', import.meta
 const now = Math.floor(Date.now() / 1000);
 const carry = { SPX: { sym: 'SPX', chg: 0.85, last: '6,800', at: now } };
 const d = composeEvening(rows, { carry, now });
-check('evening first card carries the day', !!d.slides[0].day?.money, true);
+check('evening cover carries the reader\'s money', !!d.slides[0].money?.stake, true);
 check('evening caption: the money line', d.caption.includes('₪10,000'), true);
 check('evening caption: Ron', d.caption.includes('רון:'), true);
 check('evening caption: the weekly schedule', d.caption.includes('צדקנו או טעינו?'), true);

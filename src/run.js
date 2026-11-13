@@ -24,7 +24,7 @@ import {
   provenLately,
   logRun, getState, setState, getToken, setToken, close, putPrices, closesFor,
 } from './db.js';
-import { composeEvening, composeStories, composeWeekReel, windowOf, WIN } from './compose.js';
+import { composeEvening, composeStories, composeWeekReel, composeWhyReel, composeProofReel, composeAcademy, HEAT, windowOf, WIN } from './compose.js';
 import { composeCallback, composeCallbackPost, rankRecord } from './proof.js';
 import { headlineOf } from './story.js';
 import { chartSymbolFor } from './chart.js';
@@ -43,6 +43,8 @@ const REEL = process.argv.includes('--reel') || process.env.MODE === 'reel';
 // The fourth track. Not a news track at all: it reads what the account
 // already published and asks the market whether it was right.
 const CALLBACK = process.argv.includes('--callback') || process.env.MODE === 'callback';
+// The sixth: Ron's academy, three lessons a week, in order.
+const ACADEMY = process.argv.includes('--academy') || process.env.MODE === 'academy';
 // The fifth: once a week, what the investment banks said, with their
 // names on it. Attributed third-party views, never our recommendation.
 
@@ -761,8 +763,26 @@ async function runEvening() {
     } catch (e2) { say('chart skipped —', e2.message); }
   }
 
+  // The map of the day: the last session's move for two indices and
+  // eight names. Each one soft; fewer than six and the cover falls
+  // back to the big number.
+  const heat = [];
+  try {
+    const { closes } = await import('./quotes.js');
+    const got = await Promise.allSettled(HEAT.map(h => closes(h.sym)));
+    const latest = got.map(g => (g.status === 'fulfilled' ? g.value.at(-1)?.d : null)).filter(Boolean).sort().at(-1);
+    got.forEach((g, i) => {
+      if (g.status !== 'fulfilled') return;
+      const p = g.value, a = p.at(-2), b = p.at(-1);
+      // Only names that traded on the same last session: a stale close
+      // beside fresh ones is a wrong tile.
+      if (a && b && b.d === latest && a.c > 0) heat.push({ sym: HEAT[i].sym, chg: (b.c - a.c) / a.c * 100 });
+    });
+    say(`map: ${heat.length}/${HEAT.length} moves for ${latest ?? '—'}`);
+  } catch (e) { say('map skipped —', e.message); }
+
   const carry = (await getState(CARRY_KEY)) ?? {};
-  const deck = composeEvening(rows, { now, carry, series });
+  const deck = composeEvening(rows, { now, carry, series, heat });
   if (deck.carry) await setState(CARRY_KEY, deck.carry);
   await upsertWindow(key, now - back, now);
   if (deck.skip) {
@@ -818,6 +838,62 @@ async function runEvening() {
     posted_at: Math.floor(Date.now() / 1000) }, files);
   await logRun(key, 'publish', true, result.permalink ?? result.id);
   await notify(`✅ ${key} — ${files.length} cards\n${result.permalink ?? ''}`);
+}
+
+/**
+ * Mon · Wed · Fri — "האקדמיה של רון".
+ *
+ * Thirty hand-written lessons, in order, then round again. The number
+ * of the next lesson lives in agent.state and only advances when a
+ * lesson is actually published, so a failed or reviewed run repeats
+ * the same lesson rather than skipping it.
+ */
+const ACADEMY_KEY = 'academy:next';
+async function runAcademy() {
+  const forced = process.env.IGNORE_SCHEDULE === '1';
+  const days = (process.env.ACADEMY_DAYS || 'Mon,Wed,Fri').split(',').map(x => x.trim());
+  const hours = (process.env.ACADEMY_HOURS || '13').split(',').map(x => x.trim());
+  if (!forced && !DRY && !(days.includes(localDayName()) && hours.includes(String(localHour())))) {
+    say(`SKIP — the academy runs ${days.join(', ')} at ${hours.join(', ')}:00`); return;
+  }
+  const st = (await getState(ACADEMY_KEY)) ?? { n: 1, day: null };
+  const todayKey = localDate();
+  if (!forced && !DRY && st.day === todayKey) { say('SKIP — today\'s lesson already went out'); return; }
+  const now = Math.floor(Date.now() / 1000);
+  const deck = composeAcademy(st.n, { now });
+  const key = `A:${stampKey(now)}`;
+  say(`${key} — lesson ${deck.lesson} -> ${deck.slides.length} pages`);
+  const dir = join('./out', key.replace(/:/g, ''));
+  const { files, shed } = await renderDeck({ ...deck, key }, dir, { format: 'jpeg' });
+  if (!files.length) { say('SKIP — nothing rendered'); return; }
+  if (reviewing() || DRY) {
+    say(`${DRY ? 'DRY' : 'REVIEW'} — lesson rendered, NOT published`);
+    if (!DRY) {
+      await sendForReview(files, `🖼️ האקדמיה של רון לבדיקה · שיעור ${deck.lesson}\n\n${deck.caption}`);
+      await setState(ACADEMY_KEY, { ...st, day: todayKey });
+    }
+    return;
+  }
+  const { upload, remove, publish } = await import('./publish/api.js');
+  const prefix = key.replace(/:/g, '');
+  let result = null, failure = null;
+  try { result = await publish(await upload(files, prefix), deck.caption); }
+  catch (e) { failure = e; }
+  finally { await remove(files, prefix); }
+  await upsertWindow(key, now, now);
+  if (!result) {
+    await setWindow({ key, status: 'failed', slides: files.length, shed, error: failure?.message });
+    await logRun(key, 'academy', false, failure?.message ?? 'nothing posted');
+    await notify(`❌ ${key}\n${failure?.message ?? 'nothing posted'}`);
+    process.exitCode = 1; return;
+  }
+  await setState(ACADEMY_KEY, { n: deck.lesson + 1, day: todayKey });
+  await setWindow({ key, status: 'posted', slides: files.length, shed, posted_at: Math.floor(Date.now() / 1000) });
+  await setPublished(key, { media_id: result.id ?? null, permalink: result.permalink ?? null,
+    choices: { kind: 'academy', lesson: deck.lesson, slides: files.length } });
+  await logRun(key, 'academy', true, result.permalink ?? result.id);
+  await notify(`📘 ${key} — שיעור ${deck.lesson}\n${result.permalink ?? ''}`);
+  await shareToChannel(result.permalink, `האקדמיה של רון · שיעור ${deck.lesson}`);
 }
 
 async function runInsights() {
@@ -981,24 +1057,40 @@ async function runReel() {
   const back = Number(process.env.REEL_LOOKBACK_HOURS || 24) * 3600;
   const floor = (!forced && last && last > day) ? Number(last)
     : Math.min(day, now - back);
-  // ── three reels a week ───────────────────────────────────
-  // Sunday "השבוע בדקה" over the week; Tuesday and Thursday "השוק
-  // בדקה" over the last two days (owner, 9 Nov 2026: Reels are the
-  // reach format at this size). Never two within 36 hours.
-  const reelDays = (process.env.REEL_DAYS || process.env.REEL_DAY || 'Sun').split(',').map(x => x.trim()).filter(Boolean);
+  // ── one reel a day (Nov 2026 rebrand) ────────────────────
+  // Reels are the only format here that reaches strangers (median
+  // reach 13 against 4 for a carousel), so the daily show is a reel:
+  //   Sunday    השבוע בדקה        the week
+  //   Thursday  צדקנו או טעינו?   the record, misses first
+  //   otherwise למה זה זז?        the day's move and the story behind it
+  const reelDays = (process.env.REEL_DAYS || 'Sun,Mon,Tue,Wed,Thu,Fri,Sat').split(',').map(x => x.trim()).filter(Boolean);
   const weekDay = (process.env.REEL_DAY_WEEK || 'Sun').trim();
+  const proofDay = (process.env.REEL_DAY_PROOF || 'Thu').trim();
   const today = localDayName();
   if (!forced && !DRY && !reelDays.includes(today)) {
     say(`SKIP — reels go out on ${reelDays.join(', ')}`); return;
   }
-  if (!forced && !DRY && last && now - Number(last) < 36 * 3600) {
-    say('SKIP — a reel went out in the last 36 hours'); return;
+  if (!forced && !DRY && last && now - Number(last) < 18 * 3600) {
+    say('SKIP — a reel went out in the last 18 hours'); return;
   }
-  const wk = today === weekDay || process.env.REEL_SPAN === 'week';
-  let rows = await messagesInAll(now - (wk ? 7 : 2) * 86400, now), tpl = null, tplRecent = null, proofHit = null;
-  const weekScore = wk ? await claimRecord(7) : null;
-  let deck = composeWeekReel(rows, { now, score: weekScore, span: wk ? 'week' : 'days' });
+  const kind = process.env.REEL_KIND || (today === weekDay ? 'week' : today === proofDay ? 'proof' : 'why');
+  let rows = [], tpl = null, tplRecent = null, proofHit = null, deck = null;
+  if (kind === 'proof') {
+    const board = rankRecord(await settledForecastsAll(7, 500), { hits: 2, misses: 1 });
+    deck = composeProofReel(board, { now, score: await claimRecord(30) });
+    if (deck.skip) say(`proof reel skipped (${deck.skip}) — telling the day instead`);
+  }
+  if (kind === 'week') {
+    rows = await messagesInAll(now - 7 * 86400, now);
+    deck = composeWeekReel(rows, { now, score: await claimRecord(7), span: 'week' });
+    if (deck.skip) say(`week reel skipped (${deck.skip}) — telling the day instead`);
+  }
+  if (!deck || deck.skip) {
+    rows = await messagesInAll(now - Number(process.env.REEL_LOOKBACK_HOURS || 24) * 3600, now);
+    deck = composeWhyReel(rows, { now, carry: (await getState(CARRY_KEY)) ?? {} });
+  }
   if (deck.skip) { say('SKIP — reel', `(${deck.skip})`); return; }
+  const reelKind = deck.proof ? 'proof-reel' : deck.week ? 'week-reel' : 'why-reel';
 
   // One row per reel, not one row per day.
   deck.key = `R:${stampKey(now)}`;
@@ -1027,7 +1119,8 @@ async function runReel() {
   // one will ever hear is a minute of runner time and a class of bug
   // for nothing. One condition rather than two env flags that can
   // disagree with each other.
-  if (process.env.REEL_TRANSLATE !== '0' && process.env.REEL_VOICE !== '0') {
+  const HEBREW = (process.env.REEL_VOICE_LANG || 'he') === 'he';
+  if (!HEBREW && process.env.REEL_TRANSLATE !== '0' && process.env.REEL_VOICE !== '0') {
     try {
       const { translate, speakable } = await import('./translate.js');
       const src = deck.slides.map(sl => (sl.own ? null : sl.headline ?? null));
@@ -1083,12 +1176,13 @@ async function runReel() {
   const { holdsFor, MAX_HOLD, moodOf } = await import('./reel.js');
   let voices = null, holds = null;
   if (process.env.REEL_VOICE !== '0') {
-    const { ensureVoice, sayAll, seconds } = await import('./voice.js');
+    const { ensureVoice, sayAll, seconds, haveHebrew, sayAllHe } = await import('./voice.js');
     const t0 = Date.now();
-    if (await ensureVoice()) {
+    if (HEBREW ? await haveHebrew() : await ensureVoice()) {
       try {
         // All six lines in one process. One model load, not six.
-        voices = await sayAll(deck.slides.map(sl => sl.say), dir);
+        voices = await (HEBREW ? sayAllHe : sayAll)(deck.slides.map(sl => sl.say), dir);
+        if (!voices.some(Boolean)) throw new Error('no line was spoken');
         const secs = [];
         for (const [i, wav] of voices.entries()) {
           const len = wav ? await seconds(wav).catch(() => 0) : 0;
@@ -1129,7 +1223,7 @@ async function runReel() {
   if (DRY) { say('DRY RUN OK —', mp4); return; }
   if (reviewing()) {
     say('REVIEW — the reel goes to Telegram, NOT published');
-    await handOff(mp4, `🖼️ השבוע בדקה לבדיקה\n\n${deck.caption}`);
+    await handOff(mp4, `🖼️ רילס לבדיקה (${reelKind}${voices ? ', עם קול' : ', בלי קול'})\n\n${deck.caption}`);
     return;
   }
 
@@ -1157,7 +1251,7 @@ async function runReel() {
     await setWindow({ key: deck.key, status: 'posted', slides: bgs.length,
       posted_at: Math.floor(Date.now() / 1000) });
     await setPublished(deck.key, { media_id: r.id, permalink: r.permalink,
-      choices: { kind: deck.scoreboard ? 'scoreboard-reel' : proofHit ? 'proof-reel' : 'reel',
+      choices: { kind: reelKind,
         ...(tpl ? { template: String(tpl.id), name: tpl.name } : {}),
         ...(proofHit ? { claim: proofHit.id, symbol: proofHit.symbol,
                          move: proofHit.move_pct, days: proofHit.days_after } : {}),
@@ -1171,6 +1265,7 @@ async function runReel() {
     await handOff(mp4, deck.caption);
     await logRun(deck.key, 'reel', true, r.permalink ?? r.id);
     await notify(`🎬 ${deck.key} — reel live (${built.seconds}s)\n${r.permalink ?? ''}`);
+    await shareToChannel(r.permalink, deck.caption.split('\n')[0]);
   } catch (e) {
     say('REEL FAILED —', e.message);
     await setWindow({ key: deck.key, status: 'failed', slides: bgs.length, error: e.message });
@@ -1270,6 +1365,7 @@ async function main() {
   }
 
   if (INSIGHTS) return runInsights();
+  if (ACADEMY) return runAcademy();
 
   // A review run publishes nothing, so the post-rate guards have no
   // opinion about it — let it render even at the daily cap.
@@ -1364,6 +1460,23 @@ async function handOff(file, caption) {
   finally {
     if (c) { try { await c.disconnect(); } catch {} try { await c.destroy(); } catch {} }
   }
+}
+
+/**
+ * The post, shared where the audience already is: the Telegram
+ * channel the news comes from. Only when TG_SHARE_TARGET is set and
+ * this session may write there; soft in every direction.
+ */
+async function shareToChannel(permalink, title) {
+  const to = process.env.TG_SHARE_TARGET;
+  if (!to || !permalink) return;
+  let c = null;
+  try {
+    c = await connect(); await c.connect();
+    await c.sendMessage(to, { message: `${title}\n\nעכשיו באינסטגרם 👇\n${permalink}` });
+    say(`shared to Telegram (${to})`);
+  } catch (e) { say(`telegram share skipped — ${e.message}`); }
+  finally { if (c) { try { await c.disconnect(); } catch {} try { await c.destroy(); } catch {} } }
 }
 
 async function notify(text) {

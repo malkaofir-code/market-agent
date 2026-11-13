@@ -19,8 +19,8 @@ check('a 🧭 post is a read', storyOf(by(3970)).kind, 'read');
 // ── pictures: only licensed ones ──
 check('Wikimedia + CC: the picture is used', !!imageOf(by(3944)).url, true);
 check('…and credited', imageOf(by(3944)).credit, 'תמונה: Wikimedia Commons / Briansmale / CC BY-SA 4.0');
-check('"תמונה: CNBC": no picture', imageOf(by(3968)).url, null);
-check('uncredited picture: no picture', imageOf({ ...by(3970) }).url, null);
+check('"תמונה: CNBC": used, with its credit (owner, 13 Nov)', `${!!imageOf(by(3968)).url}:${imageOf(by(3968)).credit}`, 'true:תמונה: CNBC');
+check('uncredited picture: used, no credit line invented', `${!!imageOf({ ...by(3970) }).url}:${imageOf({ ...by(3970) }).credit}`, 'true:null');
 check('credited but no media attached: no picture', imageOf(by(3957)).url, null);
 check('a bare fall is printed signed', signed('2.6%', 'dn'), '-2.6%');
 
@@ -37,37 +37,66 @@ const pts = []; let c = 100; const d0 = Date.parse('2026-08-03');
 for (let i = 0; i < 70; i++) { c *= i < 60 ? 1.002 : 0.98; pts.push({ d: new Date(d0 + i * 86400000).toISOString().slice(0, 10), c }); }
 const e = composeEvening(rows, { now, carry: { SPX: { sym: 'SPX', chg: -0.3, last: '7720', at: now } }, series: { sym: '^NDX', points: pts } });
 const types = e.slides.map(s => s.type);
-check('evening: opens on the day', types[0], 'dayCover');
-check('evening: 6–8 slides (under 5 underperforms)', types.length >= 6 && types.length <= 8, true);
-check('evening: the numbers board', types.includes('board'), true);
-check('evening: three stories', types.filter(t => t === 'card').length, 3);
-check('evening: the chart of the day, as the cover or its own slide', types.includes('chart') || e.slides[0].variant === 'chart', true);
-check('evening: 7 slides at most', types.length <= 7, true);
-check('evening: the cover variant is recorded', ['chart', 'number'].includes(e.cover), true);
-for (const v of ['chart', 'number']) {
-  process.env.COVER_VARIANT = v;
-  const ev = composeEvening(rows, { now, series: { sym: '^NDX', points: pts } });
-  check(`evening (${v} cover): the chart is said once`, ev.slides.filter(s => s.type === 'chart' || s.chart).length, 1);
-  check(`evening (${v} cover): inside every budget`, ev.slides.flatMap(overBudget).length, 0);
-}
-delete process.env.COVER_VARIANT;
-check('evening: no card ends in "…"', e.slides.filter(s => s.type === 'card').every(s => !/…$/.test(s.mean ?? '') && !/…$/.test(s.headline)), true);
-check('evening: a card line is one glance (≤12 words)', e.slides.filter(s => s.type === 'card').every(s => !s.mean || s.mean.split(/\s+/).length <= 12), true);
-check('evening: ends on the send prompt', types.at(-1), 'close');
+const heat = [['^SPX', -0.3], ['^NDX', -1.4], ['NVDA', -3.2], ['AAPL', 0.4], ['MSFT', 1.6], ['GOOGL', -6.1], ['AMZN', -0.8], ['META', -2.2]].map(([sym, chg]) => ({ sym, chg }));
+const em = composeEvening(rows, { now, series: { sym: '^NDX', points: pts }, heat });
+check('evening: opens on the brand cover', types[0], 'kCover');
+check('evening: 5–6 pages', types.length >= 5 && types.length <= 6, true);
+check('evening: the numbers board', types.includes('kBoard'), true);
+check('evening: two stories beside the board', types.filter(t => t === 'kStory').length, 2);
+check('evening: no map → the big number and the chart page', `${!!e.slides[0].big}:${types.includes('kChart')}:${e.cover}`, 'true:true:number');
+check('evening: with a map, the map is the cover and the chart page goes', `${em.slides[0].tiles.length}:${em.slides.some(s => s.type === 'kChart')}:${em.cover}`, '8:false:map');
+check('map: fewer than six moves is no map', composeEvening(rows, { now, heat: heat.slice(0, 4) }).slides[0].tiles, null);
+check('map: an implausible move is dropped', composeEvening(rows, { now, heat: [...heat.slice(0, 7), { sym: 'META', chg: 80 }] }).slides[0].tiles.length, 7);
+check('evening: no story line ends in "…"', e.slides.filter(s => s.type === 'kStory').every(s => !/…$/.test(s.mean ?? '') && !/…$/.test(s.headline)), true);
+check('evening: a story line is one glance (≤12 words)', e.slides.filter(s => s.type === 'kStory').every(s => !s.mean || s.mean.split(/\s+/).length <= 12), true);
+check('evening: ends on the send prompt', types.at(-1), 'kClose');
 check('evening: the cover is the channel\'s read', e.slides[0].headline, 'המכירה מרוכזת בטכנולוגיה, לא בכל השוק');
 check('evening: the cover carries the index move', e.slides[0].big?.value, '-1.4%');
-check('evening: the cover carries the money', !!e.slides[0].day?.money, true);
-check('evening: no story twice', new Set(e.slides.filter(s => s.type === 'card').map(s => s.tg_id)).size, 3);
-check('evening: every board inside its budget', e.slides.flatMap(overBudget).length, 0);
+check('evening: the cover carries the reader\'s money', !!e.slides[0].money?.stake, true);
+check('evening: no story twice', new Set(e.slides.filter(s => s.type === 'kStory').map(s => s.tg_id)).size, 2);
+check('evening: every page inside its budget', [...e.slides, ...em.slides].flatMap(overBudget).length, 0);
 check('evening: a photo-only message is consumed too', e.consumed.includes(3933), true);
 check('evening: every message read is consumed', e.consumed.length, rows.length);
 check('evening caption: a send prompt', e.caption.includes('שלחו לו'), true);
 check('evening caption: the schedule', e.caption.includes('ראשון: השבוע בדקה'), true);
+check('evening caption: the trust line', e.caption.includes('לא ייעוץ השקעות'), true);
 check('evening caption: under Instagram\'s limit', e.caption.length <= 2200, true);
-const noChart = composeEvening(rows, { now });
-check('evening: no closes, no chart slide — still a post', `${noChart.slides.some(s => s.type === 'chart')}:${noChart.slides.length >= 5}`, 'false:true');
 const { buildSlide } = await import('../src/builder.js');
-check('evening: no mascot on any slide', e.slides.every(sl => !buildSlide(sl, { poses: { welcome: ['x'], explain: ['x'], point: ['x'], upward: ['x'] }, quotes: [] }, 0, 8).includes('class="ron"')), true);
+const ctx = { poses: { welcome: ['data:x'], explain: ['data:x'], point: ['data:x'], yes: ['data:x'], pause: ['data:x'] }, quotes: [] };
+check('evening: Ron hosts the cover and the close', `${buildSlide(e.slides[0], ctx, 0, 6).includes('k-ron')}:${buildSlide(e.slides.at(-1), ctx, 5, 6).includes('k-ron')}`, 'true:true');
+check('evening: every page builds', em.slides.every((sl, i) => buildSlide(sl, ctx, i, em.slides.length).includes('class="slide kx')), true);
+
+// ── למה זה זז? ──
+const { composeWhyReel, composeProofReel, composeAcademy } = await import('../src/compose.js');
+const why = composeWhyReel(rows, { now });
+check('why reel: opens on the move as a question', why.slides[0].headline, 'למה הנאסד״ק ירד היום?');
+check('why reel: the number is on the first frame', why.slides[0].big, '-1.4%');
+check('why reel: the answer is the channel\'s read', why.slides[1].headline, 'המכירה מרוכזת בטכנולוגיה, לא בכל השוק');
+check('why reel: ends on a question', why.slides.at(-1).headline, 'עולה או יורד מחר?');
+check('why reel: every frame has a spoken line', why.slides.every(s => !!s.say), true);
+check('why reel: every frame builds in the brand', why.slides.every((sl, i) => buildSlide(sl, ctx, i, why.slides.length).includes('a-ks')), true);
+check('why reel: one message is not a reel', !!composeWhyReel(rows.slice(0, 1), { now }).skip, true);
+
+// ── צדקנו או טעינו? ──
+const pr = composeProofReel({ misses: [{ id: 1, asset: 'Tesla', dir: 'up', move_pct: -4.2, headline: 'x' }],
+  hits: [{ id: 2, asset: 'Nvidia', dir: 'up', move_pct: 5.1, headline: 'y' }] }, { now, score: { hit: 9, miss: 4 } });
+check('proof reel: the miss comes first', pr.slides[1].chip, 'טעינו ✗');
+check('proof reel: the record is stated with its denominator', pr.slides.at(-1).headline, 'צדקנו 9 מתוך 13');
+check('proof reel: one settled call is not a record', !!composeProofReel({ hits: [{ id: 2, asset: 'Nvidia', dir: 'up', move_pct: 5.1 }], misses: [] }, { now }).skip, true);
+
+// ── האקדמיה של רון ──
+const { LESSONS } = await import('../src/academy.js');
+const ac = composeAcademy(7, { now });
+check('academy: cover, three steps, the line to keep, the ask', ac.slides.map(s => s.type).join(' '), 'kLesson kStep kStep kStep kTake kClose');
+check('academy: thirty lessons', LESSONS.length, 30);
+check('academy: lesson 31 is lesson 1 again', composeAcademy(31, { now }).lesson, 1);
+check('academy: every lesson fits its pages', LESSONS.every((_, i) => composeAcademy(i + 1, { now }).slides.flatMap(overBudget).length === 0), true);
+check('academy: every lesson has three steps and one line', LESSONS.every(l => l.steps.length === 3 && l.take && l.hook && l.title), true);
+const ADV = /כדאי|מומלץ|תקנו|תמכרו|לקנות עכשיו|למכור עכשיו/;
+check('academy: no lesson gives advice', LESSONS.every(l => !ADV.test([l.title, l.hook, ...l.steps, l.take].join(' '))), true);
+check('academy: no lesson carries a number that goes stale', LESSONS.every(l => !/\d+(?:\.\d+)?%/.test([l.hook, ...l.steps, l.take].join(' '))), true);
+check('academy: every lesson builds', ac.slides.every((sl, i) => buildSlide(sl, ctx, i, 6).includes('class="slide kx')), true);
+
 const empty = composeEvening([by(3933)], { now });
 check('evening: nothing but a photo is a skip that still consumes', `${!!empty.skip}:${empty.consumed.length}`, 'true:1');
 
@@ -103,7 +132,8 @@ check('board: an item saying two things is dropped', boardOf('נאסד״ק 100 �
 // ── stories ──
 const st = composeStories([by(3944), by(3945)], {});
 check('story: one card', st.slides.length, 1);
-check('story: a licensed picture is on it', !!st.slides[0].photo, true);
+check('story: the picture is on it', !!st.slides[0].photo, true);
+check('story: in the brand', st.slides[0].type, 'kStory');
 check('story: inside budget', overBudget(st.slides[0]).length, 0);
 
 // ── Sunday ──

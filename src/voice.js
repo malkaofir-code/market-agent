@@ -150,3 +150,33 @@ export async function seconds(file) {
   const n = Number(String(stdout).trim());
   return Number.isFinite(n) ? n : 0;
 }
+
+// ── Hebrew (Nov 2026 rebrand) ─────────────────────────────────
+// The reel is hosted by Ron, for an Israeli audience, so it is spoken
+// in Hebrew: the same line that is on the card. Piper has no Hebrew
+// voice; edge-tts does. Same contract as sayAll — soft in every way.
+const HE_VOICE = process.env.REEL_VOICE_HE || 'he-IL-AvriNeural';
+
+/** edge-tts importable on this machine. */
+export async function haveHebrew() {
+  try { await run('python3', ['-c', 'import edge_tts'], { timeout: CHECK_MS, killSignal: 'SIGKILL' }); return true; }
+  catch { return false; }
+}
+
+/** What the voice is given: no markup, no symbols it would spell out. */
+export const speakableHe = t => String(t ?? '').replace(/<[^>]+>/g, ' ')
+  .replace(/S&P\s*500/g, 'אס אנד פי חמש מאות').replace(/S&P/g, 'אס אנד פי')
+  .replace(/(\d)\.(\d)/g, '$1 נקודה $2').replace(/%/g, ' אחוז').replace(/[+]/g, ' פלוס ')
+  .replace(/₪\s*([\d,]+)/g, '$1 שקלים').replace(/\$\s*([\d.,]+)/g, '$1 דולר')
+  .replace(/[·|•▪️✓✗"״]/g, ' ').replace(/\s+/g, ' ').trim();
+
+export async function sayAllHe(lines, dir) {
+  const req = { voice: HE_VOICE, rate: process.env.REEL_VOICE_HE_RATE || '+6%',
+    lines: lines.map((t, i) => { const line = speakableHe(t); return line ? { text: line, out: join(dir, `say-${i}.wav`) } : {}; }) };
+  const reqPath = join(dir, 'say-request.json');
+  writeFileSync(reqPath, JSON.stringify(req));
+  const { stdout } = await run('python3', [join(HERE, 'py', 'speak_he.py'), reqPath],
+    { maxBuffer: 1 << 26, timeout: SAY_MS, killSignal: 'SIGKILL' });
+  const out = JSON.parse(stdout);
+  return lines.map((_, i) => (out[i] && existsSync(out[i]) ? out[i] : null));
+}
