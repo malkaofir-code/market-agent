@@ -192,14 +192,16 @@ export function speakableHe(t) {
   s = s.replace(/(\d)\.(\d)/g, '$1 נְקוּדָה $2')
     .replace(/%/g, ' אָחוּז').replace(/[+]/g, ' פְּלוּס ')
     .replace(/₪\s*([\d,]+)/g, '$1 שְׁקָלִים').replace(/\$\s*([\d.,]+)/g, '$1 דּוֹלָר')
-    .replace(/[·|•▪️]/g, ', ').replace(/[✓✗]/g, ' ')
+    .replace(/\s+[—–]\s+/g, ', ').replace(/[·|•▪️]/g, ', ').replace(/[✓✗]/g, ' ')
     .replace(/\s+([,.!?;:])/g, '$1').replace(/\s+/g, ' ').trim();
   if (s && !/[.!?…]$/.test(s)) s += '.';
   return s;
 }
 
 export async function sayAllHe(lines, dir) {
-  const req = { voice: HE_VOICE, rate: process.env.REEL_VOICE_HE_RATE || '+0%',
+  // A little breathing room for the Hebrew voice; can be adjusted without
+  // changing the script or displayed cards. Long lines still obey MAX_HOLD.
+  const req = { voice: HE_VOICE, rate: process.env.REEL_VOICE_HE_RATE || '-5%',
     lines: lines.map((t, i) => { const line = speakableHe(t); return line ? { text: line, out: join(dir, `say-${i}.wav`) } : {}; }) };
   const reqPath = join(dir, 'say-request.json');
   writeFileSync(reqPath, JSON.stringify(req));

@@ -14,6 +14,8 @@ test('prepares Hebrew abbreviations and English tickers for speech', () => {
 
 test('preserves meaningful punctuation and existing Hebrew vowels', () => {
   assert.equal(speakableHe('שָׁלוֹם, עולם?'), 'שָׁלוֹם, עולם?');
+  assert.equal(speakableHe('השוק עלה — המניות ירדו'), 'השוק עלה, המניות ירדו.');
+  assert.equal(speakableHe('ירד ב-1%'), 'ירד ב-1 אָחוּז.');
   assert.equal(speakableHe(''), '');
   assert.match(speakableHe('XYZ'), /אֶקְס וַואי זִי/);
 });
