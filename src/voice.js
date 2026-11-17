@@ -163,15 +163,43 @@ export async function haveHebrew() {
   catch { return false; }
 }
 
-/** What the voice is given: no markup, no symbols it would spell out. */
-export const speakableHe = t => String(t ?? '').replace(/<[^>]+>/g, ' ')
-  .replace(/S&P\s*500/g, 'אס אנד פי חמש מאות').replace(/S&P/g, 'אס אנד פי')
-  .replace(/(\d)\.(\d)/g, '$1 נקודה $2').replace(/%/g, ' אחוז').replace(/[+]/g, ' פלוס ')
-  .replace(/₪\s*([\d,]+)/g, '$1 שקלים').replace(/\$\s*([\d.,]+)/g, '$1 דולר')
-  .replace(/[·|•▪️✓✗"״]/g, ' ').replace(/\s+/g, ' ').trim();
+// Speech-only expansions. Do not vocalize ambiguous ordinary Hebrew words:
+// their correct ניקוד depends on context, and a wrong reading changes meaning.
+const HE_TERMS = [
+  [/ארה[״"׳']?ב/g, 'אַרְצוֹת הַבְּרִית'],
+  [/ת[״"׳']א(?=\s*\d)/g, 'תֵּל אָבִיב'],
+  [/אג[״"׳']ח/g, 'אִגְּרוֹת חוֹב'],
+  [/מט[״"׳']ח/g, 'מַטְבֵּעַ חוּץ'],
+  [/מנכ[״"׳']ל/g, 'מַנְכַּ״ל'],
+];
+const EN_TERMS = [
+  [/\bS\s*&\s*P\s*500\b/gi, 'אֶס אַנְד פִּי חֲמֵשׁ מֵאוֹת'],
+  [/\bS\s*&\s*P\b/gi, 'אֶס אַנְד פִּי'],
+  [/\bNASDAQ\b/gi, 'נַאסְדַ״ק'], [/\bNVDA\b/g, 'אֶן וִי דִּי אֵיי'],
+  [/\bNYSE\b/g, 'אֶן וַואי אֶס אִי'], [/\bETF\b/g, 'אִי טִי אֶף'],
+  [/\bGDP\b/g, 'ג׳י דִּי פִּי'], [/\bCPI\b/g, 'סִי פִּי אַיי'],
+  [/\bAI\b/g, 'אֵיי אַיי'], [/\bUSD\b/g, 'יוּ אֶס דִּי'],
+];
+const LETTERS = { A:'אֵיי', B:'בִּי', C:'סִי', D:'דִּי', E:'אִי', F:'אֶף', G:'ג׳י', H:'אֵייץ׳', I:'אַיי', J:'ג׳יי', K:'קֵיי', L:'אֶל', M:'אֶם', N:'אֶן', O:'אוֹ', P:'פִּי', Q:'קְיוּ', R:'אָר', S:'אֶס', T:'טִי', U:'יוּ', V:'וִי', W:'דַּבְּלְיוּ', X:'אֶקְס', Y:'וַואי', Z:'זִי' };
+
+/** Prepare narration without changing the text shown on the card. */
+export function speakableHe(t) {
+  let s = String(t ?? '').replace(/<[^>]+>/g, ' ');
+  for (const [pattern, spoken] of [...HE_TERMS, ...EN_TERMS]) s = s.replace(pattern, spoken);
+  // Unknown uppercase tickers/acronyms are read as letters; ordinary English
+  // words and mixed-case company names are left to the voice engine.
+  s = s.replace(/\b[A-Z]{2,6}\b/g, word => [...word].map(c => LETTERS[c]).join(' '));
+  s = s.replace(/(\d)\.(\d)/g, '$1 נְקוּדָה $2')
+    .replace(/%/g, ' אָחוּז').replace(/[+]/g, ' פְּלוּס ')
+    .replace(/₪\s*([\d,]+)/g, '$1 שְׁקָלִים').replace(/\$\s*([\d.,]+)/g, '$1 דּוֹלָר')
+    .replace(/[·|•▪️]/g, ', ').replace(/[✓✗]/g, ' ')
+    .replace(/\s+([,.!?;:])/g, '$1').replace(/\s+/g, ' ').trim();
+  if (s && !/[.!?…]$/.test(s)) s += '.';
+  return s;
+}
 
 export async function sayAllHe(lines, dir) {
-  const req = { voice: HE_VOICE, rate: process.env.REEL_VOICE_HE_RATE || '+6%',
+  const req = { voice: HE_VOICE, rate: process.env.REEL_VOICE_HE_RATE || '+0%',
     lines: lines.map((t, i) => { const line = speakableHe(t); return line ? { text: line, out: join(dir, `say-${i}.wav`) } : {}; }) };
   const reqPath = join(dir, 'say-request.json');
   writeFileSync(reqPath, JSON.stringify(req));
